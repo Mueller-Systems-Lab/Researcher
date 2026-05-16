@@ -135,8 +135,12 @@ http://localhost:8000
 Terminal 1: ollama serve
 Terminal 2: docker compose -f searxng/docker-compose.yml up -d
 Terminal 3: ./research-serve.sh qwen
-Terminal 4: python -m gpt_researcher --stream
+Terminal 4: ./scripts/start-researcher.sh    ← GPT Researcher + Dashboard
 ```
+
+**GPU-Dashboard:** Öffne `http://localhost:8888` im Browser, um GPU-Auslastung,
+VRAM-Verbrauch und Temperatur live zu überwachen. Das Dashboard startet
+automatisch mit `./scripts/start-researcher.sh`.
 
 ### research-serve.sh
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# start-researcher.sh — Startet GPT Researcher Web-UI
+# start-researcher.sh — Startet GPT Researcher Web-UI + Dashboard
 # ============================================================================
 # Voraussetzungen:
 #   1. Python-Venv aktiviert: source .venv/bin/activate
@@ -9,8 +9,9 @@
 #   4. SearXNG läuft: scripts/start-searxng.sh (optional, für Websuche)
 #
 # Nutzung:
-#   ./scripts/start-researcher.sh           # Startet Web-UI
-#   ./scripts/start-researcher.sh --check   # Prüft Konfiguration
+#   ./scripts/start-researcher.sh               # Startet Web-UI + Dashboard
+#   ./scripts/start-researcher.sh --check        # Prüft Konfiguration
+#   ./scripts/start-researcher.sh --no-dashboard # Ohne GPU-Dashboard
 # ============================================================================
 
 set -euo pipefail
@@ -86,9 +87,23 @@ start_ui() {
     echo ""
     echo "=== Starte GPT Researcher Web-UI ==="
     echo ""
-    echo "  URL: http://localhost:8000"
+    echo "  GPT Researcher: http://localhost:8000"
+    echo "  GPU-Dashboard:  http://localhost:8888"
     echo "  Drücke Ctrl+C zum Beenden"
     echo ""
+
+    # Dashboard im Hintergrund starten (wenn nicht deaktiviert)
+    if [ "${NO_DASHBOARD:-false}" != "true" ]; then
+        if [ -f "$SCRIPT_DIR/scripts/start-dashboard.sh" ]; then
+            echo "  Starte GPU-Dashboard (Port 8888)..."
+            DASHBOARD_PORT=8888 nohup "$SCRIPT_DIR/scripts/start-dashboard.sh" \
+                > /dev/null 2>&1 &
+            echo "  ✅ GPU-Dashboard gestartet"
+        else
+            check_warn "start-dashboard.sh nicht gefunden"
+        fi
+    fi
+
     python -m gpt_researcher "$@"
 }
 
@@ -96,6 +111,10 @@ start_ui() {
 case "${1:-}" in
     --check|-c)
         check_env
+        ;;
+    --no-dashboard)
+        NO_DASHBOARD=true
+        start_ui
         ;;
     --help|-h)
         echo ""
