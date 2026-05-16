@@ -42,6 +42,14 @@ check_env() {
         return 1
     fi
 
+    # Deterministischer Modus?
+    if [ "${RESEARCH_DETERMINISTIC:-false}" = "true" ]; then
+        echo ""
+        echo "  ⚙  DETERMINISTISCHER MODUS AKTIV"
+        echo "  ⚙  temperature=0 | seed=42 | reproduzierbar"
+        echo ""
+    fi
+
     # Python-Venv aktiv?
     if [ -n "${VIRTUAL_ENV:-}" ]; then
         check_ok "Python-Venv aktiv: $VIRTUAL_ENV"

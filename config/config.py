@@ -40,6 +40,43 @@ def suggest_env():
         print(f"  →  Passe die Werte in .env an deine Umgebung an.")
 
 
+def is_deterministic() -> bool:
+    """Prüft, ob der deterministische Modus aktiv ist.
+
+    Im deterministischen Modus:
+    - temperature=0 für reproduzierbare Ergebnisse
+    - Random Seeds fixiert
+    - Snapshots/Versionen eingefroren
+
+    Returns:
+        True wenn RESEARCH_DETERMINISTIC=true, sonst False.
+    """
+    return os.getenv("RESEARCH_DETERMINISTIC", "false").lower() in ("true", "1", "yes")
+
+
+def apply_deterministic_config():
+    """Wendet die deterministische Konfiguration an.
+
+    Setzt Umgebungsvariablen für GPT Researcher, die Reproduzierbarkeit
+    sicherstellen. Sollte VOR dem Start von gpt_researcher aufgerufen werden.
+    """
+    if not is_deterministic():
+        return
+
+    # Temperatur = 0 für deterministische LLM-Antworten
+    os.environ.setdefault("LLM_TEMPERATURE", "0")
+    os.environ.setdefault("TEMPERATURE", "0")
+    # Top-P = 1 (kein Sampling)
+    os.environ.setdefault("LLM_TOP_P", "1")
+    # Seed fixieren für Reproduzierbarkeit
+    os.environ.setdefault("LLM_SEED", "42")
+
+    # GPT Researcher spezifisch (v0.14.8)
+    os.environ.setdefault("FAST_LLM_TEMPERATURE", "0")
+    os.environ.setdefault("SMART_LLM_TEMPERATURE", "0")
+    os.environ.setdefault("STRATEGIC_LLM_TEMPERATURE", "0")
+
+
 def print_config():
     """Gibt die aktuelle Konfiguration aus (ohne Secrets)."""
     print("=" * 60)
@@ -55,4 +92,8 @@ def print_config():
     print(
         f"  CHROMA_DB:       {os.getenv('CHROMA_PERSIST_DIRECTORY', 'nicht gesetzt')}"
     )
+    print(f"  DETERMINISTIC:   {os.getenv('RESEARCH_DETERMINISTIC', 'false')}")
+    if is_deterministic():
+        print(f"  TEMPERATURE:     0 (fixiert)")
+        print(f"  LLM_SEED:        42 (fixiert)")
     print("=" * 60)
