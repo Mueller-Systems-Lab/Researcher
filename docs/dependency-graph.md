@@ -65,7 +65,7 @@ Geschätzte Dauer: 2×medium + 1×medium + 1×medium + 1×small ≈ **18 h**
 | Komponente | Typ | Verfügbarkeit | Risiko |
 |---|---|---|---|
 | GPT Researcher (upstream) | Git-Repository | github.com/assafelovic/gpt-researcher | 🟢 Fork möglich |
-| Qwen3-8B-Uncensored GGUF | Modell-Datei | Hugging Face (fiktiv) | 🟡 Alternativmodell nötig |
+| Qwen3.5-9B-Uncensored-HauhauCS-Aggressive GGUF | Modell-Datei | Hugging Face (fiktiv) | 🟡 Alternativmodell nötig |
 | nomic-embed-text | Ollama-Modell | ollama.com/library | 🟢 Verfügbar |
 | SearXNG Docker Image | Container | Docker Hub | 🟢 Verfügbar |
 | Tor | System-Paket | Paketmanager | 🟢 Verfügbar |

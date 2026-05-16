@@ -22,7 +22,7 @@
           │                       │                   │
  ┌────────▼───────┐    ┌─────────▼──────┐    ┌───────▼──────┐
  │ Composite Search│    │ LLM (Ollama)  │    │ ChromaDB     │
- │ (SearXNG +     │    │ Qwen3-8B      │    │ (w/ nomic-   │
+ │ (SearXNG +     │    │ Qwen3.5-9B    │    │ (w/ nomic-   │
  │  Darknet)      │    │ local GPU     │    │ embed-text)  │
  └────────┬───────┘    └───────┬────────┘    └───────▲──────┘
           │                    │                     │

@@ -7,7 +7,7 @@
 
 ## Zusammenfassung
 
-Der Blueprint beschreibt den Aufbau eines vollständig lokalen, unzensierten Recherche-Assistenten auf Basis von GPT Researcher. Das System läuft auf einer NVIDIA GeForce GTX 1070 (8 GB VRAM), nutzt ein unzensiertes LLM (Qwen3-8B), integriert SearXNG für Websuche und einen eigenen Darknet-Forum-Crawler. Wissen wird in einer ChromaDB-Vektordatenbank persistiert.
+Der Blueprint beschreibt den Aufbau eines vollständig lokalen, unzensierten Recherche-Assistenten auf Basis von GPT Researcher. Das System läuft auf einer NVIDIA GeForce GTX 1070 (8 GB VRAM), nutzt ein unzensiertes LLM (Qwen3.5-9B), integriert SearXNG für Websuche und einen eigenen Darknet-Forum-Crawler. Wissen wird in einer ChromaDB-Vektordatenbank persistiert.
 
 ## Blueprint-Vollständigkeitsprüfung
 
@@ -25,9 +25,9 @@ Der Blueprint beschreibt den Aufbau eines vollständig lokalen, unzensierten Rec
 
 ## Kernkomponenten
 
-### 1. LLM-Service (Ollama + Qwen3-8B-Uncensored)
+### 1. LLM-Service (Ollama + Qwen3.5-9B-Uncensored-HauhauCS-Aggressive)
 - **Betrieb:** Ollama Server auf `localhost:11434`
-- **Modell:** Qwen3-8B-Instruct-Uncensored (Abliterated), Q4_K_M GGUF
+- **Modell:** Qwen3.5-9B-Instruct-Uncensored (Abliterated), Q4_K_M GGUF
 - **VRAM:** ~4.8 GB (Modell) + ~1 GB (KV-Cache bei ctx=4096) ≈ 5.8 GB / 8 GB
 - **Template:** ChatML-Format mit `<|system|>`, `<|user|>`, `<|assistant|>` Tokens
 - **Temperatur:** 0.7, Top-P: 0.9
@@ -63,7 +63,7 @@ Der Blueprint beschreibt den Aufbau eines vollständig lokalen, unzensierten Rec
 | **VRAM-Überlauf** – LLM (4.8 GB) + KV-Cache (1 GB) + Embedding (wenn GPU) = > 8 GB | 🔴 Hoch – Gegenmaßnahmen: Embedding auf CPU, num_ctx=4096, MAX_CONCURRENT=1 |
 | **Darknet-Crawler-Blocking** – Forum erkennt und blockiert Crawler | 🟡 Mittel – Gegenmaßnahmen: Crawl-Pausen, User-Agent-Rotation |
 | **Rechtliche Risiken Darknet** – Crawlen/Speichern illegaler Inhalte | 🔴 Kritisch – Gegenmaßnahmen: Fachanwalt konsultieren, Wegwerf-Account, Isolation |
-| **Modell-Verfügbarkeit** – Qwen3-8B-Uncensored ist fiktiv | 🟡 Mittel – Gegenmaßnahmen: Alternatives unzensiertes 7B-Modell (z.B. Dolphin-Mistral) |
+| **Modell-Verfügbarkeit** – Qwen3.5-9B-Uncensored-HauhauCS-Aggressive ist fiktiv | 🟡 Mittel – Gegenmaßnahmen: Alternatives unzensiertes 7B-Modell (z.B. Dolphin-Mistral) |
 | **SearXNG-Kompatibilität** – API-Änderungen in neueren Versionen | 🟢 Niedrig – Gegenmaßnahmen: Version pinnen |
 | **ChromaDB-Speicherüberlauf** – Wachsender Embedding-Speicher | 🟢 Niedrig – Gegenmaßnahmen: Persistenz auf Disk, regelmäßige Optimierung |
 

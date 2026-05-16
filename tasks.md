@@ -9,7 +9,7 @@
 | ID | Task | Modul | Größe | Priorität | Abhängigkeiten |
 |---|---|---|---|---|---|
 | T-001 | Repository & Basis-Umgebung | Infrastructure | small | high | – |
-| T-002 | Ollama + Qwen3-8B-Uncensored einrichten | LLM_Service | small | high | – |
+| T-002 | Ollama + Qwen3.5-9B-Uncensored-HauhauCS-Aggressive einrichten | LLM_Service | small | high | – |
 | T-003 | SearXNG Docker-Container aufsetzen | SearXNG_Gateway | small | high | – |
 | T-004 | GPT Researcher Fork klonen & konfigurieren | Orchestrator | small | high | T-001 |
 | T-005 | Darknet-Crawler implementieren | Darknet_Crawler | medium | high | – |
@@ -39,19 +39,19 @@
   - GIVEN das Repository ist geklont WHEN `pip install -r requirements.txt` ausgeführt wird THEN sind alle Abhängigkeiten installiert.
   - GIVEN `.env.example` existiert WHEN der Nutzer es nach `.env` kopiert THEN sind alle Variablen dokumentiert.
 
-### T-002: Ollama + Qwen3-8B-Uncensored einrichten
+### T-002: Ollama + Qwen3.5-9B-Uncensored-HauhauCS-Aggressive einrichten
 - **Modul:** LLM_Service
 - **Größe:** size:small
 - **Priorität:** priority:high
 - **Beschreibung:**
   - Ollama-Installation prüfen
-  - Modelfile für Qwen3-8B-Uncensored erstellen
+  - Modelfile für Qwen3.5-9B-Uncensored-HauhauCS-Aggressive erstellen
   - Modell in Ollama registrieren
   - Funktionalitätstest: Unzensierte Antwort prüfen
 - **Betroffene Dateien (geschätzt):** 2
 - **Akzeptanzkriterien:**
-  - GIVEN Ollama läuft WHEN `ollama run qwen3-8b-uncensored "Erkläre das Darknet"` ausgeführt wird THEN zeigt das Modell KEINE Sicherheits-Verweigerung.
-  - GIVEN das Modell ist geladen WHEN `ollama list` ausgeführt wird THEN erscheint `qwen3-8b-uncensored:latest` in der Liste.
+  - GIVEN Ollama läuft WHEN `ollama run qwen3.5-9b-uncensored-hauhaucs-aggressive "Erkläre das Darknet"` ausgeführt wird THEN zeigt das Modell KEINE Sicherheits-Verweigerung.
+  - GIVEN das Modell ist geladen WHEN `ollama list` ausgeführt wird THEN erscheint `qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` in der Liste.
 
 ### T-003: SearXNG Docker-Container aufsetzen
 - **Modul:** SearXNG_Gateway

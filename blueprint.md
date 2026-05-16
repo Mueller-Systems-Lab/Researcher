@@ -5,21 +5,21 @@ Dieser Blueprint beschreibt den Aufbau eines vollständig lokalen und kostenfrei
 Modell‑Empfehlung
 Für den Betrieb in 4‑Bit‑Quantisierung (Q4_K_M) ist ein Modell mit 7‑8 Mrd. Parametern optimal, das ca. 4,5–5 GB VRAM belegt und ausreichend Platz für KV‑Cache und Kontext lässt. Aufgrund des geforderten Veröffentlichungsdatums (September 2025 oder später) wird ein fiktives, aber realistisch erscheinendes Modell angenommen, das auf aktuellen Trends basiert:
 
-📌 Qwen3‑8B‑Instruct‑Uncensored (Abliterated)
+📌 Qwen3.5‑9B‑Uncensored‑HauhauCS‑Aggressive (Abliterated)
 
-8 Mrd. Parameter
+9 Mrd. Parameter
 Vollständig unzensierter Finetune (z. B. durch Abliteration nach dem FailSpy‑Verfahren oder einen Dolphin‑Style‑Finetune)
-Verfügbar als GGUF‑Datei auf Hugging Face, z. B. cognitivecomputations/Qwen3‑8B‑Uncensored‑GGUF
+Verfügbar als GGUF‑Datei auf Hugging Face, z. B. cognitivecomputations/Qwen3.5‑9B‑Uncensored‑HauhauCS‑Aggressive‑GGUF
 Größe in Q4_K_M: ca. 4,8 GB
 Deployment via Ollama
 
 Ollama installieren: curl -fsSL https://ollama.com/install.sh | sh
 Modell als GGUF herunterladen und in das Ollama‑Blob‑Verzeichnis legen, oder direkt aus Hugging Face laden. Beispiel mit ollama create:
-Modelfile (Modelfile.qwen3-uncensored)
+Modelfile (Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive)
 
 Dockerfile
 
-FROM ./Qwen3-8B-Uncensored-Q4_K_M.gguf
+FROM ./Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf
 
 TEMPLATE """<|system|>
 {{ .System }}</s>
@@ -38,14 +38,14 @@ PARAMETER stop "</s>"
 Erstellen des Modells in Ollama:
 Bash
 
-ollama create qwen3-8b-uncensored -f Modelfile.qwen3-uncensored
-Test: ollama run qwen3-8b-uncensored "Erkläre das Darknet"
+ollama create qwen3.5-9b-uncensored-hauhaucs-aggressive -f Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive
+Test: ollama run qwen3.5-9b-uncensored-hauhaucs-aggressive "Erkläre das Darknet"
 (Das Modell darf keinerlei Sicherheits‑Verweigerungen zeigen.)
 Alternativ mit llama.cpp (für mehr Kontrolle)
 
 Bash
 
-./llama-server -m Qwen3-8B-Uncensored-Q4_K_M.gguf \
+./llama-server -m Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf \
   --n-gpu-layers 35 --ctx-size 4096 --chat-template chatml \
   --port 8081
 2. Integration der offenen Websuche via SearXNG
@@ -253,7 +253,7 @@ text
               │                   │                   │
      ┌────────▼───────┐  ┌───────▼────────┐  ┌───────▼──────┐
      │ Composite Search│  │   LLM (Ollama) │  │ ChromaDB     │
-     │ (SearXNG +     │  │ Qwen3-8B       │  │ (w/ nomic-   │
+     │ (SearXNG +     │  │ Qwen3.5-9B     │  │ (w/ nomic-   │
      │  Darknet)      │  │ local GPU      │  │ embed-text)  │
      └────────┬───────┘  └───────┬────────┘  └───────▲──────┘
               │                  │                   │
@@ -271,7 +271,7 @@ Bash
 # LLM
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-LLM_MODEL=qwen3-8b-uncensored:latest
+LLM_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive:latest
 
 # Web-Suche
 RETRIEVER=custom          # wir nutzen unseren CompositeRetriever
@@ -308,7 +308,7 @@ Ollama installieren & Modell bereitstellen
 
 Ollama installieren
 GGUF‑Datei platzieren, Modelfile erstellen, ollama create …
-Test: ollama run qwen3-8b-uncensored:latest
+Test: ollama run qwen3.5-9b-uncensored-hauhaucs-aggressive:latest
 SearXNG starten
 
 Bash

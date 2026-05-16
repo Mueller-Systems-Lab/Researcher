@@ -17,7 +17,7 @@ GPT Researcher (`assafelovic/gpt-researcher`) ist das Orchestrator-Framework. Es
 ## Architekturregeln
 - `LLM_PROVIDER=ollama`
 - `OLLAMA_BASE_URL=http://localhost:11434`
-- `LLM_MODEL=qwen3-8b-uncensored:latest`
+- `LLM_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive:latest`
 - `RETRIEVER=searx` (vorerst, bis CompositeRetriever in T-007 implementiert ist)
 - `SEARX_URL=http://localhost:8080`
 - `EMBEDDING_PROVIDER=ollama`

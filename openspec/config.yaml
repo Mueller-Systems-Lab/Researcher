@@ -10,7 +10,7 @@ project:
   name: "Lokales, unzensiertes Research-System"
   description: >
     Vollständig lokaler, kostenfreier Recherche-Assistent auf Basis von
-    GPT Researcher. Nutzt ein unzensiertes LLM (Qwen3-8B), integriert
+    GPT Researcher. Nutzt ein unzensiertes LLM (Qwen3.5-9B), integriert
     SearXNG für Websuche und einen eigenen Darknet-Forum-Crawler.
     Speichert Wissen in einer ChromaDB-Vektordatenbank.
   repository: "https://github.com/xxammaxx/Researcher"
@@ -21,7 +21,7 @@ project:
 stack:
   llm:
     provider: ollama
-    model: "qwen3-8b-uncensored:latest"
+    model: "qwen3.5-9b-uncensored-hauhaucs-aggressive:latest"
     quantization: "Q4_K_M"
     context_size: 4096
     vram_limit: "8 GB (GTX 1070)"

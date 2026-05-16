@@ -14,7 +14,7 @@
 │               │ Composite     │ + Embedding   │ Crawler  │
 ├───────────────┤               │               │          │
 │ - Ollama API  │ ┌─────────────┤ - ChromaDB    │ - Tor    │
-│ - Qwen3-8B    │ │ SearXNG_    │ - nomic-embed │ - Login  │
+│ - Qwen3.5-9B  │ │ SearXNG_    │ - nomic-embed │ - Login  │
 │ - GPU Mgmt    │ │ Gateway     │               │ - Parser │
 │ - VRAM Tuning │ │             │               │ - Cron   │
 │               │ │ - Docker    │               │          │
@@ -41,11 +41,11 @@
 | Attribut | Wert |
 |---|---|
 | **Verantwortung** | Textgenerierung, Report-Erstellung |
-| **Technologie** | Ollama Server, Qwen3-8B-Uncensored GGUF |
+| **Technologie** | Ollama Server, Qwen3.5-9B-Uncensored-HauhauCS-Aggressive GGUF |
 | **Schnittstelle** | REST API `localhost:11434` |
 | **Abhängigkeiten** | Keine (externer Dienst) |
 | **Kritikalität** | 🔴 Systemkritisch – ohne LLM keine Reports |
-| **Dateien** | `Modelfile.qwen3-uncensored`, Ollama-Konfiguration |
+| **Dateien** | `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive`, Ollama-Konfiguration |
 
 ### Search_Composite
 | Attribut | Wert |

@@ -96,7 +96,7 @@
 
 ### Tests Run
 - `pytest tests/test_<name>.py` ✅
-- `ollama run qwen3-8b-uncensored "test"` ✅
+- `ollama run qwen3.5-9b-uncensored-hauhaucs-aggressive "test"` ✅
 
 ### Result
 <Pass/Fail Zusammenfassung>

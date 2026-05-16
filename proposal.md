@@ -30,7 +30,7 @@ laufen ohne externe API-Aufrufe.
 ## Ziele
 
 1. GPT Researcher lokal zum Laufen bringen (Fork + Anpassungen)
-2. Unzensiertes LLM (Qwen3-8B-Uncensored) in Ollama bereitstellen
+2. Unzensiertes LLM (Qwen3.5-9B-Uncensored-HauhauCS-Aggressive) in Ollama bereitstellen
 3. SearXNG als lokale Websuche-Engine integrieren
 4. Darknet-Forum-Crawler mit Whoosh-Volltextindex entwickeln
 5. CompositeRetriever für parallele Suche (Web + Darknet) implementieren

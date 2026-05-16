@@ -1,42 +1,89 @@
-# Changelog – Iteration 1 (Planung)
+# Changelog – Iteration 1
 
 ## Metadaten
+
 - **Datum:** 2026-05-16
-- **Typ:** Erster Durchlauf – Analyse & Planung
-- **Kein produktiver Code**
+- **Typ:** Erste Projektiteration – Spezifikation, Infrastruktur, Ollama und Dokumentation
+- **Bereich:** Planung, Setup, Betriebsdoku
 
-## Erstellte Artefakte
+## Git-Commits dieser Iteration
 
-### OpenSpec
-- `openspec/config.yaml` – OpenSpec-Konfiguration (Deutsch, Extended Workflow)
-- `proposal.md` – Projektvorschlag mit Zielen, Risiken, Akzeptanzkriterien
-- `specs/delta-specs.md` – Delta-Spezifikationen (SPEC-001 bis SPEC-007)
-- `design.md` – Technisches Design mit ADRs, Datenfluss, Schnittstellen
-- `tasks.md` – Aufgabenzerlegung (T-001 bis T-011)
+| Commit | Änderung |
+|---|---|
+| `e6f8be9` | `spec: Erster Durchlauf – OpenSpec-Artefakte, Dokumentation, 11 GitHub-Issues` |
+| `1540494` | `feat(infrastructure): add .env.example and requirements.txt for T-001` |
+| `5015181` | `feat(ollama): add Qwen3.5-9B-Uncensored-HauhauCS-Aggressive model setup (T-002)` |
+
+## Task-Status (T-001 bis T-011)
+
+| Task | Status | Bemerkung |
+|---|---|---|
+| T-001 | abgeschlossen | Basis-Umgebung, `.env.example`, `requirements.txt` |
+| T-002 | abgeschlossen | Ollama-/Qwen3.5-Setup über Modelfile |
+| T-003 | offen | SearXNG-Docker-Setup |
+| T-004 | offen | GPT-Researcher-Fork konfigurieren |
+| T-005 | offen | Darknet-Crawler implementieren |
+| T-006 | offen | Whoosh-Index + DarknetRetriever |
+| T-007 | offen | CompositeRetriever |
+| T-008 | offen | ChromaDB + Embeddings |
+| T-009 | offen | VRAM-Optimierungen |
+| T-010 | offen | Integrationstests & Systemvalidierung |
+| T-011 | abgeschlossen | README, Troubleshooting und Changelog finalisiert |
+
+## Erstellte Dateien und Artefakte
+
+### Projektgrundlage
+
+- `openspec/config.yaml`
+- `proposal.md`
+- `specs/delta-specs.md`
+- `design.md`
+- `tasks.md`
+- `blueprint.md`
 
 ### Dokumentation
-- `docs/architecture.md` – Architekturdokumentation (C4, Sequenzdiagramme)
-- `docs/blueprint-analysis.md` – Blueprint-Vollständigkeitsprüfung und Analyse
-- `docs/module-map.md` – Modul-Steckbriefe und Abhängigkeitsmatrix
-- `docs/dependency-graph.md` – Task-DAG und kritischer Pfad
-- `docs/integration-plan.md` – Vertikale Integrationsstrategie
-- `docs/workflows/issue-resolution.md` – Issue-Workflow und Templates
 
-### Prompts
-- `docs/prompts/issues/issue-<id>.md` – Initialprompts für jedes Issue (wird mit Issues erstellt)
+- `docs/architecture.md`
+- `docs/blueprint-analysis.md`
+- `docs/module-map.md`
+- `docs/dependency-graph.md`
+- `docs/integration-plan.md`
+- `docs/workflows/issue-resolution.md`
+- `README.md`
+- `docs/troubleshooting.md`
+- `docs/changelog/iteration-1.md`
 
-## Nächste Schritte
+### Issue-Prompts
 
-1. GitHub Issues aus `tasks.md` generieren
-2. Prompt-Dateien für jedes Issue erstellen
-3. Alles committen und pushen
-4. Prompt für **Issue #1 (T-001)** ausgeben
+- `docs/prompts/issues/issue-1.md` bis `docs/prompts/issues/issue-11.md`
 
-## Statistiken
+### Laufzeit- und Infrastrukturdateien
 
-- **Blueprint-Größe:** 649 Zeilen
-- **Spezifikationen:** 7 Delta-Specs
-- **Tasks:** 11
-- **Module:** 9
-- **Geschätzte Gesamtzeit:** ~32 h
-- **Kritischer Pfad:** ~18 h
+- `.env.example`
+- `requirements.txt`
+- `.gitignore`
+- `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive`
+- `research-serve.sh`
+- `serve_qwen3.5_uncensored.sh`
+
+## Implementierte Features / Komponenten
+
+- Lokales LLM-Setup mit Ollama und Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+- Lokales Embedding-Setup mit `nomic-embed-text`
+- Lokale Websuche über SearXNG
+- Modellserver-Verwaltung per `research-serve.sh`
+- Direktstart des Qwen3.5-Servers per `serve_qwen3.5_uncensored.sh`
+- Architektur- und Betriebsdokumentation für das komplette lokale Research-System
+
+## Offene Punkte / Bekannte Einschränkungen
+
+- T-003 bis T-010 sind im Git-Log noch nicht als fertige Implementierung sichtbar.
+- Auf der GTX 1070 sollte immer nur ein Modellserver gleichzeitig laufen.
+- Embeddings sind CPU-basiert und dürfen die GPU nicht verdrängen.
+- Der Darknet-Crawler benötigt Tor und eine gesonderte rechtliche Prüfung.
+- Alle hier gelisteten Commits sind die im lokalen Git-Log nachvollziehbaren Änderungen dieser Iteration.
+
+## Status
+
+- Dokumentation dieser Iteration ist abgeschlossen.
+- Die funktionalen Implementierungen außerhalb von T-001 und T-002 sind im Repository-Log noch nicht belegt.

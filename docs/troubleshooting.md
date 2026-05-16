@@ -1,0 +1,44 @@
+# Troubleshooting
+
+## Schnelle Diagnose
+
+Wenn eine Recherche fehlschlägt, prüfe zuerst diese Komponenten in Reihenfolge:
+
+1. `ollama serve`
+2. SearXNG-Container
+3. Modellserver auf Port `8085` oder `8086`
+4. Tor auf `9050`
+5. GPT Researcher Web-UI
+
+## Häufige Fehler
+
+| Fehler | Woran erkennbar? | Wahrscheinliche Ursache | Lösung | Prävention |
+|---|---|---|---|---|
+| Ollama nicht gestartet | `ollama list` oder Modellaufrufe schlagen sofort fehl | `ollama serve` läuft nicht | 1. `ollama serve` starten.<br>2. In einem zweiten Terminal `ollama list` prüfen.<br>3. Danach Recherche neu starten. | Ollama vor der Web-UI starten. |
+| Modell nicht gefunden | `ollama list` zeigt das Modell nicht | Modell nicht registriert | 1. `ollama list` prüfen.<br>2. Falls nötig `ollama create qwen3.5-9b-uncensored-hauhaucs-aggressive -f Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive` ausführen.<br>3. Modell erneut testen. | Nach jedem Import `ollama list` prüfen. |
+| SearXNG nicht erreichbar (Connection refused :8080) | `curl http://localhost:8080/...` bricht ab | Container läuft nicht oder ist abgestürzt | 1. `docker ps` prüfen.<br>2. Container neu starten.<br>3. Erreichbarkeit mit `curl http://localhost:8080/search?q=test&format=json` testen. | SearXNG vor der Recherche starten und Port lokal binden. |
+| Port 8085/8086 belegt | Start des Modellservers endet mit Port-Fehler | Ein anderer Prozess blockiert den Port | 1. `lsof -ti :8085` oder `lsof -ti :8086` ausführen.<br>2. PID mit `kill <PID>` beenden.<br>3. Falls nötig `kill -9 <PID>`.<br>4. Server neu starten. | Vor dem Start `./research-serve.sh status` ausführen. |
+| VRAM-Überlauf (OOM / CUDA Out of Memory) | Abbruch bei langen Antworten oder Modellstart | `num_ctx` zu groß, Modell zu groß, parallele Anfragen | 1. `num_ctx` auf `4096` setzen.<br>2. `MAX_CONCURRENT_REQUESTS=1` setzen.<br>3. `OLLAMA_NUM_PARALLEL=1` setzen.<br>4. Andere Modellserver stoppen und erneut testen. | Auf GTX 1070 nur einen Modellserver gleichzeitig betreiben. |
+| Darknet-Index leer | Darknet-Suchergebnisse fehlen komplett | Kein Crawler-Lauf ausgeführt | 1. Crawler starten.<br>2. Forum-Login prüfen.<br>3. Indexpfad `DARKNET_INDEX_PATH` kontrollieren.<br>4. Neu indexieren. | Crawler regelmäßig per Cron/Job ausführen. |
+| Tor-Verbindung fehlschlägt | Crawler meldet Proxy-/Timeout-Fehler | Tor läuft nicht auf `:9050` | 1. `systemctl start tor` ausführen.<br>2. Prüfen, ob `127.0.0.1:9050` erreichbar ist.<br>3. Crawler erneut starten. | Tor vor dem Crawler starten. |
+| GPT Researcher Web-UI startet nicht | Python-Prozess endet mit Import- oder Modulfehlern | Fehlende Abhängigkeiten oder falsche Python-Version | 1. Python-Version prüfen (`>=3.11`).<br>2. `pip install -r requirements.txt` ausführen.<br>3. Virtuelle Umgebung aktivieren und erneut starten. | Immer aus der aktiven `.venv` heraus arbeiten. |
+| `requests.exceptions.ConnectionError` bei SearXNG | Recherche bricht beim Suchen ab | SearXNG nicht gestartet oder falsche URL | 1. `SEARX_URL` in `.env` prüfen.<br>2. SearXNG-Container kontrollieren.<br>3. `curl`-Test gegen die konfigurierte URL ausführen. | `.env` nach Änderungen neu laden und testen. |
+| `ollama: command not found` | Der Shell-Befehl ist nicht verfügbar | Ollama nicht installiert | 1. Ollama installieren, z. B. mit `curl -fsSL https://ollama.com/install.sh | sh`.<br>2. Neues Terminal öffnen.<br>3. `ollama serve` erneut starten. | Installation direkt nach der Systemeinrichtung prüfen. |
+| Docker-Container startet nicht | `docker run` schlägt fehl oder Container beendet sich sofort | Docker nicht installiert oder Dienst nicht aktiv | 1. Docker installieren oder Dienst starten.<br>2. `sudo systemctl start docker` ausführen.<br>3. SearXNG-Container neu starten. | Vor dem SearXNG-Start `docker ps` prüfen. |
+| Keine Ergebnisse in der Recherche | Bericht bleibt leer oder sehr kurz | Keine Such-Backends verfügbar | 1. Ollama, SearXNG, Tor und den Darknet-Index prüfen.<br>2. `./research-serve.sh status` ausführen.<br>3. CompositeRetriever-Logs kontrollieren.<br>4. Danach erneut suchen. | Vor einer Recherche alle Backends kurz testen. |
+
+## Zusätzliche Prüfkommandos
+
+```bash
+ollama list
+./research-serve.sh status
+docker ps
+curl http://localhost:8080/search?q=test&format=json
+```
+
+## Wenn nichts hilft
+
+1. Alle Modellserver stoppen: `./research-serve.sh stop`
+2. SearXNG und Ollama neu starten
+3. Das Problem mit den letzten Logmeldungen eingrenzen
+4. Erst danach die Recherche erneut starten

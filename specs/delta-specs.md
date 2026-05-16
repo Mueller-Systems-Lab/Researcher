@@ -7,7 +7,7 @@
 
 ---
 
-## SPEC-001: LLM-Integration (Ollama + Qwen3-8B-Uncensored)
+## SPEC-001: LLM-Integration (Ollama + Qwen3.5-9B-Uncensored-HauhauCS-Aggressive)
 
 ### HINZUGEFÜGT
 
