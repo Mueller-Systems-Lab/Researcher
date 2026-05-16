@@ -85,26 +85,21 @@ check_env() {
 
 start_ui() {
     echo ""
-    echo "=== Starte GPT Researcher Web-UI ==="
+    echo "=== Starte Researcher (GPT Researcher + GPU Dashboard) ==="
     echo ""
-    echo "  GPT Researcher: http://localhost:8000"
-    echo "  GPU-Dashboard:  http://localhost:8888"
+    echo "  Researcher:     http://localhost:8000"
+    echo "  GPU-Dashboard:  http://localhost:8000/dashboard"
+    echo "  GPU-Daten:      http://localhost:8000/dashboard/api/gpu"
     echo "  Drücke Ctrl+C zum Beenden"
     echo ""
 
-    # Dashboard im Hintergrund starten (wenn nicht deaktiviert)
-    if [ "${NO_DASHBOARD:-false}" != "true" ]; then
-        if [ -f "$SCRIPT_DIR/scripts/start-dashboard.sh" ]; then
-            echo "  Starte GPU-Dashboard (Port 8888)..."
-            DASHBOARD_PORT=8888 nohup "$SCRIPT_DIR/scripts/start-dashboard.sh" \
-                > /dev/null 2>&1 &
-            echo "  ✅ GPU-Dashboard gestartet"
-        else
-            check_warn "start-dashboard.sh nicht gefunden"
-        fi
+    # Dashboard deaktivieren?
+    DASHBOARD_FLAG=""
+    if [ "${NO_DASHBOARD:-false}" = "true" ]; then
+        DASHBOARD_FLAG="--no-gpu"
     fi
 
-    python -m gpt_researcher "$@"
+    python "$SCRIPT_DIR/scripts/start-with-dashboard.py" $DASHBOARD_FLAG "$@"
 }
 
 # ---- Main ----

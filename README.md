@@ -138,9 +138,14 @@ Terminal 3: ./research-serve.sh qwen
 Terminal 4: ./scripts/start-researcher.sh    ← GPT Researcher + Dashboard
 ```
 
-**GPU-Dashboard:** Öffne `http://localhost:8888` im Browser, um GPU-Auslastung,
-VRAM-Verbrauch und Temperatur live zu überwachen. Das Dashboard startet
-automatisch mit `./scripts/start-researcher.sh`.
+**GPU-Dashboard:** Öffne `http://localhost:8000/dashboard` im Browser, um
+GPU-Auslastung, VRAM-Verbrauch und Temperatur live zu überwachen.
+Das Dashboard ist direkt in die GPT-Researcher-Web-UI eingebettet.
+
+Dashboard ohne GPU-Überwachung starten:
+```bash
+./scripts/start-researcher.sh --no-dashboard
+```
 
 ### research-serve.sh
 
