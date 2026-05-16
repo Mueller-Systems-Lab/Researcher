@@ -1,0 +1,156 @@
+# OpenSpec Konfiguration – Lokales Research-System
+# Generiert am 2026-05-16
+
+schema: spec-driven
+language: de
+workflow: opsx-extended
+
+# ─── Projektinformationen aus Blueprint ─────────────────────────────────────
+project:
+  name: "Lokales, unzensiertes Research-System"
+  description: >
+    Vollständig lokaler, kostenfreier Recherche-Assistent auf Basis von
+    GPT Researcher. Nutzt ein unzensiertes LLM (Qwen3-8B), integriert
+    SearXNG für Websuche und einen eigenen Darknet-Forum-Crawler.
+    Speichert Wissen in einer ChromaDB-Vektordatenbank.
+  repository: "https://github.com/xxammaxx/Researcher"
+  branch: "main"
+  blueprint: "blueprint.md"
+
+# ─── Technologie-Stack ───────────────────────────────────────────────────────
+stack:
+  llm:
+    provider: ollama
+    model: "qwen3-8b-uncensored:latest"
+    quantization: "Q4_K_M"
+    context_size: 4096
+    vram_limit: "8 GB (GTX 1070)"
+  search:
+    web: "SearXNG (self-hosted, Docker)"
+    darknet: "Eigener Crawler + Whoosh-Index"
+    retriever: "CompositeRetriever (SearXNG + DarknetRetriever)"
+  embeddings:
+    provider: ollama
+    model: "nomic-embed-text:latest"
+    vector_db: "ChromaDB (persistent)"
+  orchestration:
+    framework: "GPT Researcher (Fork)"
+    language: "Python 3.12"
+  infrastructure:
+    tor: "SOCKS5 proxy (127.0.0.1:9050)"
+    docker: "SearXNG container"
+    scheduler: "Cron (Darknet-Crawler)"
+
+# ─── Architekturregeln ───────────────────────────────────────────────────────
+architecture:
+  pattern: "Orchestrator + Composite-Retriever + Vektordatenbank-Pipeline"
+  principles:
+    - "Alles lokal – keine externen API-Aufrufe"
+    - "GPU exklusiv für LLM – Embeddings auf CPU"
+    - "Composite-Retriever: parallele Suche in SearXNG + Darknet-Index"
+    - "Isolation: SearXNG nur an 127.0.0.1 binden"
+    - "Kapselung: Jeder Retriever implementiert die abstrakte Retriever-Klasse"
+    - "Immutable Knowledge: ChromaDB als persistenter Wissensspeicher"
+  modules:
+    - name: "LLM_Service"
+      interface: "Ollama REST API (localhost:11434)"
+      responsibility: "Textgenerierung, Report-Erstellung"
+    - name: "Search_Composite"
+      interface: "CompositeRetriever.search(query, max_results)"
+      responsibility: "Parallele Suche in SearXNG + Darknet-Index, Deduplizierung"
+    - name: "SearXNG_Gateway"
+      interface: "SearXNG JSON-API (localhost:8080)"
+      responsibility: "Öffentliche Websuche"
+    - name: "Darknet_Search"
+      interface: "DarknetRetriever.search(query, max_results)"
+      responsibility: "Volltextsuche im Whoosh-Index, synthetische URIs"
+    - name: "Darknet_Crawler"
+      interface: "Cron-Job, Tor SOCKS5"
+      responsibility: "Forum-Crawling, Login, HTML→Text, Index-Befüllung"
+    - name: "Vector_Store"
+      interface: "ChromaDB HTTP API"
+      responsibility: "Embedding-Speicherung, Ähnlichkeitssuche"
+    - name: "Embedding_Service"
+      interface: "Ollama Embedding API"
+      responsibility: "Text→Vektor-Transformation (CPU)"
+    - name: "Orchestrator"
+      interface: "GPT Researcher conduct_research()"
+      responsibility: "Forschungsablauf, Subtopics, Report-Generierung"
+
+# ─── Projektregeln ───────────────────────────────────────────────────────────
+project_rules:
+  vcs: "Git + GitHub"
+  commit_convention: "docs:|spec:|feat:|fix:|refactor:|test:|chore:"
+  branch_strategy: "main (Trunk-based)"
+  review_required: true
+  tests_required: true
+  documentation_language: "Deutsch"
+  code_language: "Englisch (Code-Kommentare), Deutsch (Dokumentation)"
+  changelog: "docs/changelog/iteration-<n>.md"
+
+# ─── Spec-Regeln ─────────────────────────────────────────────────────────────
+spec_rules:
+  format: "Delta-Specs (HINZUGEFÜGT / GEÄNDERT / ENTFERNT)"
+  acceptance_criteria: "Given/When/Then"
+  keywords: "RFC2119 (SHALL / MUST / SHOULD)"
+  issue_size_labels:
+    small: "max. 3 Dateien, < 2h"
+    medium: "mehrere Dateien/Module, 2–8h"
+    large: "Architekturänderungen, > 8h"
+  issue_labels:
+    - "vibe-coding"
+    - "module:<name>"
+    - "priority:high|medium|low"
+    - "size:small|medium|large"
+
+# ─── Design-Regeln ───────────────────────────────────────────────────────────
+design_rules:
+  - "Neue Retriever erweitern die abstrakte Retriever-Klasse"
+  - "Konfiguration via .env und config/config.py"
+  - "Keine hartcodierten Pfade – Umgebungsvariablen nutzen"
+  - "Docker-Container nur an localhost binden"
+  - "GPU-Layers in Ollama auf max. 35 begrenzen"
+  - "Embedding-Batch-Size auf 8 begrenzen"
+
+# ─── Task-Regeln ─────────────────────────────────────────────────────────────
+task_rules:
+  decomposition: "Vertikal integrierbare Einheiten"
+  max_parallel: 2  # GTX 1070 / 8GB VRAM Limit
+  context_isolation: true
+  research_required: true
+  research_scope:
+    small: "reduziert"
+    medium: "Standardumfang"
+    large: "ausführlich mit Quellen"
+  research_sources_priority:
+    - "Offizielle Hersteller-/Framework-Dokumentation"
+    - "RFCs / Standardspezifikationen"
+    - "Sicherheitsstandards"
+    - "Architektur-Guidelines offizieller Quellen"
+    - "Maintainer-Blogs / Release Notes"
+    - "Wissenschaftliche Quellen"
+    - "Community-Quellen (ergänzend)"
+
+# ─── Sicherheitsregeln ───────────────────────────────────────────────────────
+security:
+  isolation: "Gesamten Stack in Docker-Container/VM betreiben"
+  local_only: "Alle Dienste nur an 127.0.0.1 binden"
+  tor: "Nur Client-Modus, kein Exit-Node"
+  crawler: "Nur passives HTML-Parsing (BeautifulSoup/LXML), kein JS"
+  credentials: "Wegwerf-Account für Darknet-Forum, nie persönliche Daten"
+  legal: "Vor Nutzung rechtliche Prüfung durch Fachanwalt (Darknet-Crawling)"
+
+# ─── Qualitätsregeln ─────────────────────────────────────────────────────────
+quality:
+  pre_completion_check:
+    - "Akzeptanzkriterien erfüllt"
+    - "Tests erfolgreich"
+    - "Artefakte konsistent"
+    - "Delta-Specs korrekt"
+    - "Dokumentation aktuell"
+    - "Recherche durchgeführt"
+    - "GitHub kommentiert"
+    - "Review erfolgreich"
+    - "Committed"
+    - "Gepusht"
+    - "Kontext archiviert"

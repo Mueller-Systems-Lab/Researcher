@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Environment & Secrets
+.env
+*.env.local
+*.env.production
+credentials.json
+secrets/
+
+# Database & Index files
+*.db
+*.db-shm
+*.db-wal
+chroma_db/
+darknet_index/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+searxng/
+
+# Ollama
+.ollama/
+
+# Logs
+*.log
+logs/
+.opencode/logs/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (falls genutzt)
+node_modules/
