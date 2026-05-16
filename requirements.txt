@@ -20,7 +20,8 @@ gpt-researcher==0.14.8
 # Darknet-Crawler & Index
 # ---------------------------------------------------------------------------
 # Tor SOCKS5-Proxy-Support für requests (Darknet-Crawler)
-requests[socks]>=2.32.3
+# Stand 2026-05: requests 2.34.2 ist aktuellster Patchstand
+requests[socks]>=2.34.2
 
 # Volltext-Suchindex (Pure-Python, dateibasiert, kein Server nötig)
 whoosh>=2.7.4
@@ -29,7 +30,16 @@ whoosh>=2.7.4
 # Vektordatenbank (Lernfähigkeit)
 # ---------------------------------------------------------------------------
 # ChromaDB für Embedding-Persistenz (lokale Vektordatenbank)
-chromadb>=0.5.0
+# Stand 2026-05: chromadb 1.5.9 ist aktuellste Version
+chromadb>=0.5.20
+
+# ---------------------------------------------------------------------------
+# Sicherheitsfixes für transitive Dependencies
+# ---------------------------------------------------------------------------
+# lxml >=6.1.0 erforderlich wegen CVE-2026-41066 (XXE)
+# Wird normalerweise transitiv über gpt-researcher installiert,
+# hier explizit gepinnt für Sicherheit.
+lxml>=6.1.0
 
 # ---------------------------------------------------------------------------
 # Dev & Testing (optional, für CI/Qualitätssicherung)
