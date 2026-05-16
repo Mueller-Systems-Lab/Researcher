@@ -89,7 +89,7 @@ def test_fault_vectorstore_chromadb_down():
     )
     # Keine Exception, nur graceful degradation
     assert store.add_one("test", [0.1] * 768) is False
-    assert store.query([[0.1] * 768]) == []
+    assert store.query([0.1] * 768) == []
     assert store.count == 0
 
 

@@ -77,7 +77,7 @@ def test_vector_store_query():
 
         # Suchen
         results = store.query(
-            query_embeddings=[[0.1] * 768],
+            query_embedding=[0.1] * 768,
             n_results=5,
         )
         assert len(results) >= 1, "Sollte Ergebnisse finden"
@@ -97,7 +97,7 @@ def test_vector_store_graceful_degradation():
     assert result is False, "Sollte False bei Fehler zurückgeben"
 
     # query sollte leere Liste zurückgeben
-    results = store.query([[0.1] * 768])
+    results = store.query([0.1] * 768)
     assert results == [], "Sollte leere Liste bei Fehler zurückgeben"
 
     # count sollte 0 zurückgeben

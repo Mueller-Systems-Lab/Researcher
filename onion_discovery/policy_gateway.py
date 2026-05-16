@@ -64,25 +64,26 @@ class PolicyGateway:
     def is_allowed(self, url: str) -> PolicyDecision:
         """Prüft, ob eine URL gecrawlt werden darf.
 
-        Reihenfolge: Allowlist → Blocklist → Opt-out → Rate-Limit
+        Reihenfolge: Blocklist → Allowlist → Opt-out → Rate-Limit
+        Blocklist hat Vorrang vor Allowlist (Deny-overrides-allow).
         """
         host = self._extract_host(url)
         url_lower = url.lower()
 
-        # Allowlist-Prüfung (wenn gesetzt, nur erlaubte Hosts)
-        if self.allowlist:
-            if host not in self.allowlist:
-                return PolicyDecision(
-                    False, f"Host {host} nicht in Allowlist", "not_in_allowlist"
-                )
-
-        # Blocklist-Prüfung
+        # Blocklist-Prüfung (hat VORRANG vor Allowlist — Deny-overrides-allow)
         if host in self.blocklist:
             return PolicyDecision(False, f"Host {host} ist blocklistiert", "blocklist")
         for pattern in self.blocklist:
             if re.search(pattern, url_lower):
                 return PolicyDecision(
                     False, f"URL {url} matcht Blocklist-Pattern {pattern}", "blocklist"
+                )
+
+        # Allowlist-Prüfung (wenn gesetzt, nur erlaubte Hosts)
+        if self.allowlist:
+            if host not in self.allowlist:
+                return PolicyDecision(
+                    False, f"Host {host} nicht in Allowlist", "not_in_allowlist"
                 )
 
         # Opt-out-Prüfung

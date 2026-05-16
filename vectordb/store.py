@@ -134,13 +134,13 @@ class VectorStore:
 
     def query(
         self,
-        query_embeddings: list[list[float]],
+        query_embedding: list[float],
         n_results: int = 10,
     ) -> list[dict]:
         """Sucht ähnliche Dokumente per Embedding.
 
         Args:
-            query_embeddings: Embedding-Vektor für die Suche.
+            query_embedding: Embedding-Vektor für die Suche (einzelner Vektor).
             n_results: Anzahl gewünschter Ergebnisse.
 
         Returns:
@@ -152,7 +152,7 @@ class VectorStore:
 
         try:
             results = collection.query(
-                query_embeddings=query_embeddings,
+                query_embeddings=[query_embedding],
                 n_results=n_results,
             )
             output = []

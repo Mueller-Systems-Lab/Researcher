@@ -19,7 +19,7 @@
 
 import logging
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 from typing import Optional
 
 import requests
@@ -50,7 +50,10 @@ class DarknetCrawler:
     """
 
     def __init__(self, config_override: Optional[dict] = None):
-        self.config = config
+        # Tiefe Kopie der globalen Config pro Instanz (T-024)
+        import copy
+
+        self.config = copy.deepcopy(config)
         if config_override:
             for key, value in config_override.items():
                 if hasattr(self.config, key):

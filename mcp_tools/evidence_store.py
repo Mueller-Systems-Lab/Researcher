@@ -155,7 +155,7 @@ class EvidenceStore(MCPToolBase):
         n_results = params.get("n_results", 10)
         store = self._get_store()
         results = store.query(
-            query_embeddings=[query_embedding],
+            query_embedding=query_embedding,
             n_results=n_results,
         )
 
