@@ -96,7 +96,7 @@ def query_model(
     cfg = MODELS[model]
 
     if model == "qwen":
-        # Ollama API
+        # Ollama API — think=false verhindert leeres content-Feld
         payload = {
             "model": cfg["model"],
             "messages": [
@@ -104,6 +104,7 @@ def query_model(
                 {"role": "user", "content": prompt},
             ],
             "stream": False,
+            "think": False,  # <-- Thinking deaktivieren
             "options": {
                 "num_predict": max_tokens,
                 "temperature": temperature,
@@ -176,14 +177,8 @@ def research(query: str, mode: str = "deep_summary", model: str = "gemma4"):
     print(answer)
     print(f"{'─' * 60}")
 
-    # Auch mit dem anderen Modell vergleichen
-    other = "qwen" if model == "gemma4" else "gemma4"
-    print(f"\n🔄 Vergleich mit {MODELS[other]['name']}:")
-    print(f"{'─' * 60}")
-    alt_answer = query_model(prompt, model=other)
-    print(alt_answer[:1000])
-    print(f"{'─' * 60}")
-
+    # ⚠️ KEIN automatischer Vergleich! Nur 1 Modell passt in 8 GB VRAM.
+    # Zum Vergleich: manuell mit --model qwen bzw. --model gemma4 starten.
     return answer
 
 
@@ -249,10 +244,13 @@ if __name__ == "__main__":
                 continue
             if user_input.lower() == "exit":
                 break
-            if user_input.startswith("model "):
-                new_model = user_input.split()[1]
-                if new_model in MODELS:
-                    current_model = new_model
-                    print(f"   → Modell: {MODELS[current_model]['name']}")
-                continue
+        if user_input.startswith("model "):
+            new_model = user_input.split()[1]
+            if new_model in MODELS:
+                print(f"   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
+                print(f"   Stoppe vorher: pkill -f llama-server ODER ollama serve")
+                print(f"   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
+                current_model = new_model
+                print(f"   → Gewählt: {MODELS[current_model]['name']}")
+            continue
             research(user_input, mode=args.mode, model=current_model)
