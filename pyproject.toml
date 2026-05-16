@@ -34,10 +34,10 @@ exclude_lines = [
     "raise NotImplementedError",
     "if 0:",
 ]
-# Aktuell: 73 % (T-018)
-# Ziel: 85 % (nächste Iteration)
-# Lücken: crawlers (0%), server.py (HTTP braucht Integration), embedding.py (braucht Ollama)
-fail_under = 70
+# Aktuell: 77 % (T-025) — ohne externe Dienste erreichbar
+# Lücken: darknet_crawler.py (Login/Crawl braucht Tor), server.py (HTTP braucht Integration)
+# Mit laufenden Diensten (Ollama, SearXNG, Tor): Ziel 85 %
+fail_under = 75
 
 [tool.coverage.html]
 directory = "coverage_html"

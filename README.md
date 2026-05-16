@@ -1,5 +1,8 @@
 # Researcher — Lokales, unzensiertes Research-System
 
+[![CI](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml/badge.svg)](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-75%25-yellowgreen)]()
+
 Researcher ist ein vollständig lokales Research-System auf Basis von GPT Researcher. Es nutzt ein lokales LLM, lokale Websuche, einen Darknet-Crawler und einen lokalen Vektorspeicher — ohne externe API-Aufrufe.
 
 ## Kurzstart
