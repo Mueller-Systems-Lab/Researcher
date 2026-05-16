@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-05-16T12:30:00Z",
+  "route": "/",
+  "viewport": "1280x720",
+  "classification": "NEW_BASELINE",
+  "pixel_diff_percent": 0.0,
+  "dom_changes": 0,
+  "a11y_violations": [],
+  "screenshot_path": "tests/playwright/screenshots/baseline/dashboard.png",
+  "dom_snapshot_path": "tests/playwright/screenshots/baseline/dashboard.html",
+  "recommendation": "review",
+  "notes": [
+    "Visueller Screenshot wurde mit Playwright bei 1280x720 erstellt.",
+    "Dashboard-Zustand wurde mit Fallback-Daten für nicht verfügbare NVIDIA-GPU/nvidia-smi aufgenommen.",
+    "Shell-Ausführung war durch die Umgebung eingeschränkt; der Python-Server konnte in dieser Sitzung nicht per Bash gestartet werden. Der Browser-Render entspricht dem Dashboard-Widget aus dashboard/static/index.html."
+  ]
+}
