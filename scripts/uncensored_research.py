@@ -244,13 +244,13 @@ if __name__ == "__main__":
                 continue
             if user_input.lower() == "exit":
                 break
-        if user_input.startswith("model "):
-            new_model = user_input.split()[1]
-            if new_model in MODELS:
-                print(f"   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
-                print(f"   Stoppe vorher: pkill -f llama-server ODER ollama serve")
-                print(f"   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
-                current_model = new_model
-                print(f"   → Gewählt: {MODELS[current_model]['name']}")
-            continue
+            if user_input.startswith("model "):
+                new_model = user_input.split()[1]
+                if new_model in MODELS:
+                    print(f"   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
+                    print(f"   Stoppe vorher: pkill -f llama-server ODER ollama serve")
+                    print(f"   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
+                    current_model = new_model
+                    print(f"   → Gewählt: {MODELS[current_model]['name']}")
+                continue
             research(user_input, mode=args.mode, model=current_model)
