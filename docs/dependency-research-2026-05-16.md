@@ -70,7 +70,7 @@
 ## Schlussfolgerung
 
 ### Sofort handeln
-1. **pynvml → nvidia-ml-py** migrieren (deprecated)
+1. ~~**pynvml → nvidia-ml-py** migrieren (deprecated)~~ → **Keine Code-Änderung nötig** (Code nutzt nvidia-smi direkt, nicht pynvml)
 2. **lxml >=6.1.0** pinnen (CVE-2026-41066)
 3. **requests >=2.34.2** pinnen (aktueller Patchstand)
 4. **Ollama** auf v0.24.0 aktualisieren
