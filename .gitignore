@@ -40,6 +40,10 @@ searxng/
 # Ollama
 .ollama/
 
+# Model files (GGUF)
+*.gguf
+*.gguf.lock
+
 # Logs
 *.log
 logs/

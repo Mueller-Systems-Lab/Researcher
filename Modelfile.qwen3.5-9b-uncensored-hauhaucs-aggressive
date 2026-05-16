@@ -1,0 +1,19 @@
+# Modelfile für Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+#
+# Zwei Nutzungsoptionen:
+# 1. GGUF-Datei (uncensored weights von HauhauCS): FROM ./Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf
+#    - Enthält die spezifischen abliterierten Gewichte
+#    - Benötigt Ollama >= 0.22.0 mit aktuellem llama.cpp (Qwen3.5 Hybrid Attention Support)
+# 2. Ollama-Basismodell (einfacher, funktioniert garantiert): FROM qwen3.5:9b
+#    - Gleiche Architektur, gleiche Quantisierung (Q4_K_M)
+#    - GGUF liegt zusätzlich bereit
+#
+# Aktuell wird Option 2 verwendet, da Option 1 Template-Probleme zeigt.
+# Siehe docs/prompts/issues/issue-2.md für Details.
+
+FROM qwen3.5:9b
+
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER num_ctx 4096
+PARAMETER repeat_penalty 1.1
