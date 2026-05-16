@@ -1,0 +1,14 @@
+# SearXNG Docker Compose — Lokale Websuche für Researcher
+# Bindet NUR an 127.0.0.1 (kein externer Zugriff)
+# Siehe docs/searxng-local-setup.md für Details
+services:
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+      - ./limiter.toml:/etc/searxng/limiter.toml:ro

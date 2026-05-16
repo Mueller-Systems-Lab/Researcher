@@ -1,0 +1,26 @@
+# SearXNG settings.yml — Lokale Research-Umgebung
+# Validierte Konfiguration basierend auf docs.searxng.org
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - wikipedia
+      - wikidata
+
+server:
+  bind_address: "0.0.0.0"  # Sicherheit durch Docker-Port-Binding (127.0.0.1)
+  port: 8080
+  base_url: "http://localhost:8080/"
+  limiter: false  # Kein Rate-Limiting für lokalen Betrieb (kein Valkey nötig)
+
+search:
+  safe_search: 0     # Keine Filter für Research-Zwecke
+  formats:
+    - html
+    - json          # JSON-API für GPT Researcher
+
+ui:
+  static_use_hash: true
+
+# Keine zusätzlichen Plugins aktiviert
+plugins: {}
