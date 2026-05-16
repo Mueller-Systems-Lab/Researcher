@@ -8,7 +8,7 @@ Researcher ist ein vollständig lokales Research-System auf Basis von GPT Resear
 2. Repository klonen und virtuelle Umgebung anlegen.
 3. `.env.example` nach `.env` kopieren und anpassen.
 4. Ollama starten, Modell registrieren, Embeddings laden.
-5. SearXNG starten.
+5. SearXNG per Docker Compose starten.
 6. Web-UI starten und eine Test-Recherche ausführen.
 
 ## Architekturübersicht
@@ -103,7 +103,7 @@ ollama pull nomic-embed-text
 ### 7) SearXNG starten
 
 ```bash
-docker run -d -p 127.0.0.1:8080:8080 searxng/searxng
+docker compose -f searxng/docker-compose.yml up -d
 ```
 
 ### 8) Darknet-Crawler konfigurieren
@@ -130,7 +130,7 @@ http://localhost:8000
 
 ```text
 Terminal 1: ollama serve
-Terminal 2: docker run -d -p 127.0.0.1:8080:8080 searxng/searxng
+Terminal 2: docker compose -f searxng/docker-compose.yml up -d
 Terminal 3: ./research-serve.sh qwen
 Terminal 4: python -m gpt_researcher --stream
 ```
@@ -213,6 +213,7 @@ curl http://127.0.0.1:8086/v1/models
 - Embeddings laufen CPU-seitig und sollen die GPU nicht blockieren.
 - Der Darknet-Crawler benötigt Tor und eine separate rechtliche Prüfung.
 - Wenn ein Backend ausfällt, arbeitet der CompositeRetriever mit den verbleibenden Quellen weiter.
+- SearXNG wird lokal per `127.0.0.1:8080` bereitgestellt; Details stehen in `docs/searxng-local-setup.md`.
 
 ## Test-Recherche
 
@@ -223,3 +224,4 @@ Nach dem Start aller Komponenten eine kurze Probeabfrage ausführen und prüfen,
 - `docs/architecture.md`
 - `docs/troubleshooting.md`
 - `docs/changelog/iteration-1.md`
+- `docs/searxng-local-setup.md`

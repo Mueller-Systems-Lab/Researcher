@@ -52,6 +52,7 @@
 - `README.md`
 - `docs/troubleshooting.md`
 - `docs/changelog/iteration-1.md`
+- `docs/searxng-local-setup.md`
 
 ### Issue-Prompts
 
@@ -78,6 +79,7 @@
 ## Offene Punkte / Bekannte Einschränkungen
 
 - T-003 bis T-010 sind im Git-Log noch nicht als fertige Implementierung sichtbar.
+- Für T-003 liegt jetzt eine dokumentierte Zielkonfiguration auf Basis der offiziellen SearXNG-Doku vor.
 - Auf der GTX 1070 sollte immer nur ein Modellserver gleichzeitig laufen.
 - Embeddings sind CPU-basiert und dürfen die GPU nicht verdrängen.
 - Der Darknet-Crawler benötigt Tor und eine gesonderte rechtliche Prüfung.

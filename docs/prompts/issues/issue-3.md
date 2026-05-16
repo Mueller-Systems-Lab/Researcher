@@ -1,7 +1,7 @@
 # Issue Prompt: T-003
 
 ## Ziel
-SearXNG Docker-Container starten, Port nur an 127.0.0.1 binden, JSON-API aktivieren, Erreichbarkeit testen.
+SearXNG als lokales Docker-Compose-Backend starten, Port nur an 127.0.0.1 binden, JSON-API aktivieren, Erreichbarkeit testen.
 
 ## Kontext
 Docker 29.3.1 ist installiert und läuft. SearXNG soll als isolierter Suchdienst betrieben werden. Kein externer Netzwerkzugriff erlaubt (Sicherheitsregel).
@@ -11,13 +11,16 @@ Docker 29.3.1 ist installiert und läuft. SearXNG soll als isolierter Suchdienst
 
 ## Relevante Dateien
 - `searxng/settings.yml`
-- Docker-Run-Konfiguration (Skript oder docker-compose)
+- `searxng/docker-compose.yml`
+- `searxng/limiter.toml` (optional)
+- `scripts/start-searxng.sh`
 
 ## Architekturregeln
-- SearXNG MUSS nur an `127.0.0.1:8080` binden (`--publish 127.0.0.1:8080:8080`)
-- JSON-API MUSS aktiviert sein (`formats: [html, json]` in settings.yml)
-- Rate-Limits für lokale IPs deaktivieren
-- Suchmaschinen nach Bedarf auswählen (Standard: alle)
+- SearXNG MUSS nur an `127.0.0.1:8080` binden (Host-Port-Mapping)
+- JSON-API MUSS aktiviert sein (`search.formats: [html, json]` in `settings.yml`)
+- `plugins:` statt `enabled_plugins:` verwenden
+- Rate-Limits für lokale IPs nur dann konfigurieren, wenn Valkey vorhanden ist; sonst `server.limiter: false`
+- Suchmaschinen nach Bedarf auswählen (minimal: DuckDuckGo, Wikipedia, Wikidata)
 
 ## Best Practices
 - `SEARXNG_BASE_URL=http://localhost:8080/` setzen
@@ -25,7 +28,7 @@ Docker 29.3.1 ist installiert und läuft. SearXNG soll als isolierter Suchdienst
 - API-Test mit `curl` vor Integration in GPT Researcher
 
 ## Akzeptanzkriterien
-- **GIVEN** Docker läuft **WHEN** `docker run -d -p 127.0.0.1:8080:8080 searxng/searxng` ausgeführt wird **THEN** ist SearXNG unter `http://localhost:8080` erreichbar.
+- **GIVEN** Docker läuft **WHEN** `docker compose -f searxng/docker-compose.yml up -d` ausgeführt wird **THEN** ist SearXNG unter `http://localhost:8080` erreichbar.
 - **GIVEN** SearXNG läuft **WHEN** `curl "http://localhost:8080/search?q=test&format=json"` ausgeführt wird **THEN** wird valides JSON zurückgegeben.
 
 ## Tests
