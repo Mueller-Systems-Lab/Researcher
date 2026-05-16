@@ -1,6 +1,6 @@
 # ADR-006: Evidence-first Research Pipeline mit isoliertem Tool-Layer
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Datum:** 2026-05-16  
 **Autor:** Architecture Review Agent  
 **Kontext:** Architecture Review von `deepresearch-agent-stack.md`
@@ -11,15 +11,16 @@
 
 Das Researcher-Projekt soll skalierbare, lokale und reproduzierbare Deep Research betreiben. Der aktuelle Blueprint `deepresearch-agent-stack.md` trennt Research Coordinator, MCP Tool Layer, Search Workers, Extraction Workers, Validation Workers und Local LLM Synthesis. Der Architecture Review vom 2026-05-16 ergab folgende kritische Lücken:
 
-1. Kein formaler Evidence Store → keine echte Reproduzierbarkeit
-2. Pipeline falsch sequenziert (Contradiction Analysis nach Synthesis)
-3. vLLM auf GTX 1070 nicht lauffähig (CC 6.1 vs. benötigt ≥7.5)
-4. Vier Datenbanken ohne Rollenzuweisung (PostgreSQL + Qdrant + Chroma + SQLite)
-5. Onion/Darknet-Security zu vage spezifiziert
-6. Deterministische Reports nicht technisch abgesichert
-7. Human-in-the-loop Gates fehlen für riskante Operationen
-8. MCP-Tools unvollständig
-9. Inference-Backend nicht abstrahiert (Ollama vs. llama-server)
+1. ADR-006 muss als verbindliche Entscheidung akzeptiert werden.
+2. Der Blueprint braucht einen expliziten Architecture-Review-Abschnitt.
+3. Kein formaler Evidence Store und unklare Storage-Rollen → keine echte Reproduzierbarkeit.
+4. vLLM auf GTX 1070 nicht lauffähig (CC 6.1 vs. benötigt ≥7.5).
+5. Onion/Darknet-Security zu vage spezifiziert.
+6. Inference-Backend nicht abstrahiert (Ollama vs. llama-server).
+7. Deterministische Reports nicht technisch abgesichert.
+8. MCP-Tools unvollständig.
+9. Pipeline falsch sequenziert (Contradiction Analysis nach Synthesis).
+10. Human-in-the-loop Gates fehlen für riskante Operationen.
 
 ---
 
@@ -205,3 +206,39 @@ Erforderlich bei:
 3. Inference-Abstraktion in `.env.example` aufnehmen: `INFERENCE_BACKEND`
 4. Evidence-Store-Schema als Draft in `specs/delta-specs.md` dokumentieren
 5. GitHub Issues für Teilaufgaben erstellen (T-015 bis T-020)
+
+---
+
+## Acceptance-Criteria Traceability for Issue #14
+
+| AC | Abdeckung in dieser ADR | Status |
+|---|---|---|
+| AC-1 | Status auf `Accepted`; ADR enthält Context, Decision, Alternatives, Consequences und References. | ✅ Erledigt |
+| AC-2 | Blueprint-Review wird in `deepresearch-agent-stack.md` dokumentiert; Detailnachweis in ADR-009. | ✅ Erledigt |
+| AC-3 | Storage-Rollen: ChromaDB für Vektoren, SQLite/PostgreSQL für Evidence/Metadata/Audit, Filesystem für Snapshots, Qdrant als Upgrade-Pfad. | ✅ Erledigt |
+| AC-4 | vLLM wird wegen GTX 1070 / CC 6.1 aus dem MVP gestrichen. | ✅ Erledigt |
+| AC-5 | Drei Netzwerkzonen, Tor/SOCKS-DNS-Regel, Onion disabled by default und Human Approval definiert. | ✅ Erledigt |
+| AC-6 | `INFERENCE_BACKEND=ollama|llama-server` als Backend-Abstraktion definiert. | ✅ Erledigt |
+| AC-7 | Deterministisches Profil mit `temperature=0`, fixen Modell-/Prompt-Versionen, Evidence-Snapshots und Quellen-Sortierung definiert. | ✅ Erledigt |
+| AC-8 | MCP-Tools `web-fetch`, `evidence-store`, `claim-validator`, `audit-log`, `human-review-request` sind in der erweiterten Tool-Taxonomie enthalten. | ✅ Erledigt |
+| AC-9 | Contradiction + Gap Analysis läuft vor LLM Synthesis. | ✅ Erledigt |
+| AC-10 | Human Gates für Onion/Darknet, Binary-Downloads, niedrige Confidence, PII, illegale Inhalte und widersprüchliche Quellen definiert. | ✅ Erledigt |
+
+---
+
+## References
+
+- Issue #14: <https://github.com/xxammaxx/Researcher/issues/14>
+- ADR-001 bis ADR-005: `design.md`
+- ADR-007: `docs/adr/007-onion-discovery-engine.md`
+- ADR-008: `docs/adr/008-onion-search-index.md`
+- Review-Nachweis: `docs/adr/009-architecture-review-gaps.md`
+- Blueprint: `deepresearch-agent-stack.md`
+- C4-/Komponentenarchitektur: `docs/architecture.md`
+- Delta-Spezifikationen: `specs/delta-specs.md`
+- Inference-/Storage-Konfiguration: `.env.example`
+- ChromaDB-Wrapper: `vectordb/store.py`
+- Whoosh-Index: `darknet_search/index.py`
+- Onion Discovery Engine: `onion_discovery/engine.py`
+- Human Review Queue: `onion_discovery/human_review.py`
+- Projekt-Sicherheitsregeln: `researcher_research_first_rule.md`

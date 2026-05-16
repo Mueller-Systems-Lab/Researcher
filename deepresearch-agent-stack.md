@@ -56,16 +56,16 @@ Local LLM Synthesis
 
 ## Storage
 
-- PostgreSQL
-- Qdrant
-- Chroma
-- SQLite
+- ChromaDB — Vektorspeicher für Embeddings
+- SQLite/PostgreSQL — Evidence, Metadata, Research Runs, Claims, Citations, Audit
+- Filesystem — Raw Snapshots und Reproducibility Manifests
+- Whoosh — lokaler Onion-/Darknet-Volltextindex im MVP
+- Qdrant — späterer produktiver Vektor-Store als Upgrade-Pfad
 
 ## Inference
 
 - llama-server
 - Ollama
-- vLLM
 
 ---
 
@@ -104,11 +104,11 @@ Evidence extraction
 
 ## Phase 6
 
-LLM synthesis
+Contradiction analysis
 
 ## Phase 7
 
-Contradiction analysis
+LLM synthesis
 
 ## Phase 8
 
@@ -142,11 +142,16 @@ The system MUST:
 # Recommended MCP Tools
 
 - web-search
+- web-fetch
 - onion-search
 - browser-use
 - markdown-export
 - vector-search
 - citation-engine
+- evidence-store
+- claim-validator
+- audit-log
+- human-review-request
 - document-parser
 - screenshot-analysis
 
@@ -164,26 +169,30 @@ The system is complete only if:
 
 ---
 
-# Architecture Review (2026-05-16)
+# Architecture Review 2026-05-16
 
-**Bewertung:** 6.5/10 — Architektonische Richtung gut, aber noch nicht implementierbar.
+**Bewertung:** 8/10 — Die kritischen Architekturentscheidungen sind dokumentiert; mehrere Gates und Tooling-Aspekte bleiben als geplante Umsetzung offen.
 
 ## Ergebnisse
 
-Der Architecture Review identifizierte 9 kritische Lücken:
+Der Architecture Review zu Issue #14 identifizierte 10 Gaps. Der verbindliche Nachweis steht in ADR-009; die Zielarchitektur wird durch ADR-006, ADR-007 und ADR-008 konkretisiert.
 
-| # | Problem | Impact |
-|---|---|---|
-| 1 | Kein Evidence Store | Ohne Snapshots keine echte Reproduzierbarkeit |
-| 2 | Pipeline falsch sequenziert | Contradiction Analysis kommt nach der Synthese |
-| 3 | vLLM auf GTX 1070 | vLLM braucht CC ≥7.5, GTX 1070 hat nur 6.1 |
-| 4 | 4 Datenbanken ohne Rollenzuweisung | PostgreSQL + Qdrant + Chroma + SQLite zu redundant |
-| 5 | Onion-Security zu vage | Netzwerkisolation nicht spezifiziert |
-| 6 | Deterministische Reports nicht technisch | temperature 0.7 widerspricht Ziel |
-| 7 | Keine Human-in-the-loop Gates | Onion-Zugriff braucht Freigabe |
-| 8 | MCP-Tools unvollständig | web-fetch, evidence-store, claim-validator fehlen |
-| 9 | Inference-Backend nicht abstrahiert | Ollama vs. llama-server nicht vereinheitlicht |
+| # | AC | Gap | Status | Referenz |
+|---|---|---|---|---|
+| 1 | AC-1 | ADR-006 war Proposed und musste akzeptiert werden. | ✅ Erledigt | ADR-006, ADR-009 |
+| 2 | AC-2 | Blueprint brauchte einen Architecture-Review-Abschnitt. | ✅ Erledigt | dieser Abschnitt, ADR-009 |
+| 3 | AC-3 | Storage-Rollen waren unklar. | ✅ Erledigt | ADR-006, ADR-008, ADR-009 |
+| 4 | AC-4 | vLLM war trotz GTX 1070 / CC 6.1 gelistet. | ✅ Erledigt | ADR-006, ADR-009 |
+| 5 | AC-5 | Onion-Security war zu vage. | ✅ Erledigt | ADR-006, ADR-007, ADR-009 |
+| 6 | AC-6 | Inference-Backend war nicht abstrahiert. | ✅ Erledigt | ADR-006, `.env.example`, ADR-009 |
+| 7 | AC-7 | Deterministisches Profil war nicht technisch definiert. | ⏳ Geplant | ADR-006, ADR-009 |
+| 8 | AC-8 | MCP-Tools für Evidence/Governance fehlten. | ⏳ Geplant | ADR-006, ADR-009 |
+| 9 | AC-9 | Contradiction Analysis kam nach LLM-Synthese. | ✅ Erledigt | ADR-006, ADR-009 |
+| 10 | AC-10 | Human Gates für Onion, Binary-Downloads und Low-Confidence fehlten. | ⏳ Geplant | ADR-006, ADR-007, ADR-009 |
 
-## ADR-006
+## ADR-Referenzen
 
-Details und Lösungsweg: `docs/adr/006-evidence-first-pipeline.md`
+- `docs/adr/006-evidence-first-pipeline.md` — akzeptierte Evidence-first Pipeline, Storage-Rollen, Netzwerkzonen, deterministisches Profil, MCP-Tools, Human Gates.
+- `docs/adr/007-onion-discovery-engine.md` — Onion Discovery Engine, disabled-by-default Onion Zone, Tor/SOCKS, Human Approval.
+- `docs/adr/008-onion-search-index.md` — Whoosh als MVP-Index, Qdrant/Meilisearch/Typesense/OpenSearch als spätere Upgrade-/Review-Pfade.
+- `docs/adr/009-architecture-review-gaps.md` — Gap-für-Gap-Nachweis für Issue #14.
