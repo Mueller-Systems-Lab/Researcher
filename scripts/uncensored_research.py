@@ -142,7 +142,8 @@ def query_model(
     if model == "qwen":
         msg = data.get("message", {})
         content = msg.get("content", "").strip()
-        thinking = msg.get("thinking", "").strip()
+        # Ollama v1 API: reasoning statt content
+        thinking = msg.get("thinking", "").strip() or msg.get("reasoning", "").strip()
     else:
         choice = data.get("choices", [{}])[0]
         msg = choice.get("message", {})
