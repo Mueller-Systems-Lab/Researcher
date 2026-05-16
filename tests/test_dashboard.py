@@ -184,3 +184,66 @@ def test_dashboard_health_endpoint():
     handler = DashboardHandler
     assert hasattr(handler, "monitor")
     assert hasattr(handler.monitor, "collect_dict")
+
+
+# ─── Path-Traversal-Schutz (T-021) ────────────────────────────────────────────
+
+
+def test_resolve_static_normal():
+    """_resolve_static: Normale Datei wird aufgelöst."""
+    from dashboard.server import DashboardHandler, STATIC_DIR
+    import os
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, "index.html")
+    assert result is not None
+    assert os.path.exists(result)
+    assert "index.html" in result
+
+
+def test_resolve_static_traversal():
+    """_resolve_static: ../ wird blockiert."""
+    from dashboard.server import DashboardHandler
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, "../.env")
+    assert result is None, "Traversal sollte blockiert werden"
+
+
+def test_resolve_static_deep_traversal():
+    """_resolve_static: Tiefes ../ wird blockiert."""
+    from dashboard.server import DashboardHandler
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, "../../etc/passwd")
+    assert result is None
+
+
+def test_resolve_static_absolute_path():
+    """_resolve_static: Absoluter Pfad wird blockiert."""
+    from dashboard.server import DashboardHandler
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, "/etc/passwd")
+    assert result is None
+
+
+def test_resolve_static_dot_traversal():
+    """_resolve_static: .../.../ wird blockiert."""
+    from dashboard.server import DashboardHandler
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, ".../.../env")
+    assert result is None
+
+
+def test_resolve_static_nonexistent():
+    """_resolve_static: Nicht-existente Datei gibt None (wird später 404)."""
+    from dashboard.server import DashboardHandler
+
+    handler = DashboardHandler
+    result = handler._resolve_static(handler, "nonexistent.html")
+    assert result is not None  # Pfad ist sicher, Datei existiert nur nicht
+    import os
+
+    assert not os.path.exists(result)

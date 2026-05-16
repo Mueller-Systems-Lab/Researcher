@@ -57,16 +57,46 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": "Not Found"}).encode())
 
+    def _resolve_static(self, filename: str) -> Optional[str]:
+        """Löst einen Dateinamen sicher innerhalb von STATIC_DIR auf.
+
+        Verhindert Path-Traversal, indem der normalisierte Pfad
+        auf STATIC_DIR-Präfix geprüft wird.
+
+        Args:
+            filename: Angeforderter Dateiname (relativ).
+
+        Returns:
+            Absoluter Pfad wenn sicher, None bei Traversal.
+        """
+        # Grundlegende Sicherheitsprüfung
+        if ".." in filename or filename.startswith("/"):
+            return None
+
+        safe_path = os.path.realpath(os.path.join(STATIC_DIR, filename))
+        static_real = os.path.realpath(STATIC_DIR)
+
+        if not safe_path.startswith(static_real):
+            return None
+        return safe_path
+
     def _serve_static(self, filename: str, content_type: str):
-        """Serviert eine statische Datei."""
-        file_path = os.path.join(STATIC_DIR, filename)
-        if not os.path.exists(file_path):
+        """Serviert eine statische Datei (mit Traversal-Schutz)."""
+        safe_path = self._resolve_static(filename)
+        if safe_path is None:
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Forbidden"}).encode())
+            return
+
+        if not os.path.exists(safe_path):
             self.send_response(404)
             self.end_headers()
             return
 
         try:
-            with open(file_path, "rb") as f:
+            with open(safe_path, "rb") as f:
                 content = f.read()
             self.send_response(200)
             self.send_header("Content-Type", content_type)
