@@ -10,14 +10,29 @@
 #   result = tool.run({"url": "http://example.com", "max_chars": 5000})
 # =============================================================================
 
+import ipaddress
 import logging
+import socket
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from mcp_tools.base import MCPToolBase, MCPToolResult
 from onion_discovery.policy_gateway import PolicyGateway
+
+# Private und interne IP-Bereiche (SSRF-Schutz)
+_PRIVATE_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),  # localhost
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC1918
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC1918
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC1918
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local
+    ipaddress.ip_network("::1"),  # localhost IPv6
+    ipaddress.ip_network("fc00::/7"),  # unique local IPv6
+    ipaddress.ip_network("fe80::/10"),  # link-local IPv6
+]
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +89,54 @@ class WebFetchTool(MCPToolBase):
         )
         self._session.timeout = 30
 
+    def _validate_url_target(self, url: str) -> Optional[str]:
+        """Validiert die Ziel-IP einer URL (SSRF-Schutz).
+
+        Löst den Hostnamen auf und prüft, ob die IP in einem privaten
+        oder internen Netzwerk liegt.
+
+        Returns:
+            None wenn OK, Fehlerstring wenn blockiert.
+        """
+        try:
+            parsed = urlparse(url)
+            host = parsed.hostname
+            if not host:
+                return "Ungültige URL: kein Hostname"
+
+            # Hostname auflösen
+            addrinfo = socket.getaddrinfo(
+                host, 80, socket.AF_UNSPEC, socket.SOCK_STREAM
+            )
+            for family, _, _, _, sockaddr in addrinfo:
+                ip_str = sockaddr[0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                except ValueError:
+                    continue
+
+                # Gegen private Netze prüfen
+                for network in _PRIVATE_NETWORKS:
+                    if ip in network:
+                        return (
+                            f"SSRF blockiert: {host} ({ip_str}) "
+                            f"ist in privatem Netz {network}"
+                        )
+
+                # Zusätzlich: Prüfen ob die IP überhaupt routing-fähig ist
+                if ip.is_loopback or ip.is_private or ip.is_link_local:
+                    return (
+                        f"SSRF blockiert: {host} ({ip_str}) "
+                        f"ist eine private/lokale Adresse"
+                    )
+            return None
+
+        except socket.gaierror as e:
+            return f"Hostname nicht auflösbar: {host} ({e})"
+        except Exception as e:
+            logger.warning(f"SSRF-Validierungsfehler für {url}: {e}")
+            return None  # Im Zweifel erlauben (kein blockierendes Verhalten)
+
     def run(self, params: dict) -> dict:
         url = params.get("url", "")
         max_chars = params.get("max_chars", 5000)
@@ -99,6 +162,11 @@ class WebFetchTool(MCPToolBase):
                 False,
                 error=f"URL blockiert: {decision.reason}",
             ).to_dict()
+
+        # SSRF-Prüfung: Ziel-IP auflösen und gegen private Netze prüfen
+        ssrf_error = self._validate_url_target(url)
+        if ssrf_error:
+            return MCPToolResult(False, error=ssrf_error).to_dict()
 
         try:
             response = self._session.get(url, timeout=30)

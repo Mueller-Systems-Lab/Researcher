@@ -398,3 +398,113 @@ def test_human_review_reject_no_id():
     tool = HumanReviewTool()
     result = tool.run({"action": "reject"})
     assert result["success"] is False
+
+# ─── SSRF-Schutz (T-019) ──────────────────────────────────────────────────────
+
+from unittest.mock import patch, MagicMock
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_localhost(mock_getaddrinfo):
+    """SSRF: localhost wird blockiert."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    # Simuliere 127.0.0.1 als Auflösung
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("127.0.0.1", 80))
+    ]
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://localhost:11434/api/tags"})
+    assert result["success"] is False
+    assert "SSRF" in result["error"] or "blockiert" in result["error"]
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_rfc1918(mock_getaddrinfo):
+    """SSRF: RFC1918 (192.168.x.x) wird blockiert."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("192.168.1.1", 80))
+    ]
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://192.168.1.1/admin"})
+    assert result["success"] is False
+    assert "SSRF" in result["error"] or "blockiert" in result["error"]
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_10_range(mock_getaddrinfo):
+    """SSRF: 10.x.x.x wird blockiert."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("10.0.0.5", 8000))
+    ]
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://10.0.0.5:8000"})
+    assert result["success"] is False
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_public_ip_allowed(mock_getaddrinfo):
+    """SSRF: Öffentliche IP wird erlaubt."""
+    from mcp_tools.web_fetch import WebFetchTool
+    from requests.exceptions import ConnectionError
+
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("93.184.216.34", 80))
+    ]
+
+    tool = WebFetchTool()
+    # Public IP geht durch SSRF-Prüfung, schlägt dann aber beim Fetch feil
+    with patch.object(tool._session, 'get') as mock_get:
+        mock_get.side_effect = ConnectionError("Expected test error")
+        result = tool.run({"url": "http://example.com"})
+        # Sollte NICHT "SSRF" im Fehler haben
+        assert "SSRF" not in result.get("error", "")
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_link_local(mock_getaddrinfo):
+    """SSRF: Link-Local (169.254.x.x) wird blockiert."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("169.254.1.1", 80))
+    ]
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://169.254.1.1"})
+    assert result["success"] is False
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_ipv6_localhost(mock_getaddrinfo):
+    """SSRF: IPv6 localhost (::1) wird blockiert."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [
+        (0, 0, 0, "", ("::1", 80))
+    ]
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://[::1]:11434"})
+    assert result["success"] is False
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_ssrf_resolution_failure(mock_getaddrinfo):
+    """SSRF: Nicht auflösbarer Hostname gibt Fehler."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    import socket
+    mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://nonexistent-domain-xyz-123.com"})
+    assert result["success"] is False
+    assert "nicht auflösbar" in result["error"]
