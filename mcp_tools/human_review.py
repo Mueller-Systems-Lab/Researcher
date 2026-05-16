@@ -3,13 +3,13 @@
 # =============================================================================
 # Signalisiert Human Review bei riskanten/grenzwertigen Ergebnissen.
 # Nutzt die vorhandene ReviewQueue.
-# Erlaubt approve/reject via MCP.
+# AUS SICHERHEITSGRÜNDEN: approve/reject NUR über CLI/UI, nicht via MCP.
+# Siehe T-020.
 #
 # Nutzung:
 #   tool = HumanReviewTool()
 #   tool.run({"action": "request", "url": "...", "reason": "..."})
-#   tool.run({"action": "approve", "item_id": "..."})
-#   tool.run({"action": "reject", "item_id": "...", "reason": "..."})
+#   tool.run({"action": "list_pending"})
 # =============================================================================
 
 import hashlib
@@ -33,7 +33,7 @@ class HumanReviewTool(MCPToolBase):
     def description(self) -> str:
         return (
             "Signalisiert Human Review bei riskanten/grenzwertigen "
-            "Ergebnissen. Erlaubt approve/reject von Review-Items."
+            "Ergebnissen. Approve/Reject NUR über CLI (--approve/--reject)."
         )
 
     @property
@@ -45,12 +45,10 @@ class HumanReviewTool(MCPToolBase):
                     "type": "string",
                     "enum": [
                         "request",
-                        "approve",
-                        "reject",
                         "list_pending",
                         "stats",
                     ],
-                    "description": "Aktion",
+                    "description": "Aktion: request, list_pending, stats",
                 },
                 "url": {
                     "type": "string",
@@ -66,7 +64,7 @@ class HumanReviewTool(MCPToolBase):
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Grund für Review (für action=request/reject)",
+                    "description": "Grund für Review (für action=request)",
                 },
                 "topic": {
                     "type": "string",
@@ -76,15 +74,6 @@ class HumanReviewTool(MCPToolBase):
                     "type": "string",
                     "enum": ["low", "medium", "high", "critical"],
                     "description": "Risikostufe (für action=request)",
-                },
-                "item_id": {
-                    "type": "string",
-                    "description": "ID des Review-Items (für action=approve/reject)",
-                },
-                "reviewer": {
-                    "type": "string",
-                    "description": "Name des Reviewers (für action=approve/reject)",
-                    "default": "mcp",
                 },
             },
             "required": ["action"],
@@ -96,12 +85,19 @@ class HumanReviewTool(MCPToolBase):
     def run(self, params: dict) -> dict:
         action = params.get("action", "")
 
+        if action in ("approve", "reject"):
+            return MCPToolResult(
+                False,
+                error=(
+                    f"action={action} ist nicht über MCP verfügbar. "
+                    "Approve/Reject nur über CLI: "
+                    "python -m onion_discovery --approve <id> "
+                    "oder --reject <id> <reason>"
+                ),
+            ).to_dict()
+
         if action == "request":
             return self._request_review(params)
-        elif action == "approve":
-            return self._approve(params)
-        elif action == "reject":
-            return self._reject(params)
         elif action == "list_pending":
             return self._list_pending()
         elif action == "stats":
@@ -110,8 +106,7 @@ class HumanReviewTool(MCPToolBase):
             return MCPToolResult(
                 False,
                 error=f"Unbekannte action: {action}. "
-                f"Erlaubt: request, approve, reject, "
-                f"list_pending, stats",
+                f"Erlaubt: request, list_pending, stats",
             ).to_dict()
 
     def _request_review(self, params: dict) -> dict:
@@ -152,59 +147,6 @@ class HumanReviewTool(MCPToolBase):
             return MCPToolResult(
                 False,
                 error=f"Review-Item existiert bereits: {item_id}",
-            ).to_dict()
-
-    def _approve(self, params: dict) -> dict:
-        item_id = params.get("item_id", "")
-        if not item_id:
-            return MCPToolResult(
-                False, error="item_id ist erforderlich für action=approve"
-            ).to_dict()
-
-        reviewer = params.get("reviewer", "mcp")
-        notes = params.get("reason", "")
-        success = self.review_queue.approve(item_id, reviewer=reviewer, notes=notes)
-
-        if success:
-            return MCPToolResult(
-                True,
-                data={
-                    "item_id": item_id,
-                    "approved_by": reviewer,
-                    "message": "Review-Item genehmigt — zur Indexierung freigegeben",
-                },
-            ).to_dict()
-        else:
-            return MCPToolResult(
-                False,
-                error=f"Review-Item nicht gefunden: {item_id}",
-            ).to_dict()
-
-    def _reject(self, params: dict) -> dict:
-        item_id = params.get("item_id", "")
-        if not item_id:
-            return MCPToolResult(
-                False, error="item_id ist erforderlich für action=reject"
-            ).to_dict()
-
-        reviewer = params.get("reviewer", "mcp")
-        reason = params.get("reason", "")
-        success = self.review_queue.reject(item_id, reviewer=reviewer, reason=reason)
-
-        if success:
-            return MCPToolResult(
-                True,
-                data={
-                    "item_id": item_id,
-                    "rejected_by": reviewer,
-                    "reason": reason,
-                    "message": "Review-Item abgelehnt — nicht indexiert",
-                },
-            ).to_dict()
-        else:
-            return MCPToolResult(
-                False,
-                error=f"Review-Item nicht gefunden: {item_id}",
             ).to_dict()
 
     def _list_pending(self) -> dict:

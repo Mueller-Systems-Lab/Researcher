@@ -290,64 +290,103 @@ def test_human_review_request_no_url():
     assert result["success"] is False
 
 
-def test_human_review_request_and_approve():
+def test_human_review_approve_blocked_via_mcp():
+    """Approve via MCP wird blockiert (T-020)."""
     from mcp_tools.human_review import HumanReviewTool
-    import tempfile
+
+    tool = HumanReviewTool()
+    result = tool.run(
+        {
+            "action": "approve",
+            "item_id": "test-id",
+        }
+    )
+    assert result["success"] is False
+    assert "nicht über MCP" in result["error"] or "CLI" in result["error"]
+
+
+def test_human_review_reject_blocked_via_mcp():
+    """Reject via MCP wird blockiert (T-020)."""
+    from mcp_tools.human_review import HumanReviewTool
+
+    tool = HumanReviewTool()
+    result = tool.run(
+        {
+            "action": "reject",
+            "item_id": "test-id",
+            "reason": "Not relevant",
+        }
+    )
+    assert result["success"] is False
+    assert "nicht über MCP" in result["error"]
+
+
+def test_human_review_request_and_approve_via_cli():
+    """Kompletter Workflow: MCP-Request → CLI-Approve."""
+    from mcp_tools.human_review import HumanReviewTool
+    from onion_discovery.human_review import ReviewQueue
+    import tempfile, os
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        import os
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        tool = HumanReviewTool(review_queue=rq)
 
-        old_file = os.environ.get("ONION_REVIEW_FILE")
-        os.environ["ONION_REVIEW_FILE"] = f"{tmpdir}/reviews.json"
-        try:
-            tool = HumanReviewTool()
-            tool.review_queue.queue_file = f"{tmpdir}/reviews.json"
+        # Request via MCP
+        result = tool.run(
+            {
+                "action": "request",
+                "url": "http://test.onion",
+                "risk_level": "high",
+            }
+        )
+        assert result["success"] is True
+        item_id = result["data"]["item_id"]
 
-            # Request
-            result = tool.run(
-                {
-                    "action": "request",
-                    "url": "http://test.onion/page",
-                    "title": "Test Page",
-                    "risk_level": "high",
-                    "reason": "High risk content",
-                }
-            )
-            assert result["success"] is True
-            item_id = result["data"]["item_id"]
+        # Approve via CLI (direkt auf derselben ReviewQueue-Instanz)
+        assert rq.approve(item_id, reviewer="admin") is True
 
-            # List Pending
-            result = tool.run({"action": "list_pending"})
-            assert result["success"] is True
-            assert result["data"]["pending"] >= 1
-
-            # Approve
-            result = tool.run(
-                {
-                    "action": "approve",
-                    "item_id": item_id,
-                    "reviewer": "pytest",
-                }
-            )
-            assert result["success"] is True
-
-            # Stats
-            result = tool.run({"action": "stats"})
-            assert result["success"] is True
-        finally:
-            if old_file is not None:
-                os.environ["ONION_REVIEW_FILE"] = old_file
-            else:
-                del os.environ["ONION_REVIEW_FILE"]
+        # Verify via stats
+        result = tool.run({"action": "stats"})
+        assert result["success"] is True
+        assert result["data"]["stats"].get("approved", 0) >= 1
 
 
-def test_human_review_request_and_reject():
+def test_human_review_request_and_reject_via_cli():
+    """Kompletter Workflow: MCP-Request → CLI-Reject."""
     from mcp_tools.human_review import HumanReviewTool
-    import tempfile
+    from onion_discovery.human_review import ReviewQueue
+    import tempfile, os
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        import os
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        tool = HumanReviewTool(review_queue=rq)
 
+        result = tool.run(
+            {
+                "action": "request",
+                "url": "http://bad.onion",
+            }
+        )
+        assert result["success"] is True
+        item_id = result["data"]["item_id"]
+
+        # Reject via CLI (dieselbe Instanz)
+        assert rq.reject(item_id, reviewer="admin", reason="Not relevant") is True
+
+        # Verify
+        result = tool.run({"action": "stats"})
+        assert result["success"] is True
+        assert result["data"]["stats"].get("rejected", 0) >= 1
+
+
+def test_human_review_request_and_reject_via_cli():
+    """Kompletter Workflow: MCP-Request → CLI-Reject."""
+    from mcp_tools.human_review import HumanReviewTool
+    import tempfile, os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
         old_file = os.environ.get("ONION_REVIEW_FILE")
         os.environ["ONION_REVIEW_FILE"] = f"{tmpdir}/reviews.json"
         try:
@@ -358,38 +397,21 @@ def test_human_review_request_and_reject():
                 {
                     "action": "request",
                     "url": "http://bad.onion",
-                    "risk_level": "critical",
                 }
             )
             assert result["success"] is True
             item_id = result["data"]["item_id"]
 
-            result = tool.run(
-                {
-                    "action": "reject",
-                    "item_id": item_id,
-                    "reason": "Not relevant",
-                }
-            )
-            assert result["success"] is True
+            # Reject via CLI
+            from onion_discovery.human_review import ReviewQueue
+
+            rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+            assert rq.reject(item_id, reviewer="admin", reason="Not relevant") is True
         finally:
             if old_file is not None:
                 os.environ["ONION_REVIEW_FILE"] = old_file
             else:
                 del os.environ["ONION_REVIEW_FILE"]
-
-
-def test_human_review_approve_not_found():
-    from mcp_tools.human_review import HumanReviewTool
-
-    tool = HumanReviewTool()
-    result = tool.run(
-        {
-            "action": "approve",
-            "item_id": "nonexistent",
-        }
-    )
-    assert result["success"] is False
 
 
 def test_human_review_reject_no_id():
@@ -398,6 +420,7 @@ def test_human_review_reject_no_id():
     tool = HumanReviewTool()
     result = tool.run({"action": "reject"})
     assert result["success"] is False
+
 
 # ─── SSRF-Schutz (T-019) ──────────────────────────────────────────────────────
 
@@ -410,9 +433,7 @@ def test_web_fetch_ssrf_localhost(mock_getaddrinfo):
     from mcp_tools.web_fetch import WebFetchTool
 
     # Simuliere 127.0.0.1 als Auflösung
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("127.0.0.1", 80))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("127.0.0.1", 80))]
 
     tool = WebFetchTool()
     result = tool.run({"url": "http://localhost:11434/api/tags"})
@@ -425,9 +446,7 @@ def test_web_fetch_ssrf_rfc1918(mock_getaddrinfo):
     """SSRF: RFC1918 (192.168.x.x) wird blockiert."""
     from mcp_tools.web_fetch import WebFetchTool
 
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("192.168.1.1", 80))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("192.168.1.1", 80))]
 
     tool = WebFetchTool()
     result = tool.run({"url": "http://192.168.1.1/admin"})
@@ -440,9 +459,7 @@ def test_web_fetch_ssrf_10_range(mock_getaddrinfo):
     """SSRF: 10.x.x.x wird blockiert."""
     from mcp_tools.web_fetch import WebFetchTool
 
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("10.0.0.5", 8000))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("10.0.0.5", 8000))]
 
     tool = WebFetchTool()
     result = tool.run({"url": "http://10.0.0.5:8000"})
@@ -455,13 +472,11 @@ def test_web_fetch_ssrf_public_ip_allowed(mock_getaddrinfo):
     from mcp_tools.web_fetch import WebFetchTool
     from requests.exceptions import ConnectionError
 
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("93.184.216.34", 80))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("93.184.216.34", 80))]
 
     tool = WebFetchTool()
     # Public IP geht durch SSRF-Prüfung, schlägt dann aber beim Fetch feil
-    with patch.object(tool._session, 'get') as mock_get:
+    with patch.object(tool._session, "get") as mock_get:
         mock_get.side_effect = ConnectionError("Expected test error")
         result = tool.run({"url": "http://example.com"})
         # Sollte NICHT "SSRF" im Fehler haben
@@ -473,9 +488,7 @@ def test_web_fetch_ssrf_link_local(mock_getaddrinfo):
     """SSRF: Link-Local (169.254.x.x) wird blockiert."""
     from mcp_tools.web_fetch import WebFetchTool
 
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("169.254.1.1", 80))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("169.254.1.1", 80))]
 
     tool = WebFetchTool()
     result = tool.run({"url": "http://169.254.1.1"})
@@ -487,9 +500,7 @@ def test_web_fetch_ssrf_ipv6_localhost(mock_getaddrinfo):
     """SSRF: IPv6 localhost (::1) wird blockiert."""
     from mcp_tools.web_fetch import WebFetchTool
 
-    mock_getaddrinfo.return_value = [
-        (0, 0, 0, "", ("::1", 80))
-    ]
+    mock_getaddrinfo.return_value = [(0, 0, 0, "", ("::1", 80))]
 
     tool = WebFetchTool()
     result = tool.run({"url": "http://[::1]:11434"})
@@ -502,6 +513,7 @@ def test_web_fetch_ssrf_resolution_failure(mock_getaddrinfo):
     from mcp_tools.web_fetch import WebFetchTool
 
     import socket
+
     mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
 
     tool = WebFetchTool()
