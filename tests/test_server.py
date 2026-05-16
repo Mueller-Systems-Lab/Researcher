@@ -64,7 +64,7 @@ def test_resolve_static_nonexistent():
 
 def test_serve_static_403():
     """Traversal wird mit 403 abgewiesen."""
-    from dashboard.server import DashboardHandler, STATIC_DIR
+    from dashboard.server import DashboardHandler
 
     with patch.object(DashboardHandler, "__init__", lambda self: None):
         handler = DashboardHandler.__new__(DashboardHandler)
@@ -77,9 +77,8 @@ def test_serve_static_403():
         handler.send_response.assert_called_with(403)
 
 
-@patch("dashboard.server.os.path.exists", return_value=False)
-def test_serve_static_404(mock_exists):
-    """Nicht-existente Datei gibt 404."""
+def test_serve_static_success():
+    """Existierende Datei wird mit 200 ausgeliefert."""
     from dashboard.server import DashboardHandler
 
     with patch.object(DashboardHandler, "__init__", lambda self: None):
@@ -89,8 +88,60 @@ def test_serve_static_404(mock_exists):
         handler.end_headers = MagicMock()
         handler.wfile = io.BytesIO()
 
-        DashboardHandler._serve_static(handler, "random.html", "text/html")
+        DashboardHandler._serve_static(handler, "index.html", "text/html")
+        handler.send_response.assert_called_with(200)
+
+
+@patch("dashboard.server.os.path.exists", return_value=False)
+def test_do_get_not_found(mock_exists):
+    """do_GET mit unbekanntem Pfad."""
+    from dashboard.server import DashboardHandler
+
+    with patch.object(DashboardHandler, "__init__", lambda self: None):
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.wfile = io.BytesIO()
+
+        handler.path = "/nonexistent"
+        handler.do_GET()
         handler.send_response.assert_called_with(404)
+
+
+def test_do_get_root():
+    """do_GET / serviert index.html."""
+    from dashboard.server import DashboardHandler
+
+    with patch.object(DashboardHandler, "__init__", lambda self: None):
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.wfile = io.BytesIO()
+
+        handler.path = "/"
+        handler.do_GET()
+        handler.send_response.assert_called_with(200)
+
+
+@patch("dashboard.server.GPUMonitor.collect_dict")
+def test_do_get_api_gpu(mock_collect):
+    """do_GET /api/gpu gibt GPU-Daten."""
+    from dashboard.server import DashboardHandler
+
+    mock_collect.return_value = {"gpu_utilization": 50.0}
+
+    with patch.object(DashboardHandler, "__init__", lambda self: None):
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.wfile = io.BytesIO()
+
+        handler.path = "/api/gpu"
+        handler.do_GET()
+        handler.send_response.assert_called_with(200)
 
 
 # ─── _serve_gpu_json ──────────────────────────────────────────────────────

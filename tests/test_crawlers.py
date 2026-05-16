@@ -2,7 +2,7 @@
 # Tests: Darknet-Crawler (T-025 Coverage)
 # =============================================================================
 import sys, os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -44,12 +44,108 @@ def test_forum_post_dataclass():
 
 
 @patch("crawlers.darknet_crawler.requests.Session.get")
-def test_crawler_login_not_configured(mock_get):
+def test_crawler_login_no_credentials(mock_get):
     from crawlers.darknet_crawler import DarknetCrawler
+    import os
 
     crawler = DarknetCrawler()
+    crawler.config.forum_base_url = "http://forum.onion"
+    crawler.config.login_url = "http://forum.onion/login"
+    crawler.config.username = ""
+    crawler.config.password = ""
     result = crawler.login()
     assert result is False
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_extract_text_from_html(mock_get):
+    """_extract_text und _extract_attribute Hilfsmethoden."""
+    from crawlers.darknet_crawler import DarknetCrawler
+    from bs4 import BeautifulSoup
+
+    crawler = DarknetCrawler()
+    html = '<div class="content">Hello <b>World</b></div>'
+    soup = BeautifulSoup(html, "lxml")
+
+    text = crawler._extract_text(soup, "div.content")
+    assert "Hello" in text and "World" in text
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_extract_attribute(mock_get):
+    from crawlers.darknet_crawler import DarknetCrawler
+    from bs4 import BeautifulSoup
+
+    crawler = DarknetCrawler()
+    html = '<time datetime="2026-05-16">May 16</time>'
+    soup = BeautifulSoup(html, "lxml")
+
+    dt = crawler._extract_attribute(soup, "time", "datetime")
+    assert dt == "2026-05-16"
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_extract_not_found(mock_get):
+    from crawlers.darknet_crawler import DarknetCrawler
+    from bs4 import BeautifulSoup
+
+    crawler = DarknetCrawler()
+    soup = BeautifulSoup("<p>No data</p>", "lxml")
+
+    assert crawler._extract_text(soup, "div.nonexistent") == ""
+    assert crawler._extract_attribute(soup, "span", "data-x") is None
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_crawl_thread_page(mock_get):
+    """crawl_thread_page parses HTML korrekt."""
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = """
+    <html><body>
+    <div class="post">
+        <span class="author">User1</span>
+        <span class="time">2026-05-16</span>
+        <div class="content">Test post content</div>
+        <h2 class="post_title">Test Title</h2>
+    </div>
+    <div class="post">
+        <span class="author">User2</span>
+        <span class="time">2026-05-15</span>
+        <div class="content">Another post</div>
+    </div>
+    </body></html>
+    """
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    crawler = DarknetCrawler()
+    crawler.logged_in = True
+    posts = crawler.crawl_thread_page("http://forum.onion/thread/1")
+
+    assert len(posts) == 2
+    assert posts[0].author == "User1"
+    assert posts[0].content == "Test post content"
+    assert posts[1].author == "User2"
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_crawl_thread_page_http_error(mock_get):
+    """crawl_thread_page bei HTTP-Fehler."""
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    from requests.exceptions import HTTPError
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = HTTPError("404")
+    mock_get.return_value = mock_response
+
+    crawler = DarknetCrawler()
+    crawler.logged_in = True
+    posts = crawler.crawl_thread_page("http://forum.onion/thread/1")
+    assert posts == []
 
 
 @patch("crawlers.darknet_crawler.requests.Session.get")

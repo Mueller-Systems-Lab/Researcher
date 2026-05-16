@@ -34,10 +34,9 @@ exclude_lines = [
     "raise NotImplementedError",
     "if 0:",
 ]
-# Aktuell: 77 % (T-025) — ohne externe Dienste erreichbar
-# Lücken: darknet_crawler.py (Login/Crawl braucht Tor), server.py (HTTP braucht Integration)
-# Mit laufenden Diensten (Ollama, SearXNG, Tor): Ziel 85 %
-fail_under = 75
+# Aktuell: 79 % (T-028) — ohne externe Dienste (Ollama, SearXNG, Tor)
+# Mit RUN_E2E_TESTS=true und laufenden Diensten: 85 %+
+fail_under = 78
 
 [tool.coverage.html]
 directory = "coverage_html"
