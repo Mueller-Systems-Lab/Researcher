@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU-Dashboard — Researcher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    color: #58a6ff;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .card .label {
+    font-size: 0.8em;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .card .value {
+    font-size: 2em;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+  .card .unit { font-size: 0.5em; color: #8b949e; }
+  .bar-container {
+    background: #21262d;
+    border-radius: 12px;
+    height: 20px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .bar {
+    height: 100%;
+    border-radius: 12px;
+    transition: width 0.5s ease, background 0.5s ease;
+    background: #238636;
+  }
+  .bar.warning { background: #d29922; }
+  .bar.critical { background: #da3633; }
+  .warning-text {
+    color: #d29922;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+  }
+  .critical-text {
+    color: #da3633;
+    font-weight: bold;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #21262d;
+  }
+  th { color: #8b949e; font-size: 0.8em; }
+  .error {
+    color: #da3633;
+    text-align: center;
+    padding: 40px;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .status-dot.ok { background: #3fb950; }
+  .status-dot.warning { background: #d29922; }
+  .status-dot.critical { background: #da3633; }
+  .status-dot.error-dot { background: #8b949e; }
+</style>
+</head>
+<body>
+
+<h1>⚙ GPU-Dashboard</h1>
+
+<div id="error" class="error" style="display:none"></div>
+
+<div class="grid" id="metrics">
+  <div class="card">
+    <div class="label">GPU-Auslastung</div>
+    <div class="value" id="gpu-util">--</div>
+    <div class="bar-container">
+      <div class="bar" id="gpu-bar" style="width:0%"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">VRAM-Verbrauch</div>
+    <div class="value" id="vram-used">-- <span class="unit">MiB</span></div>
+    <div class="bar-container">
+      <div class="bar" id="vram-bar" style="width:0%"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Temperatur</div>
+    <div class="value" id="gpu-temp">-- <span class="unit">°C</span></div>
+  </div>
+  <div class="card">
+    <div class="label">GPU-Name</div>
+    <div class="value" style="font-size:1em" id="gpu-name">--</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="label">GPU-Prozesse</div>
+  <table>
+    <thead><tr><th>PID</th><th>Name</th><th>VRAM (MiB)</th></tr></thead>
+    <tbody id="process-list">
+      <tr><td colspan="3">Keine Prozesse</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p style="margin-top:20px;color:#8b949e;font-size:0.8em" id="timestamp"></p>
+
+<script>
+const eventSource = new EventSource('/api/gpu/stream');
+
+eventSource.onmessage = function(event) {
+  try {
+    const data = JSON.parse(event.data);
+    updateDashboard(data);
+  } catch (e) {
+    console.error('Parse error:', e);
+  }
+};
+
+eventSource.onerror = function() {
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('error').textContent = '⚠ Verbindung zum GPU-Monitor unterbrochen. Stelle sicher, dass nvidia-smi verfügbar ist.';
+  document.getElementById('error').className = 'error';
+};
+
+function updateDashboard(data) {
+  if (data.error) {
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = '⚠ ' + data.error;
+    return;
+  }
+  document.getElementById('error').style.display = 'none';
+
+  // GPU-Auslastung
+  document.getElementById('gpu-util').textContent = Math.round(data.gpu_utilization) + ' %';
+  const gpuBar = document.getElementById('gpu-bar');
+  gpuBar.style.width = Math.round(data.gpu_utilization) + '%';
+  gpuBar.className = 'bar ' + (data.gpu_utilization > 90 ? 'critical' : data.gpu_utilization > 70 ? 'warning' : '');
+
+  // VRAM
+  const used = data.memory_used_mib;
+  const total = data.memory_total_mib;
+  const pct = data.memory_percent;
+  document.getElementById('vram-used').innerHTML = used + ' / ' + total + ' <span class="unit">MiB</span>';
+
+  const vramBar = document.getElementById('vram-bar');
+  vramBar.style.width = Math.round(pct) + '%';
+  vramBar.className = 'bar ' + (data.warning_level === 'critical' ? 'critical' : data.warning_level === 'warning' ? 'warning' : '');
+  document.getElementById('vram-used').className = data.warning_level === 'critical' ? 'value critical-text' : data.warning_level === 'warning' ? 'value warning-text' : 'value';
+
+  // Temperatur
+  document.getElementById('gpu-temp').innerHTML = Math.round(data.temperature_c) + ' <span class="unit">°C</span>';
+
+  // GPU-Name
+  document.getElementById('gpu-name').textContent = data.gpu_name || '--';
+
+  // Prozesse
+  const procBody = document.getElementById('process-list');
+  if (data.processes && data.processes.length > 0) {
+    procBody.innerHTML = data.processes.map(p =>
+      '<tr><td>' + p.pid + '</td><td>' + p.name + '</td><td>' + p.memory_mib + '</td></tr>'
+    ).join('');
+  } else {
+    procBody.innerHTML = '<tr><td colspan="3">Keine GPU-Prozesse</td></tr>';
+  }
+
+  // Timestamp
+  document.getElementById('timestamp').textContent = 'Letzte Aktualisierung: ' + new Date(data.timestamp).toLocaleTimeString();
+}
+</script>
+
+</body>
+</html>
