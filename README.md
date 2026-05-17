@@ -30,11 +30,11 @@ CompositeRetriever
 SearXNG (lokale Websuche)     Darknet-Crawler + Whoosh
   |                           |
   |                           v
-  |                     Darknet-Index
+  |                     Darknet-Index (ADR-008: SQLite FTS5 geplant)
   |                           |
   |---------------------------|
-              |
-              v
+               |
+               v
    Ollama (Qwen3.5 + Embeddings)
               |
               v
@@ -112,7 +112,7 @@ docker compose -f searxng/docker-compose.yml up -d
 ### 8) Darknet-Crawler konfigurieren
 
 - Tor muss lokal auf `127.0.0.1:9050` laufen.
-- Der Crawler schreibt in den Whoosh-Index unter `DARKNET_INDEX_PATH`.
+- Der Crawler schreibt aktuell in den lokalen Whoosh-Index unter `DARKNET_INDEX_PATH`; die Ablösung durch SQLite FTS5 ist in `docs/adr/adr-008-whoosh-migration.md` dokumentiert.
 - Darknet-Zugriffe nur mit rechtlicher Prüfung und klarer Zielsetzung durchführen.
 
 ### 9) GPT Researcher Web-UI starten
@@ -181,6 +181,11 @@ curl http://127.0.0.1:8086/v1/models
 ./research-serve.sh status
 ```
 
+## Tests
+
+- Echte Playwright-Browser-/Screenshot-Tests liegen unter `tests/playwright/`.
+- Ausführung: `RUN_PLAYWRIGHT_TESTS=true python -m pytest tests/playwright/test_dashboard_visual_regression.py -v`
+
 ## `.env`-Konfigurationsreferenz
 
 | Variable | Beschreibung |
@@ -192,7 +197,7 @@ curl http://127.0.0.1:8086/v1/models
 | `SEARX_URL` | Basis-URL des lokalen SearXNG-Dienstes. |
 | `SEARX_MAX_RESULTS` | Maximale Trefferzahl pro SearXNG-Abfrage. |
 | `DARKNET_ENABLED` | Aktiviert oder deaktiviert die Darknet-Suche. |
-| `DARKNET_INDEX_PATH` | Pfad zum Whoosh-Index für Darknet-Inhalte. |
+| `DARKNET_INDEX_PATH` | Pfad zum lokalen Darknet-Index (aktuell Whoosh; Migration zu SQLite FTS5 via ADR-008 geplant). |
 | `EMBEDDING_PROVIDER` | Provider für Embeddings; aktuell `ollama`. |
 | `OLLAMA_EMBEDDING_MODEL` | Embedding-Modell in Ollama, z. B. `nomic-embed-text:latest`. |
 | `CHROMA_PERSIST_DIRECTORY` | Persistenzverzeichnis für ChromaDB. |
@@ -217,6 +222,7 @@ curl http://127.0.0.1:8086/v1/models
 | `docs/architecture.md` | Architektur- und Laufzeitdokumentation. |
 | `docs/troubleshooting.md` | Fehlerdiagnosen und Lösungen. |
 | `docs/changelog/iteration-1.md` | Änderungsprotokoll der ersten Iteration. |
+| `docs/changelog/iteration-2.md` | Änderungsprotokoll der Audit- und Repair-Iteration. |
 | `docs/prompts/issues/` | Issue-Prompts für die Dokumentations- und Implementierungsschritte. |
 
 ## Hinweise
@@ -224,6 +230,7 @@ curl http://127.0.0.1:8086/v1/models
 - Auf der GTX 1070 ist nur **ein** Modellserver gleichzeitig sinnvoll.
 - Embeddings laufen CPU-seitig und sollen die GPU nicht blockieren.
 - Der Darknet-Crawler benötigt Tor und eine separate rechtliche Prüfung.
+- Whoosh ist derzeit noch aktiv, aber per ADR-008 als Ablöse-Kandidat markiert.
 - Wenn ein Backend ausfällt, arbeitet der CompositeRetriever mit den verbleibenden Quellen weiter.
 - SearXNG wird lokal per `127.0.0.1:8080` bereitgestellt; Details stehen in `docs/searxng-local-setup.md`.
 
@@ -236,4 +243,5 @@ Nach dem Start aller Komponenten eine kurze Probeabfrage ausführen und prüfen,
 - `docs/architecture.md`
 - `docs/troubleshooting.md`
 - `docs/changelog/iteration-1.md`
+- `docs/changelog/iteration-2.md`
 - `docs/searxng-local-setup.md`
