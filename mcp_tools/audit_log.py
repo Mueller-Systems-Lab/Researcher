@@ -122,7 +122,7 @@ class AuditLog(MCPToolBase):
                 },
             ).to_dict()
         except Exception as e:
-            logger.error(f"Fehler beim Audit-Log-Schreiben: {e}")
+            logger.exception(f"Fehler beim Audit-Log-Schreiben: {e}")
             return MCPToolResult(False, error=f"Kann nicht schreiben: {e}").to_dict()
 
     def _read_entries(self, params: dict) -> dict:
@@ -170,7 +170,7 @@ class AuditLog(MCPToolBase):
                 },
             ).to_dict()
         except Exception as e:
-            logger.error(f"Fehler beim Audit-Log-Lesen: {e}")
+            logger.exception(f"Fehler beim Audit-Log-Lesen: {e}")
             return MCPToolResult(False, error=f"Kann nicht lesen: {e}").to_dict()
 
     def _get_stats(self) -> dict:
@@ -192,7 +192,7 @@ class AuditLog(MCPToolBase):
                         except json.JSONDecodeError:
                             continue
             except Exception as e:
-                logger.error(f"Fehler: {e}")
+                logger.exception(f"Fehler beim Audit-Log-Stats: {e}")
 
         return MCPToolResult(
             True,

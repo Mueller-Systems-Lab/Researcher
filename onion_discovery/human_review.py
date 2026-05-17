@@ -60,7 +60,7 @@ class ReviewQueue:
                     item = ReviewItem(**entry)
                     self._items[item.id] = item
                 logger.info(f"{len(self._items)} Review-Items geladen")
-            except Exception as e:
+            except (json.JSONDecodeError, OSError) as e:
                 logger.warning(f"Fehler beim Laden der Review-Queue: {e}")
 
     def _save(self):
@@ -73,7 +73,7 @@ class ReviewQueue:
                     indent=2,
                     ensure_ascii=False,
                 )
-        except Exception as e:
+        except (OSError, TypeError) as e:
             logger.error(f"Fehler beim Speichern der Review-Queue: {e}")
 
     def add(
@@ -120,6 +120,19 @@ class ReviewQueue:
             reverse=True,
         )
         return pending[0]
+
+    def get_pending_items(self, limit: int = 10) -> list[ReviewItem]:
+        """Holt die nächsten pending Review-Items (älteste zuerst).
+
+        Args:
+            limit: Maximale Anzahl zurückgegebener Items.
+
+        Returns:
+            Liste von ReviewItems, sortiert nach Entdeckungszeitpunkt.
+        """
+        pending = [item for item in self._items.values() if item.status == "pending"]
+        pending.sort(key=lambda x: x.discovered_at)
+        return pending[:limit]
 
     def approve(self, item_id: str, reviewer: str = "admin", notes: str = "") -> bool:
         """Genehmigt ein Item (erlaubt Indexierung)."""

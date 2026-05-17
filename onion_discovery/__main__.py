@@ -130,7 +130,7 @@ def main():
 
     if args.review:
         rq = ReviewQueue()
-        items = [item for item in rq._items.values() if item.status == "pending"]
+        items = rq.get_pending_items(limit=10)
         if not items:
             print("  Keine pending Review-Items.")
             return

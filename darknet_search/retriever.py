@@ -30,7 +30,7 @@ def make_darknet_uri(forum_id: str, post_url: str) -> str:
     """
     import hashlib
 
-    post_hash = hashlib.md5(post_url.encode()).hexdigest()[:12]
+    post_hash = hashlib.sha256(post_url.encode()).hexdigest()[:16]
     return f"darknet://{forum_id}/post/{post_hash}"
 
 

@@ -172,4 +172,5 @@ class GPUMonitor:
             )
             return result.returncode == 0
         except Exception:
+            logger.debug("GPU-Monitor: is_available Prüfung fehlgeschlagen", exc_info=True)
             return False

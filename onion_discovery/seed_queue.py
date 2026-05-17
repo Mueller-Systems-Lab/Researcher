@@ -57,7 +57,7 @@ class SeedQueue:
                     seed = SeedEntry(**entry)
                     self._seeds[seed.url] = seed
                 logger.info(f"{len(self._seeds)} Seeds aus {self.seed_file} geladen")
-            except Exception as e:
+            except (json.JSONDecodeError, OSError) as e:
                 logger.warning(f"Fehler beim Laden der Seeds: {e}")
 
     def _save(self):
@@ -71,7 +71,7 @@ class SeedQueue:
                     indent=2,
                     ensure_ascii=False,
                 )
-        except Exception as e:
+        except (OSError, TypeError) as e:
             logger.error(f"Fehler beim Speichern der Seeds: {e}")
 
     def add_seed(
@@ -80,8 +80,17 @@ class SeedQueue:
         source: str = "manual",
         priority: int = 5,
         tags: Optional[list[str]] = None,
+        auto_save: bool = True,
     ) -> bool:
         """Fügt einen neuen Seed hinzu (ignoriert Duplikate).
+
+        Args:
+            url: Die Seed-URL.
+            source: Quelle des Seeds.
+            priority: Priorität 1–10 (10 = höchste).
+            tags: Optionale Tags.
+            auto_save: Wenn False, wird nicht automatisch gespeichert.
+                Nützlich für Batch-Operationen via add_seeds().
 
         Returns:
             True bei neuem Seed, False bei Duplikat.
@@ -95,7 +104,8 @@ class SeedQueue:
             priority=max(1, min(10, priority)),
             tags=tags or [],
         )
-        self._save()
+        if auto_save:
+            self._save()
         logger.info(f"Seed hinzugefügt: {url} (Quelle: {source})")
         return True
 
@@ -105,15 +115,18 @@ class SeedQueue:
         source: str = "manual",
         priority: int = 5,
     ) -> int:
-        """Fügt mehrere Seeds hinzu.
+        """Fügt mehrere Seeds hinzu (Batch mit einem Save).
 
         Returns:
             Anzahl neu hinzugefügter Seeds.
         """
         count = 0
         for url in urls:
-            if self.add_seed(url, source, priority):
+            if self.add_seed(url, source, priority, auto_save=False):
                 count += 1
+        if count > 0:
+            self._save()
+            logger.info(f"{count} Seeds batch-hinzugefügt (Quelle: {source})")
         return count
 
     def get_next(self, max_priority: int = 10) -> Optional[SeedEntry]:

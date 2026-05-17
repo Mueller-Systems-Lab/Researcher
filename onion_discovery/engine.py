@@ -168,7 +168,7 @@ class DiscoveryPipeline:
                         content += text + "\n"
                 content = content[:5000]  # Begrenzen
             except Exception as e:
-                logger.warning(f"Parse-Fehler: {e}")
+                logger.warning(f"Parse-Fehler: {e}", exc_info=True)
 
             # 5. Classify
             classification = self.classifier.classify(
@@ -179,7 +179,7 @@ class DiscoveryPipeline:
             stats["classified"] += 1
 
             # 6. Human Review (wenn nötig)
-            item_id = hashlib.md5(seed.url.encode()).hexdigest()[:16]
+            item_id = hashlib.sha256(seed.url.encode()).hexdigest()[:16]
 
             if classification.requires_human_review:
                 self.review_queue.add(
@@ -217,7 +217,7 @@ class DiscoveryPipeline:
                     )
                     stats["sent_to_index"] += 1
                 except Exception as e:
-                    logger.warning(f"Index-Fehler: {e}")
+                    logger.warning(f"Index-Fehler: {e}", exc_info=True)
 
             # Seed als verarbeitet markieren
             self.seed_queue.mark_completed(

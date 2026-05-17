@@ -11,6 +11,7 @@
 #   results = idx.search("suchbegriff", limit=10)
 # =============================================================================
 
+import hashlib
 import logging
 import os
 from datetime import datetime
@@ -72,7 +73,9 @@ class WhooshIndex:
         """
         try:
             writer = AsyncWriter(self.ix)
-            post_id = post.get("url", str(hash(str(post))))
+            post_id = (
+                post.get("url") or hashlib.sha256(str(post).encode()).hexdigest()[:32]
+            )
 
             # Timestamp normalisieren
             ts = post.get("timestamp")
@@ -95,7 +98,7 @@ class WhooshIndex:
             return True
 
         except Exception as e:
-            logger.error(f"Fehler beim Indexieren von Post: {e}")
+            logger.exception(f"Fehler beim Indexieren von Post: {e}")
             return False
 
     def add_posts(self, posts: list[dict]) -> int:
@@ -162,7 +165,7 @@ class WhooshIndex:
                 return output
 
         except Exception as e:
-            logger.error(f"Suchfehler: {e}")
+            logger.exception(f"Suchfehler: {e}")
             return []
 
     def optimize(self):
@@ -174,7 +177,7 @@ class WhooshIndex:
             writer.commit(optimize=True)
             logger.info("Index optimiert")
         except Exception as e:
-            logger.error(f"Fehler bei Index-Optimierung: {e}")
+            logger.exception(f"Fehler bei Index-Optimierung: {e}")
 
     @property
     def doc_count(self) -> int:
@@ -183,6 +186,7 @@ class WhooshIndex:
             with self.ix.searcher() as searcher:
                 return searcher.doc_count()
         except Exception:
+            logger.exception("Fehler bei doc_count")
             return 0
 
     def clear(self):
@@ -193,4 +197,4 @@ class WhooshIndex:
             self._ix = create_in(self.index_dir, POST_SCHEMA)
             logger.info("Index geleert")
         except Exception as e:
-            logger.error(f"Fehler beim Leeren des Index: {e}")
+            logger.exception(f"Fehler beim Leeren des Index: {e}")

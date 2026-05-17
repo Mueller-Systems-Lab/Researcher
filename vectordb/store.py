@@ -136,27 +136,38 @@ class VectorStore:
         self,
         query_embedding: list[float],
         n_results: int = 10,
+        where_filter: dict | None = None,
     ) -> list[dict]:
-        """Sucht ähnliche Dokumente per Embedding.
+        """Sucht ähnliche Dokumente per Embedding (ein einzelner Vektor).
 
         Args:
-            query_embedding: Embedding-Vektor für die Suche (einzelner Vektor).
+            query_embedding: Ein einzelner Embedding-Vektor für die Suche.
+                Keine Batch-Queries — für mehrere Vektoren mehrfach aufrufen.
             n_results: Anzahl gewünschter Ergebnisse.
+            where_filter: Optionaler ChromaDB-Metadaten-Filter (z.B.
+                {"topic": "technology"}).
 
         Returns:
-            Liste von Ergebnis-Dicts (oder leere Liste bei Fehler).
+            Liste von Ergebnis-Dicts mit keys: document, metadata, distance, id.
+            Leere Liste bei Fehler oder wenn ChromaDB nicht verfügbar.
         """
         collection = self._get_collection()
         if collection is None:
             return []
 
+        kwargs: dict = {
+            "query_embeddings": [query_embedding],
+            "n_results": n_results,
+        }
+        if where_filter:
+            kwargs["where"] = where_filter
+
         try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results,
-            )
+            results = collection.query(**kwargs)
             output = []
             if results.get("documents"):
+                # ChromaDB gibt pro Query-Embedding eine Ergebnisliste zurück.
+                # Da wir nur EIN Embedding senden, greifen wir auf Index [0] zu.
                 for i in range(len(results["documents"][0])):
                     output.append(
                         {
@@ -176,7 +187,7 @@ class VectorStore:
                     )
             return output
         except Exception as e:
-            logger.warning(f"Fehler bei ChromaDB-Query: {e}")
+            logger.warning(f"Fehler bei ChromaDB-Query: {e}", exc_info=True)
             return []
 
     @property
@@ -188,6 +199,7 @@ class VectorStore:
         try:
             return collection.count()
         except Exception:
+            logger.debug("Fehler bei ChromaDB-Count", exc_info=True)
             return 0
 
     def delete_collection(self):

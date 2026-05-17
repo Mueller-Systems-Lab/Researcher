@@ -116,7 +116,7 @@ class HumanReviewTool(MCPToolBase):
                 False, error="url ist erforderlich für action=request"
             ).to_dict()
 
-        item_id = hashlib.md5(url.encode()).hexdigest()[:16]
+        item_id = hashlib.sha256(url.encode()).hexdigest()[:16]
         content = params.get("content", "")
         risk_level = params.get("risk_level", "medium")
 
