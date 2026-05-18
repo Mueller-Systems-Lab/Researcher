@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" role="application" aria-label="GPU-Dashboard">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -104,44 +104,44 @@
 
 <h1>⚙ GPU-Dashboard</h1>
 
-<div id="error" class="error" style="display:none"></div>
+<div id="error" class="error" style="display:none" role="alert" aria-live="assertive"></div>
 
-<div class="grid" id="metrics">
-  <div class="card">
+<div class="grid" id="metrics" aria-label="GPU-Metriken" role="region">
+  <div class="card" role="status" aria-label="GPU-Auslastung">
     <div class="label">GPU-Auslastung</div>
-    <div class="value" id="gpu-util">--</div>
+    <div class="value" id="gpu-util" aria-live="polite" aria-atomic="true">--</div>
     <div class="bar-container">
-      <div class="bar" id="gpu-bar" style="width:0%"></div>
+      <div class="bar" id="gpu-bar" style="width:0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="GPU-Auslastung Fortschritt"></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card" role="status" aria-label="VRAM-Verbrauch">
     <div class="label">VRAM-Verbrauch</div>
-    <div class="value" id="vram-used">-- <span class="unit">MiB</span></div>
+    <div class="value" id="vram-used" aria-live="polite" aria-atomic="true">-- <span class="unit">MiB</span></div>
     <div class="bar-container">
-      <div class="bar" id="vram-bar" style="width:0%"></div>
+      <div class="bar" id="vram-bar" style="width:0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="VRAM-Verbrauch Fortschritt"></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card" role="status" aria-label="Temperatur">
     <div class="label">Temperatur</div>
-    <div class="value" id="gpu-temp">-- <span class="unit">°C</span></div>
+    <div class="value" id="gpu-temp" aria-live="polite" aria-atomic="true">-- <span class="unit">°C</span></div>
   </div>
-  <div class="card">
+  <div class="card" role="status" aria-label="GPU-Name">
     <div class="label">GPU-Name</div>
-    <div class="value" style="font-size:1em" id="gpu-name">--</div>
+    <div class="value" style="font-size:1em" id="gpu-name" aria-live="polite" aria-atomic="true">--</div>
   </div>
 </div>
 
-<div class="card">
+<div class="card" role="region" aria-label="GPU-Prozesse">
   <div class="label">GPU-Prozesse</div>
-  <table>
+  <table aria-label="GPU-Prozessliste">
     <thead><tr><th>PID</th><th>Name</th><th>VRAM (MiB)</th></tr></thead>
-    <tbody id="process-list">
+    <tbody id="process-list" aria-live="polite">
       <tr><td colspan="3">Keine Prozesse</td></tr>
     </tbody>
   </table>
 </div>
 
-<p style="margin-top:20px;color:#8b949e;font-size:0.8em" id="timestamp"></p>
+<p style="margin-top:20px;color:#8b949e;font-size:0.8em" id="timestamp" aria-live="polite" aria-atomic="true"></p>
 
 <script>
 const eventSource = new EventSource('/api/gpu/stream');
@@ -174,6 +174,7 @@ function updateDashboard(data) {
   const gpuBar = document.getElementById('gpu-bar');
   gpuBar.style.width = Math.round(data.gpu_utilization) + '%';
   gpuBar.className = 'bar ' + (data.gpu_utilization > 90 ? 'critical' : data.gpu_utilization > 70 ? 'warning' : '');
+  gpuBar.setAttribute('aria-valuenow', Math.round(data.gpu_utilization));
 
   // VRAM
   const used = data.memory_used_mib;
@@ -184,6 +185,7 @@ function updateDashboard(data) {
   const vramBar = document.getElementById('vram-bar');
   vramBar.style.width = Math.round(pct) + '%';
   vramBar.className = 'bar ' + (data.warning_level === 'critical' ? 'critical' : data.warning_level === 'warning' ? 'warning' : '');
+  vramBar.setAttribute('aria-valuenow', Math.round(pct));
   document.getElementById('vram-used').className = data.warning_level === 'critical' ? 'value critical-text' : data.warning_level === 'warning' ? 'value warning-text' : 'value';
 
   // Temperatur
