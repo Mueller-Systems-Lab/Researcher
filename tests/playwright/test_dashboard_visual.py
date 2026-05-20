@@ -18,7 +18,6 @@ def test_dashboard_gpu_widget_structure():
     Validiert die Struktur des Dashboard-HTML-Widgets.
     Läuft OHNE Playwright — prüft nur den HTML-Quelltext.
     """
-    import re
 
     index_path = os.path.join(
         os.path.dirname(__file__), "../../dashboard/static/index.html"

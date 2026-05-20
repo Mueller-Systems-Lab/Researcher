@@ -14,7 +14,6 @@
 
 import hashlib
 import logging
-from typing import Optional
 
 from mcp_tools.base import MCPToolBase, MCPToolResult
 from onion_discovery.human_review import ReviewQueue
@@ -52,7 +51,9 @@ class HumanReviewTool(MCPToolBase):
                 },
                 "url": {
                     "type": "string",
-                    "description": "URL des zu reviewenden Inhalts (für action=request)",
+                    "description": (
+                        "URL des zu reviewenden Inhalts (für action=request)"
+                    ),
                 },
                 "title": {
                     "type": "string",
@@ -79,7 +80,7 @@ class HumanReviewTool(MCPToolBase):
             "required": ["action"],
         }
 
-    def __init__(self, review_queue: Optional[ReviewQueue] = None):
+    def __init__(self, review_queue: ReviewQueue | None = None):
         self.review_queue = review_queue or ReviewQueue()
 
     def run(self, params: dict) -> dict:

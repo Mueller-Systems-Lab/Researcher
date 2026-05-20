@@ -14,9 +14,8 @@
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,9 @@ class SeedEntry:
         "pending"  # pending, fetching, parsed, reviewed, approved, rejected, error
     )
     added_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    fetched_at: Optional[str] = None
-    reviewed_at: Optional[str] = None
-    error: Optional[str] = None
+    fetched_at: str | None = None
+    reviewed_at: str | None = None
+    error: str | None = None
     tags: list[str] = field(default_factory=list)
     notes: str = ""
 
@@ -42,7 +41,7 @@ class SeedEntry:
 class SeedQueue:
     """Verwaltet die Warteschlange der bekannten .onion-Seeds."""
 
-    def __init__(self, seed_file: Optional[str] = None):
+    def __init__(self, seed_file: str | None = None):
         self.seed_file = seed_file or os.getenv("ONION_SEED_FILE", "./onion_seeds.json")
         self._seeds: dict[str, SeedEntry] = {}
         self._load()
@@ -79,7 +78,7 @@ class SeedQueue:
         url: str,
         source: str = "manual",
         priority: int = 5,
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
         auto_save: bool = True,
     ) -> bool:
         """Fügt einen neuen Seed hinzu (ignoriert Duplikate).
@@ -129,7 +128,7 @@ class SeedQueue:
             logger.info(f"{count} Seeds batch-hinzugefügt (Quelle: {source})")
         return count
 
-    def get_next(self, max_priority: int = 10) -> Optional[SeedEntry]:
+    def get_next(self, max_priority: int = 10) -> SeedEntry | None:
         """Holt den nächsten zu verarbeitenden Seed (höchste Priorität zuerst).
 
         Args:
@@ -177,7 +176,7 @@ class SeedQueue:
 
     def get_stats(self) -> dict:
         """Liefert Statistiken über die Seed-Queue."""
-        statuses = {}
+        statuses: dict[str, int] = {}
         for s in self._seeds.values():
             statuses[s.status] = statuses.get(s.status, 0) + 1
         return {

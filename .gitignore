@@ -53,6 +53,8 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+qa/
 
 # Node (falls genutzt)
 node_modules/
+reports/

@@ -11,9 +11,7 @@
 # =============================================================================
 
 import logging
-import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +156,7 @@ class Classifier:
         url: str = "",
         title: str = "",
         content: str = "",
-        headers: Optional[dict] = None,
+        headers: dict | None = None,
     ) -> ClassificationResult:
         """Klassifiziert eine Onion-Seite.
 
@@ -182,7 +180,7 @@ class Classifier:
                 topic_scores[topic] = score
 
         if topic_scores:
-            best_topic = max(topic_scores, key=topic_scores.get)
+            best_topic = max(topic_scores, key=lambda k: topic_scores.get(k, 0))
             result.topic = best_topic
             result.keywords_found = [
                 kw for kw in self.TOPIC_KEYWORDS.get(best_topic, []) if kw in text
@@ -202,7 +200,7 @@ class Classifier:
             result.reasons.append(f"Multiple High-Risk-Keywords: {high_risk_matches}")
         elif high_risk_matches >= 1:
             result.risk_level = RISK_HIGH
-            result.reasons.append(f"High-Risk-Keyword gefunden")
+            result.reasons.append("High-Risk-Keyword gefunden")
 
         # Marketplace immer kritisch
         if result.topic == "marketplace":

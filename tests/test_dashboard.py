@@ -6,10 +6,9 @@
 #   python3 -m pytest tests/test_dashboard.py -v
 # =============================================================================
 
-import sys
 import os
-import json
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -191,8 +190,9 @@ def test_dashboard_health_endpoint():
 
 def test_resolve_static_normal():
     """_resolve_static: Normale Datei wird aufgelöst."""
-    from dashboard.server import DashboardHandler, STATIC_DIR
     import os
+
+    from dashboard.server import DashboardHandler
 
     handler = DashboardHandler
     result = handler._resolve_static(handler, "index.html")

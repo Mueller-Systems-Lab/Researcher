@@ -15,7 +15,6 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Optional
 
 from mcp_tools.base import MCPToolBase, MCPToolResult
 
@@ -45,7 +44,9 @@ class AuditLog(MCPToolBase):
                 "action": {
                     "type": "string",
                     "enum": ["write", "read", "stats"],
-                    "description": "Aktion: write=schreiben, read=lesen, stats=Statistiken",
+                    "description": (
+                        "Aktion: write=schreiben, read=lesen, stats=Statistiken"
+                    ),
                 },
                 "event": {
                     "type": "string",
@@ -62,7 +63,9 @@ class AuditLog(MCPToolBase):
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximale Anzahl Einträge (für action=read, default: 50)",
+                    "description": (
+                        "Maximale Anzahl Einträge (für action=read, default: 50)"
+                    ),
                     "default": 50,
                 },
                 "event_filter": {
@@ -71,13 +74,15 @@ class AuditLog(MCPToolBase):
                 },
                 "since": {
                     "type": "string",
-                    "description": "Optional: ISO-Datum, nur Einträge ab diesem Zeitpunkt",
+                    "description": (
+                        "Optional: ISO-Datum, nur Einträge ab diesem Zeitpunkt"
+                    ),
                 },
             },
             "required": ["action"],
         }
 
-    def __init__(self, log_file: Optional[str] = None):
+    def __init__(self, log_file: str | None = None):
         self.log_file = log_file or os.getenv("AUDIT_LOG_FILE", "./audit_trail.jsonl")
 
     def run(self, params: dict) -> dict:
@@ -110,8 +115,9 @@ class AuditLog(MCPToolBase):
         }
 
         try:
-            os.makedirs(os.path.dirname(self.log_file) or ".", exist_ok=True)
-            with open(self.log_file, "a") as f:
+            log_dir = os.path.dirname(self.log_file or ".") or "."
+            os.makedirs(log_dir, exist_ok=True)
+            with open(self.log_file or "audit_log.jsonl", "a") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             return MCPToolResult(
                 True,
@@ -130,7 +136,8 @@ class AuditLog(MCPToolBase):
         event_filter = params.get("event_filter", "")
         since = params.get("since", "")
 
-        if not os.path.exists(self.log_file):
+        log_file = self.log_file or "audit_log.jsonl"
+        if not os.path.exists(log_file):
             return MCPToolResult(
                 True,
                 data={
@@ -142,7 +149,7 @@ class AuditLog(MCPToolBase):
 
         try:
             entries = []
-            with open(self.log_file) as f:
+            with open(log_file) as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -175,11 +182,12 @@ class AuditLog(MCPToolBase):
 
     def _get_stats(self) -> dict:
         count = 0
-        events = {}
+        events: dict[str, int] = {}
 
-        if os.path.exists(self.log_file):
+        log_file = self.log_file or "audit_log.jsonl"
+        if os.path.exists(log_file):
             try:
-                with open(self.log_file) as f:
+                with open(log_file) as f:
                     for line in f:
                         line = line.strip()
                         if not line:

@@ -8,8 +8,8 @@
 #   python3 -m pytest tests/test_vectordb.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -130,3 +130,73 @@ def test_embedding_service_connection_error():
 
     with pytest.raises(ConnectionError):
         svc.embed("test")
+
+
+# ---------------------------------------------------------------------------
+# VectorStore — erweiterte Tests (Repair Coverage)
+# ---------------------------------------------------------------------------
+
+
+def test_vector_store_delete_collection():
+    """Test: delete_collection löscht die Collection und setzt _collection zurück."""
+    from vectordb.store import VectorStore
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = VectorStore(
+            persist_directory=tmpdir,
+            collection_name="test_delete_collection",
+        )
+        # Collection erstellen durch add_one (metadata required by ChromaDB 1.5.9)
+        store.add_one("test doc", [0.1] * 768, metadata={"source": "test"})
+        assert store.count >= 1
+
+        # Collection löschen
+        store.delete_collection()
+        assert store._collection is None
+
+        # Nach Löschen: count sollte 0 sein (neue Collection)
+        assert store.count >= 0
+
+
+def test_vector_store_query_with_where_filter():
+    """Test: query mit where_filter Parameter."""
+    from vectordb.store import VectorStore
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = VectorStore(
+            persist_directory=tmpdir,
+            collection_name="test_filtered",
+        )
+        # Dokumente mit unterschiedlichen Metadaten
+        store.add_one("AI document", [0.1] * 768, metadata={"topic": "AI"})
+        store.add_one("Cooking document", [0.2] * 768, metadata={"topic": "Cooking"})
+
+        # Mit Filter nur AI-Dokumente finden
+        results = store.query(
+            query_embedding=[0.1] * 768,
+            n_results=5,
+            where_filter={"topic": "AI"},
+        )
+        assert len(results) >= 1, "Sollte mindestens ein AI-Dokument finden"
+
+        # Ergebnisse sollten nur AI-Topic haben
+        for r in results:
+            assert r.get("metadata", {}).get("topic") == "AI"
+
+
+def test_vector_store_count_after_clear():
+    """Test: count nach Hinzufügen und Löschen konsistent."""
+    from vectordb.store import VectorStore
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = VectorStore(
+            persist_directory=tmpdir,
+            collection_name="test_count",
+        )
+        assert store.count == 0
+
+        store.add_one("doc1", [0.1] * 768, metadata={"source": "test"})
+        assert store.count == 1
+
+        store.add_one("doc2", [0.2] * 768, metadata={"source": "test"})
+        assert store.count == 2

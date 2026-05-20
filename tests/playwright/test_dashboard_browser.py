@@ -25,8 +25,9 @@ def test_dashboard_screenshot():
     """
     Startet Dashboard-Server, macht Screenshot, vergleicht mit Baseline.
     """
-    from dashboard.server import run_server
     from threading import Thread
+
+    from dashboard.server import run_server
 
     server_thread = Thread(
         target=run_server,

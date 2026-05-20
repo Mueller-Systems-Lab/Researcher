@@ -5,8 +5,10 @@
 # Instance-Methoden von BaseHTTPRequestHandler werden über das
 # http.server-Modul mit Dummy-Anfragen getestet.
 # =============================================================================
-import sys, os, io, json
-from unittest.mock import patch, MagicMock
+import io
+import os
+import sys
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -29,7 +31,7 @@ def test_dashboard_static_exists():
 
 
 def test_resolve_static_normal():
-    from dashboard.server import DashboardHandler, STATIC_DIR
+    from dashboard.server import DashboardHandler
 
     # Instanz erstellen durch Mocken des Konstruktors
     with patch.object(DashboardHandler, "__init__", lambda self: None):

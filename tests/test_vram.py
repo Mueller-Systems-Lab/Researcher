@@ -7,9 +7,9 @@
 #   python3 -m pytest tests/test_vram.py -v
 # =============================================================================
 
-import sys
 import os
 import subprocess
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

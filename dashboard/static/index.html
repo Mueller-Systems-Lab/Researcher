@@ -180,7 +180,9 @@ function updateDashboard(data) {
   const used = data.memory_used_mib;
   const total = data.memory_total_mib;
   const pct = data.memory_percent;
-  document.getElementById('vram-used').innerHTML = used + ' / ' + total + ' <span class="unit">MiB</span>';
+  // textContent statt innerHTML für Plaintext (XSS-Schutz)
+  const vramEl = document.getElementById('vram-used');
+  vramEl.textContent = used + ' / ' + total + ' MiB';
 
   const vramBar = document.getElementById('vram-bar');
   vramBar.style.width = Math.round(pct) + '%';
@@ -189,19 +191,35 @@ function updateDashboard(data) {
   document.getElementById('vram-used').className = data.warning_level === 'critical' ? 'value critical-text' : data.warning_level === 'warning' ? 'value warning-text' : 'value';
 
   // Temperatur
-  document.getElementById('gpu-temp').innerHTML = Math.round(data.temperature_c) + ' <span class="unit">°C</span>';
+  document.getElementById('gpu-temp').textContent = Math.round(data.temperature_c) + ' °C';
 
   // GPU-Name
   document.getElementById('gpu-name').textContent = data.gpu_name || '--';
 
-  // Prozesse
+  // Prozesse — DOM-API statt innerHTML (XSS-Schutz, Block 3.4)
   const procBody = document.getElementById('process-list');
+  procBody.textContent = ''; // Clear sicher
   if (data.processes && data.processes.length > 0) {
-    procBody.innerHTML = data.processes.map(p =>
-      '<tr><td>' + p.pid + '</td><td>' + p.name + '</td><td>' + p.memory_mib + '</td></tr>'
-    ).join('');
+    data.processes.forEach(function(p) {
+      const tr = document.createElement('tr');
+      const tdPid = document.createElement('td');
+      tdPid.textContent = p.pid;
+      const tdName = document.createElement('td');
+      tdName.textContent = p.name;
+      const tdMem = document.createElement('td');
+      tdMem.textContent = p.memory_mib;
+      tr.appendChild(tdPid);
+      tr.appendChild(tdName);
+      tr.appendChild(tdMem);
+      procBody.appendChild(tr);
+    });
   } else {
-    procBody.innerHTML = '<tr><td colspan="3">Keine GPU-Prozesse</td></tr>';
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.setAttribute('colspan', '3');
+    td.textContent = 'Keine GPU-Prozesse';
+    tr.appendChild(td);
+    procBody.appendChild(tr);
   }
 
   // Timestamp

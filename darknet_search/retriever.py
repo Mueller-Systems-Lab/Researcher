@@ -16,7 +16,6 @@
 
 import logging
 import os
-from typing import Optional
 
 from darknet_search.index import WhooshIndex
 
@@ -44,8 +43,8 @@ class DarknetRetriever:
     def __init__(
         self,
         query: str,
-        query_domains: Optional[list] = None,
-        index_dir: Optional[str] = None,
+        query_domains: list | None = None,
+        index_dir: str | None = None,
     ):
         """
         Args:
@@ -57,7 +56,11 @@ class DarknetRetriever:
         self.query_domains = query_domains or []
 
         # Index-Pfad aus Umgebungsvariable oder Default
-        index_path = index_dir or os.getenv("DARKNET_INDEX_PATH", "./darknet_index")
+        index_path: str = (
+            index_dir
+            or os.getenv("DARKNET_INDEX_PATH", "./darknet_index")
+            or "./darknet_index"
+        )
         self.index = WhooshIndex(index_path)
 
     def search(self, max_results: int = 10) -> list[dict]:

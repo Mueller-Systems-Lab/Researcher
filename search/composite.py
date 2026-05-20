@@ -17,7 +17,7 @@
 
 import logging
 import os
-from typing import Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -37,9 +37,9 @@ class CompositeRetriever:
     def __init__(
         self,
         query: str,
-        query_domains: Optional[list] = None,
-        searx_url: Optional[str] = None,
-        darknet_index_dir: Optional[str] = None,
+        query_domains: list | None = None,
+        searx_url: str | None = None,
+        darknet_index_dir: str | None = None,
     ):
         self.query = query
         self.query_domains = query_domains or []
@@ -60,8 +60,8 @@ class CompositeRetriever:
             Liste von Ergebnissen im GPT-Researcher-Format, oder leere Liste.
         """
         try:
-            search_url = urljoin(self.searx_url, "search")
-            params = {
+            search_url = urljoin(self.searx_url or "http://localhost:8080", "search")
+            params: dict[str, Any] = {
                 "q": self.query,
                 "format": "json",
                 "language": "de-DE",

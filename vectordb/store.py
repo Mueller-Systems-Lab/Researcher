@@ -13,7 +13,6 @@
 
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +27,8 @@ class VectorStore:
 
     def __init__(
         self,
-        persist_directory: Optional[str] = None,
-        collection_name: Optional[str] = None,
+        persist_directory: str | None = None,
+        collection_name: str | None = None,
     ):
         self.persist_directory = persist_directory or os.getenv(
             "CHROMA_PERSIST_DIRECTORY", "./chroma_db"
@@ -80,8 +79,8 @@ class VectorStore:
         self,
         documents: list[str],
         embeddings: list[list[float]],
-        metadatas: Optional[list[dict]] = None,
-        ids: Optional[list[str]] = None,
+        metadatas: list[dict] | None = None,
+        ids: list[str] | None = None,
     ) -> bool:
         """Fügt Dokumente mit Embeddings hinzu.
 
@@ -119,8 +118,8 @@ class VectorStore:
         self,
         document: str,
         embedding: list[float],
-        metadata: Optional[dict] = None,
-        doc_id: Optional[str] = None,
+        metadata: dict | None = None,
+        doc_id: str | None = None,
     ) -> bool:
         """Fügt ein einzelnes Dokument hinzu."""
         import uuid

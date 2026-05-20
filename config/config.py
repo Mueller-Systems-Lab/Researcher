@@ -10,10 +10,69 @@
 # =============================================================================
 
 import os
+import sys
 from pathlib import Path
 
 # Projekt-Root ermitteln
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+
+# Cloud-Provider, die lokal-first ersetzen würden (Block 3.6)
+_CLOUD_PROVIDERS = ["openai", "tavily", "google-genai", "anthropic"]
+
+
+def validate_local_first() -> list[str]:
+    """Startup-Check: Cloud-Provider fail-closed.
+
+    Prüft, ob LLM_PROVIDER oder RETRIEVER auf Cloud-Dienste zeigen,
+    ohne dass ALLOW_CLOUD=true gesetzt ist.
+
+    Returns:
+        Liste mit Fehlermeldungen (leer = alles OK).
+    """
+    if os.getenv("ALLOW_CLOUD", "").lower() in ("true", "1", "yes"):
+        return []  # Cloud explizit erlaubt
+
+    errors = []
+
+    # Prüfe LLM-Provider
+    llm_provider = os.getenv("LLM_PROVIDER", "").lower()
+    for provider in _CLOUD_PROVIDERS:
+        if provider in llm_provider:
+            errors.append(f"LLM_PROVIDER='{llm_provider}'")
+
+    # Prüfe FAST/SMART/STRATEGIC_LLM
+    for llm_var in ("FAST_LLM", "SMART_LLM", "STRATEGIC_LLM"):
+        val = os.getenv(llm_var, "").lower()
+        for provider in _CLOUD_PROVIDERS:
+            if val.startswith(provider + ":"):
+                errors.append(f"{llm_var}='{val}'")
+                break
+
+    # Prüfe Retriever
+    retriever = os.getenv("RETRIEVER", "").lower()
+    if retriever == "tavily":
+        errors.append("RETRIEVER='tavily'")
+
+    if errors:
+        providers_list = ", ".join(errors)
+        return [
+            "ERROR: Cloud provider detected without ALLOW_CLOUD=true.",
+            f"  Detected: {providers_list}",
+            "  Set LLM_PROVIDER=ollama or add ALLOW_CLOUD=true to .env",
+            "  See .env.example for local-first configuration.",
+        ]
+
+    return []
+
+
+def ensure_local_first_or_die():
+    """Bricht den Startup ab, wenn Cloud-Provider ohne ALLOW_CLOUD=true
+    erkannt werden."""
+    errors = validate_local_first()
+    if errors:
+        for line in errors:
+            print(line, file=sys.stderr)
+        sys.exit(1)
 
 
 def validate_env() -> list[str]:
@@ -35,9 +94,9 @@ def suggest_env():
     env_path = PROJECT_ROOT / ".env"
     example_path = PROJECT_ROOT / ".env.example"
     if not env_path.exists():
-        print(f"  ⚠  .env nicht gefunden.")
+        print("  ⚠  .env nicht gefunden.")
         print(f"  →  Kopiere {example_path} nach {env_path}")
-        print(f"  →  Passe die Werte in .env an deine Umgebung an.")
+        print("  →  Passe die Werte in .env an deine Umgebung an.")
 
 
 def is_deterministic() -> bool:
@@ -94,6 +153,6 @@ def print_config():
     )
     print(f"  DETERMINISTIC:   {os.getenv('RESEARCH_DETERMINISTIC', 'false')}")
     if is_deterministic():
-        print(f"  TEMPERATURE:     0 (fixiert)")
-        print(f"  LLM_SEED:        42 (fixiert)")
+        print("  TEMPERATURE:     0 (fixiert)")
+        print("  LLM_SEED:        42 (fixiert)")
     print("=" * 60)

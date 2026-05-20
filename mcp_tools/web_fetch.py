@@ -13,7 +13,6 @@
 import ipaddress
 import logging
 import socket
-from typing import Optional
 from urllib.parse import urlparse
 
 import requests
@@ -68,14 +67,16 @@ class WebFetchTool(MCPToolBase):
                 },
                 "extract_text": {
                     "type": "boolean",
-                    "description": "HTML bereinigen, nur Text extrahieren (default: true)",
+                    "description": (
+                        "HTML bereinigen, nur Text extrahieren (default: true)"
+                    ),
                     "default": True,
                 },
             },
             "required": ["url"],
         }
 
-    def __init__(self, policy_gateway: Optional[PolicyGateway] = None):
+    def __init__(self, policy_gateway: PolicyGateway | None = None):
         self.policy = policy_gateway or PolicyGateway()
         self._session = requests.Session()
         self._session.headers.update(
@@ -87,9 +88,9 @@ class WebFetchTool(MCPToolBase):
                 "Accept": "text/html,application/xhtml+xml",
             }
         )
-        self._session.timeout = 30
+        self._session.timeout = 30  # type: ignore[attr-defined]
 
-    def _validate_url_target(self, url: str) -> Optional[str]:
+    def _validate_url_target(self, url: str) -> str | None:
         """Validiert die Ziel-IP einer URL (SSRF-Schutz).
 
         Löst den Hostnamen auf und prüft, ob die IP in einem privaten
@@ -103,6 +104,10 @@ class WebFetchTool(MCPToolBase):
             host = parsed.hostname
             if not host:
                 return "Ungültige URL: kein Hostname"
+
+            # Nur http/https erlauben (kein file://, ftp://, gopher://, etc.)
+            if parsed.scheme not in ("http", "https"):
+                return f"SSRF blockiert: Schema '{parsed.scheme}' nicht erlaubt"
 
             # Hostname auflösen
             addrinfo = socket.getaddrinfo(
@@ -135,7 +140,7 @@ class WebFetchTool(MCPToolBase):
             return f"Hostname nicht auflösbar: {host} ({e})"
         except Exception as e:
             logger.warning(f"SSRF-Validierungsfehler für {url}: {e}")
-            return None  # Im Zweifel erlauben (kein blockierendes Verhalten)
+            return f"SSRF-Validierung fehlgeschlagen: {e}"
 
     def run(self, params: dict) -> dict:
         url = params.get("url", "")
@@ -169,9 +174,19 @@ class WebFetchTool(MCPToolBase):
             return MCPToolResult(False, error=ssrf_error).to_dict()
 
         try:
-            response = self._session.get(url, timeout=30)
+            response = self._session.get(url, timeout=30, allow_redirects=True)
             response.raise_for_status()
             content = response.text
+
+            # SSRF-Redirect-Revalidation: Jede Redirect-URL prüfen
+            for redirect_resp in response.history:
+                redirect_url = redirect_resp.url
+                ssrf_error = self._validate_url_target(redirect_url)
+                if ssrf_error:
+                    return MCPToolResult(
+                        False,
+                        error=f"SSRF blockiert nach Redirect: {ssrf_error}",
+                    ).to_dict()
 
             result = {
                 "url": url,

@@ -17,10 +17,9 @@
 import json
 import logging
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Any
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from mcp_tools.registry import init_tools, get_all_manifests, run_tool
+from mcp_tools.registry import get_all_manifests, init_tools, run_tool
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +195,7 @@ def run_server(host: str = "127.0.0.1", port: int = MCP_PORT):
     print(f"  MCP-Server: http://{host}:{port}/mcp")
     print(f"  Health:     http://{host}:{port}/health")
     print(f"  Tools:      {[m['name'] for m in get_all_manifests()]}")
-    print(f"  Drücke Ctrl+C zum Beenden")
+    print("  Drücke Ctrl+C zum Beenden")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

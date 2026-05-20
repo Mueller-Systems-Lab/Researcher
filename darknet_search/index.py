@@ -15,10 +15,9 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Optional
 
-from whoosh.index import create_in, open_dir, exists_in
-from whoosh.fields import Schema, TEXT, ID, DATETIME
+from whoosh.fields import DATETIME, ID, TEXT, Schema
+from whoosh.index import create_in, exists_in, open_dir
 from whoosh.qparser import MultifieldParser
 from whoosh.writing import AsyncWriter
 
@@ -171,7 +170,6 @@ class WhooshIndex:
     def optimize(self):
         """Optimiert den Index (Komprimierung)."""
         try:
-            from whoosh import writing
 
             writer = AsyncWriter(self.ix)
             writer.commit(optimize=True)
@@ -192,7 +190,6 @@ class WhooshIndex:
     def clear(self):
         """Leert den Index vollständig."""
         try:
-            from whoosh import index
 
             self._ix = create_in(self.index_dir, POST_SCHEMA)
             logger.info("Index geleert")

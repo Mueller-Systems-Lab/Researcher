@@ -1,9 +1,10 @@
-# ADR-008: Whoosh Migration
+# ADR-014: Whoosh Migration (ursprünglich ADR-008)
 
 **Status:** Proposed  
 **Date:** 2026-05-17  
 **Deciders:** Architecture Review Agent  
 **Context:** Issue #35 — migrate away from unmaintained `whoosh 2.7.4`
+**Note:** Renumbered from ADR-008 to ADR-014 to resolve duplicate numbering with `008-onion-search-index.md`.
 
 ---
 

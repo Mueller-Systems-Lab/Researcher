@@ -13,13 +13,18 @@ Nutzung:
   python uncensored_research.py --model qwen "Frage"        # Qwen
 """
 
-import argparse, json, os, requests, sys, textwrap
+import argparse
+import sys
+import textwrap
+from typing import Any
+
+import requests
 
 # ═══════════════════════════════════════════════════════════════
 # Modell-Konfiguration
 # ═══════════════════════════════════════════════════════════════
 
-MODELS = {
+MODELS: dict[str, dict[str, Any]] = {
     "gemma4": {
         "name": "Gemma4 Obliterated (llama.cpp)",
         "url": "http://localhost:8085/v1/chat/completions",
@@ -161,7 +166,7 @@ def query_model(
             raw = data.get("choices", [{}])[0].get("text", "")
             if raw and raw.strip("* "):
                 return raw
-        return f"⚠️ Keine Antwort (Tokens generiert, aber leer)"
+        return "⚠️ Keine Antwort (Tokens generiert, aber leer)"
 
 
 def research(query: str, mode: str = "deep_summary", model: str = "gemma4"):
@@ -248,9 +253,9 @@ if __name__ == "__main__":
             if user_input.startswith("model "):
                 new_model = user_input.split()[1]
                 if new_model in MODELS:
-                    print(f"   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
-                    print(f"   Stoppe vorher: pkill -f llama-server ODER ollama serve")
-                    print(f"   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
+                    print("   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
+                    print("   Stoppe vorher: pkill -f llama-server ODER ollama serve")
+                    print("   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
                     current_model = new_model
                     print(f"   → Gewählt: {MODELS[current_model]['name']}")
                 continue

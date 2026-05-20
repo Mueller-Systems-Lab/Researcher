@@ -158,8 +158,9 @@ def _assert_or_create_visual_baseline(screenshot: bytes) -> None:
         return
 
     try:
-        from PIL import Image, ImageChops
         from io import BytesIO
+
+        from PIL import Image, ImageChops
     except ImportError:
         assert (
             hashlib.sha256(screenshot).hexdigest()

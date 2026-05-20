@@ -9,8 +9,8 @@ import argparse
 import logging
 import sys
 
-from crawlers.darknet_crawler import DarknetCrawler
 from crawlers.config import config
+from crawlers.darknet_crawler import DarknetCrawler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,7 +82,7 @@ def main():
     print(f"\n  ✅ {len(posts)} Posts extrahiert")
 
     if posts:
-        print(f"\n  Erstes Posting:")
+        print("\n  Erstes Posting:")
         print(f"    Autor:     {posts[0].author}")
         print(f"    Content:   {posts[0].content[:100]}...")
         print(f"    Timestamp: {posts[0].timestamp}")

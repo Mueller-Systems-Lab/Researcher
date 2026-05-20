@@ -59,10 +59,10 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    from onion_discovery.seed_queue import SeedQueue
-    from onion_discovery.policy_gateway import PolicyGateway
-    from onion_discovery.human_review import ReviewQueue
     from onion_discovery.engine import DiscoveryPipeline
+    from onion_discovery.human_review import ReviewQueue
+    from onion_discovery.policy_gateway import PolicyGateway
+    from onion_discovery.seed_queue import SeedQueue
 
     if args.config_only:
         print("=" * 60)
@@ -72,7 +72,7 @@ def main():
             f"  ONION_DISCOVERY_ENABLED: "
             f"{os.getenv('ONION_DISCOVERY_ENABLED', 'false')}"
         )
-        print(f"  Tor-Proxy: socks5h://127.0.0.1:9050")
+        print("  Tor-Proxy: socks5h://127.0.0.1:9050")
         print(f"  Pipeline aktiv: {DiscoveryPipeline().enabled()}")
         print("=" * 60)
         return

@@ -47,12 +47,31 @@ warn_return_any = false
 warn_unused_configs = true
 no_implicit_optional = true
 
+[[tool.mypy.overrides]]
+module = ["gpt_researcher.*"]
+ignore_errors = true
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+exclude = [
+    "gpt_researcher/**",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Playwright-Tests: Enthalten eingebettetes JavaScript (String-Literale)
+"tests/playwright/*.py" = ["E501"]
+# Scripts mit sys.path-Manipulation vor Imports (architekturbedingt)
+"scripts/deep_research.py" = ["E501"]
+"scripts/patch_gpt_researcher.py" = ["E402"]
+"scripts/start-with-dashboard.py" = ["E402"]
+# E2E-Tests: Lange Mock-Datenstrings
+"tests/e2e/*.py" = ["E501"]
+# Infra-Skripte: sys.path-Imports + Utility-Code
+"infra/*.py" = ["E402", "E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,8 +1,9 @@
 # =============================================================================
 # Tests: Claim Validator Coverage (T-025)
 # =============================================================================
-import sys, os
-from unittest.mock import patch, MagicMock
+import os
+import sys
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
