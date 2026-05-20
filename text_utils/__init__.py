@@ -22,6 +22,12 @@ from text_utils.german import (
     normalize_search_key,
     slugify_german,
 )
+from text_utils.search_keys import (
+    GermanSearchKeys,
+    build_german_search_keys,
+    german_query_matches_text,
+    german_search_keys_match,
+)
 
 __all__ = [
     "normalize_nfc",
@@ -29,4 +35,8 @@ __all__ = [
     "ascii_fold_german",
     "slugify_german",
     "normalize_markdown_text",
+    "GermanSearchKeys",
+    "build_german_search_keys",
+    "german_search_keys_match",
+    "german_query_matches_text",
 ]

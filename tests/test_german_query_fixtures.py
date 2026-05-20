@@ -380,3 +380,60 @@ def test_fixture_count():
 
     count = get_fixture_count()
     assert count >= 4, f"Erwartet ≥4 Fixtures, gefunden: {count}"
+
+
+# ── Search-Key Integration (Issue #77) ────────────────────────────────────────
+
+
+def test_german_fixtures_have_search_keys():
+    """Jede Fixture kann in GermanSearchKeys umgewandelt werden."""
+    from tests.helpers.german_query_fixtures import load_german_query_fixtures
+    from text_utils.search_keys import build_german_search_keys
+
+    for fixture in load_german_query_fixtures():
+        keys = build_german_search_keys(fixture["query"])
+
+        assert keys.original == fixture["query"], (
+            f"{fixture['id']}: Original nicht erhalten"
+        )
+        assert keys.normalized, f"{fixture['id']}: normalized ist leer"
+        assert keys.ascii_folded, f"{fixture['id']}: ascii_folded ist leer"
+
+
+def test_german_fixture_ascii_folded_matches_policy():
+    """ascii_folded in Fixtures entspricht ascii_fold_german()."""
+    from tests.helpers.german_query_fixtures import load_german_query_fixtures
+    from text_utils.german import ascii_fold_german
+
+    for fixture in load_german_query_fixtures():
+        if "ascii_folded" in fixture:
+            assert ascii_fold_german(fixture["query"]) == fixture["ascii_folded"], (
+                f"{fixture['id']}: ascii_fold_german != fixture.ascii_folded"
+            )
+
+
+def test_german_fixture_ids_are_slug_safe():
+    """Fixture-IDs sind slug-safe (keine Pfadseparatoren)."""
+    from tests.helpers.german_query_fixtures import load_german_query_fixtures
+    from text_utils.german import slugify_german
+
+    for fixture in load_german_query_fixtures():
+        slug = slugify_german(fixture["id"])
+
+        assert slug == fixture["id"], f"{fixture['id']}: Slug '{slug}' != ID"
+        assert "/" not in slug
+        assert "\\" not in slug
+
+
+def test_expected_terms_match_example_text():
+    """expected_terms matchen via german_query_matches_text()."""
+    from tests.helpers.german_query_fixtures import load_german_query_fixtures
+    from text_utils.search_keys import german_query_matches_text
+
+    for fixture in load_german_query_fixtures():
+        example_text = " ".join(fixture["expected_terms"])
+
+        for term in fixture["expected_terms"]:
+            assert german_query_matches_text(term, example_text), (
+                f"{fixture['id']}: term '{term}' nicht in '{example_text}'"
+            )
