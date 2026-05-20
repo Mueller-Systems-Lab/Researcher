@@ -13,6 +13,8 @@ Beweist, dass die komplette lokale Research-Pipeline funktioniert:
 3. Ein Markdown-Report wird geschrieben
 4. Keine Cloud-Provider werden verwendet
 
+Seit Issue #75 nutzt der Happy-Path dafür die zentrale Modellkonfiguration aus `config/ollama_models.py`.
+
 ---
 
 ## Was dieser Test beweist
@@ -22,6 +24,7 @@ Beweist, dass die komplette lokale Research-Pipeline funktioniert:
 - ✅ Report-Datei wird korrekt erzeugt
 - ✅ Cloud-Blocker funktioniert
 - ✅ Query-Safety-Guard blockiert riskante Queries
+- ✅ Modellrollen/Fallbacks werden zentral über `config/ollama_models.py` aufgelöst
 
 ## Was dieser Test nicht beweist
 

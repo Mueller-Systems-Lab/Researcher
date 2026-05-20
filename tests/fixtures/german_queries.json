@@ -1,0 +1,44 @@
+[
+  {
+    "id": "de-search-engine",
+    "query": "Was ist eine Suchmaschine?",
+    "expected_terms": ["Suchmaschine"],
+    "forbidden_terms": ["CVE", "Exploit", "Credentials", "Darknet", "Exploit", "Vulnerability", "Person:", "Site:"],
+    "requires_umlaut": false
+  },
+  {
+    "id": "de-free-software",
+    "query": "Was ist freie Software?",
+    "expected_terms": ["freie", "Software"],
+    "forbidden_terms": ["CVE", "Exploit", "Credentials", "Darknet"],
+    "requires_umlaut": false
+  },
+  {
+    "id": "de-local-ai",
+    "query": "Was bedeutet lokale KI?",
+    "expected_terms": ["lokale", "KI"],
+    "forbidden_terms": ["CVE", "Exploit", "Credentials", "Darknet"],
+    "requires_umlaut": false
+  },
+  {
+    "id": "de-footpath-sharp-s",
+    "query": "Was ist eine Fußgängerzone?",
+    "expected_terms": ["Fußgängerzone"],
+    "ascii_folded": "Was ist eine Fussgaengerzone?",
+    "requires_umlaut": true
+  },
+  {
+    "id": "de-oversize-umlaut",
+    "query": "Was bedeutet Übergröße?",
+    "expected_terms": ["Übergröße"],
+    "ascii_folded": "Was bedeutet Uebergroesse?",
+    "requires_umlaut": true
+  },
+  {
+    "id": "de-muellerstrasse-example",
+    "query": "Was ist die Müllerstraße als Wortbeispiel?",
+    "expected_terms": ["Müllerstraße", "Wortbeispiel"],
+    "ascii_folded": "Was ist die Muellerstrasse als Wortbeispiel?",
+    "requires_umlaut": true
+  }
+]

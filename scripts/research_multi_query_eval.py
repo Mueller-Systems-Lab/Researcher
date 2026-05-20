@@ -209,9 +209,32 @@ def main() -> None:
         action="store_true",
         help="Exit !=0 bei Regression",
     )
+    parser.add_argument(
+        "--queries-file",
+        default="",
+        help="Pfad zu einer JSON-Datei mit Queries "
+        "(z.B. tests/fixtures/german_queries.json)",
+    )
     args = parser.parse_args()
 
-    queries = DEFAULT_QUERIES[: args.limit]
+    # Load queries from file if --queries-file is specified
+    if args.queries_file:
+        if not os.path.isfile(args.queries_file):
+            print(f"❌ Queries-Datei nicht gefunden: {args.queries_file}")
+            sys.exit(1)
+        with open(args.queries_file) as f:
+            try:
+                fixture_data = json.load(f)
+                queries = [item["query"] for item in fixture_data if "query" in item]
+                # Apply --limit if specified
+                if args.limit and len(queries) > args.limit:
+                    queries = queries[: args.limit]
+                print(f"   Queries geladen aus: {args.queries_file}")
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"❌ Ungültige Queries-Datei: {e}")
+                sys.exit(1)
+    else:
+        queries = DEFAULT_QUERIES[: args.limit]
 
     # Filter unsafe queries
     safe_queries = [q for q in queries if is_safe_query(q)]

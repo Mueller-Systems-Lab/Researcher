@@ -23,19 +23,22 @@ import sys
 
 import requests
 
+from config.ollama_models import (
+    OllamaModelConfig,  # noqa: F401  # used in type hints
+    load_ollama_model_config,
+    resolve_chat_model,
+)
+from text_utils.german import normalize_markdown_text
+
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 
 SEARXNG_URL = os.getenv("SEARX_URL", "http://localhost:8080")
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_CHAT_MODEL = os.getenv(
-    "OLLAMA_CHAT_MODEL", "qwen3.5-uncensored-no-thinking:latest"
-)
-ALLOW_MODEL_FALLBACK = os.getenv("ALLOW_OLLAMA_MODEL_FALLBACK", "").lower() in (
-    "true",
-    "1",
-    "yes",
-)
 OUTPUT_DIR = os.getenv("RESEARCH_REPORT_DIR", "reports/research")
+
+# Zentrale Ollama-Modellkonfiguration (einmalig laden)
+_ollama_config = load_ollama_model_config()
+OLLAMA_URL = _ollama_config.base_url
+OLLAMA_CHAT_MODEL = _ollama_config.chat_model
 REQUEST_TIMEOUT = (5, 30)
 
 # Harmlose Default-Query
@@ -103,34 +106,29 @@ def get_ollama_models() -> list[str]:
         return []
 
 
-def resolve_chat_model() -> tuple[str, str]:
-    """Löst das Chat-Modell auf. Returns (model_name, status).
+def resolve_chat_model_local() -> tuple[str, str]:
+    """Löst das Chat-Modell auf via zentraler Konfiguration.
+    Returns (model_name, status) für Abwärtskompatibilität.
 
     Status: 'ok', 'fallback', 'missing'
     """
     available = get_ollama_models()
+    resolution = resolve_chat_model(_ollama_config, available)
 
-    # Prüfe, ob das konfigurierte Modell verfügbar ist
-    if OLLAMA_CHAT_MODEL in available:
-        return OLLAMA_CHAT_MODEL, "ok"
+    # Diagnose-Ausgabe
+    if resolution.status in ("missing", "fallback", "no_models", "config_error"):
+        print(f"   ⚠️  {resolution.message}")
 
-    # Fallback: suche nach Chat-Modellen (nicht embedding)
-    chat_models = [
-        m for m in available if "embed" not in m.lower() and "nomic" not in m.lower()
-    ]
-
-    if chat_models and ALLOW_MODEL_FALLBACK:
-        fallback = chat_models[0]
-        print(f"   ⚠️  '{OLLAMA_CHAT_MODEL}' fehlt, Fallback: '{fallback}'")
-        return fallback, "fallback"
-
-    if chat_models:
-        print(f"   ⚠️  '{OLLAMA_CHAT_MODEL}' fehlt.")
-        print(f"   Verfügbare Chat-Modelle: {', '.join(chat_models)}")
-        print("   Setze OLLAMA_CHAT_MODEL= oder ALLOW_OLLAMA_MODEL_FALLBACK=true")
-        return "", "missing"
-
-    return "", "missing"
+    # Alte Status-Werte erhalten
+    status_map = {
+        "ok": "ok",
+        "fallback": "fallback",
+        "missing": "missing",
+        "no_models": "missing",
+        "config_error": "missing",
+    }
+    model_name = resolution.used_model or ""
+    return model_name, status_map.get(resolution.status, "missing")
 
 
 # ── Research Pipeline ─────────────────────────────────────────────────────────
@@ -220,8 +218,12 @@ def write_report(
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = os.path.join(output_dir, f"research_{timestamp}.md")
 
-    embed_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest")
+    embed_model = _ollama_config.embedding_model
     cloud_active = os.getenv("ALLOW_CLOUD", "").lower() in ("true", "1", "yes")
+
+    # Text-NFC-Normalisierung für Query und Summary (ADR-016)
+    query = normalize_markdown_text(query)
+    summary = normalize_markdown_text(summary)
 
     with open(filename, "w") as f:
         # Header
@@ -333,7 +335,7 @@ def main() -> None:
 
     # 4. Ollama Summary
     print("🦙 Summarizing...")
-    model_name, model_status = resolve_chat_model()
+    model_name, model_status = resolve_chat_model_local()
     summary = summarize_with_ollama(args.query, sources, model_name)
     if model_status == "missing" and args.strict:
         print("❌ Strict-Mode: Chat-Modell muss verfügbar sein")

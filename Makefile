@@ -178,6 +178,12 @@ research-evaluate-multi:
 research-evaluate-multi-strict:
 	ALLOW_OLLAMA_MODEL_FALLBACK=true python3 scripts/research_multi_query_eval.py --limit 3 --min-overall 80 --min-query-overall 70
 
+# ── Deutsche Query-Fixture Evaluation (optional, nicht in make quality) ────────
+
+research-evaluate-german:
+	ALLOW_OLLAMA_MODEL_FALLBACK=true python3 scripts/research_multi_query_eval.py \
+		--queries-file tests/fixtures/german_queries.json --limit 3
+
 # ── Coverage (mit Schwelle >=78%) ─────────────────────────────────────────────
 
 coverage: coverage-fast

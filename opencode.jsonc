@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    // Repo-local MCP server exposing the security-gated tools in mcp_tools/.
+    "researcher-mcp": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8765/mcp",
+      "enabled": true
+    },
+    // Project-scoped Playwright override: headless and restricted to local app origins.
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest",
+        "--config",
+        "{env:WORKSPACE_ROOT}config/playwright-mcp.local.json"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}

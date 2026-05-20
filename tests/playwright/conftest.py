@@ -10,6 +10,10 @@
 # Voraussetzung:
 #   pip install playwright
 #   playwright install chromium
+#
+# Hinweis: Damit "import playwright" das installierte Paket auflöst und nicht
+# das lokale tests/playwright-Verzeichnis, darf dieses Verzeichnis KEIN
+# __init__.py enthalten.  Siehe Issue "CI-/Playwright-/Requirements-Bereinigung".
 # =============================================================================
 
 import os

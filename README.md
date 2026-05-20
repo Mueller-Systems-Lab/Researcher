@@ -126,6 +126,8 @@ cp .env.example .env
 
 Danach `.env` an die lokale Umgebung anpassen. Die vollständige Referenz steht weiter unten.
 
+Die aktiven Modellvariablen sind in `.env.example` dokumentiert: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL` und optional `ALLOW_OLLAMA_MODEL_FALLBACK`.
+
 ### 4) Ollama installieren und starten
 
 ```bash
@@ -239,6 +241,9 @@ curl http://127.0.0.1:8086/v1/models
 |---|---|
 | `LLM_PROVIDER` | Provider für die Textgenerierung; aktuell `ollama`. |
 | `OLLAMA_BASE_URL` | Basis-URL des lokalen Ollama-Servers. |
+| `OLLAMA_CHAT_MODEL` | Aktives Chat-/Summary-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
+| `OLLAMA_EMBEDDING_MODEL` | Aktives Embedding-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
+| `ALLOW_OLLAMA_MODEL_FALLBACK` | Erlaubt einen Chat-Modell-Fallback, falls das konfigurierte Modell fehlt; Embedding-Modelle werden nie als Chat-Fallback genutzt. |
 | `LLM_MODEL` | Modellname in Ollama, z. B. `qwen3.5-9b-uncensored-hauhaucs-aggressive:latest`. |
 | `RETRIEVER` | Retriever-Modus; `custom` aktiviert den CompositeRetriever. |
 | `SEARX_URL` | Basis-URL des lokalen SearXNG-Dienstes. |
@@ -246,7 +251,7 @@ curl http://127.0.0.1:8086/v1/models
 | `DARKNET_ENABLED` | Aktiviert oder deaktiviert die Darknet-Suche. |
 | `DARKNET_INDEX_PATH` | Pfad zum lokalen Darknet-Index (aktuell Whoosh; Migration zu SQLite FTS5 via ADR-008 geplant). |
 | `EMBEDDING_PROVIDER` | Provider für Embeddings; aktuell `ollama`. |
-| `OLLAMA_EMBEDDING_MODEL` | Embedding-Modell in Ollama, z. B. `nomic-embed-text:latest`. |
+| `EMBEDDING` | Legacy-GPT-Researcher-Embedding-Setting im Format `ollama:<model>`; in `.env.example` aktuell `ollama:nomic-embed-text:latest`. |
 | `CHROMA_PERSIST_DIRECTORY` | Persistenzverzeichnis für ChromaDB. |
 | `CHROMA_COLLECTION` | Name der ChromaDB-Collection. |
 | `EMBEDDING_BATCH_SIZE` | Batch-Größe für Embeddings; klein halten für CPU-Betrieb. |

@@ -1,10 +1,9 @@
 # =============================================================================
-# Researcher CI — GitHub Actions Workflow
-# =============================================================================
+# Researcher CI Extended Gate — GitHub Actions Workflow
 # Python 3.11, exakte Pins, Unit + Integration + Playwright a11y + Benchmarks.
-# =============================================================================
+# Complements CI Fast Gate (test.yml) with Playwright visual/a11y tests.
 
-name: CI
+name: CI Extended Gate
 
 on:
   push:

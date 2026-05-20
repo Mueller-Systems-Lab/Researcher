@@ -21,6 +21,11 @@ import sys
 
 import requests
 
+from config.ollama_models import (
+    is_embedding_model_name,
+    load_ollama_model_config,
+)
+
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -50,9 +55,10 @@ def _status(ok: bool) -> str:
 
 
 def check_ollama() -> bool:
-    """Prüft Ollama: API, Embed-Modell, Chat-Modell."""
-    embed_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest")
-    chat_model = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5-uncensored-no-thinking:latest")
+    """Prüft Ollama: API, Embed-Modell, Chat-Modell (zentrale Config)."""
+    config = load_ollama_model_config()
+    embed_model = config.embedding_model
+    chat_model = config.chat_model
 
     try:
         r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=REQUEST_TIMEOUT)
@@ -69,12 +75,20 @@ def check_ollama() -> bool:
             print(f"     Verfügbar: {', '.join(models[:5])}...")
             return False
 
-        # Check chat model
+        # Check chat model — with embedding-model protection
         if chat_model in models:
+            # Validate: is this actually a chat model?
+            if is_embedding_model_name(chat_model):
+                print(
+                    f"  {_status(False)} Ollama chat: '{chat_model}' "
+                    f"ist ein Embedding-Modell, kein Chat-Modell!"
+                )
+                print("     Setze OLLAMA_CHAT_MODEL auf ein Chat-/Summary-Modell.")
+                return False
             print(f"  {_status(True)} Ollama chat: {chat_model}")
         else:
             print(f"  ⚠️  Ollama chat: '{chat_model}' fehlt")
-            chat_candidates = [m for m in models if "embed" not in m.lower()]
+            chat_candidates = [m for m in models if not is_embedding_model_name(m)]
             if chat_candidates:
                 print(f"     Verfügbare Chat-Modelle: {', '.join(chat_candidates)}")
                 print("     Setze OLLAMA_CHAT_MODEL=<model>")

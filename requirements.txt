@@ -11,10 +11,11 @@
 # ---------------------------------------------------------------------------
 # Core: GPT Researcher (Fork-Basis)
 # ---------------------------------------------------------------------------
-# Installiert als PyPI-Paket. Zieht fastapi, uvicorn, langchain, langchain-ollama,
-# langchain-community, openai, ollama, beautifulsoup4, lxml, requests,
-# python-dotenv, numpy, pydantic etc. als transitive Abhängigkeiten mit.
-gpt-researcher==0.14.8
+# GPT Researcher is provided via git submodule `gpt_researcher/`, NOT from PyPI.
+# Run before first install: git submodule update --init --recursive
+# The submodule is importable as `from gpt_researcher import GPTResearcher`
+# after adding the repo root to sys.path.
+# gpt-researcher==0.14.8  # DO NOT install from PyPI — use the git submodule
 
 # ---------------------------------------------------------------------------
 # Darknet-Crawler & Index

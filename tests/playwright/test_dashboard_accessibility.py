@@ -11,15 +11,28 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
+# The real playwright distribution is imported below.  The shadowing
+# between the tests/playwright directory and the installed "playwright"
+# package is resolved by removing tests/playwright/__init__.py — the
+# directory is NOT a Python package, so "import playwright" correctly
+# resolves the installed distribution.
 try:
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import sync_playwright
-except ImportError:
+except ImportError as _pw_exc:
     PlaywrightError = Exception
     sync_playwright = None
+    _PLAYWRIGHT_IMPORT_ERROR = str(_pw_exc)
+else:
+    _PLAYWRIGHT_IMPORT_ERROR = None
 
 pytestmark = pytest.mark.skipif(
-    sync_playwright is None, reason="Playwright Python package is not installed"
+    sync_playwright is None,
+    reason=(
+        "Playwright Python package is not installed"
+        if _PLAYWRIGHT_IMPORT_ERROR is None
+        else f"Playwright import failed: {_PLAYWRIGHT_IMPORT_ERROR}"
+    ),
 )
 
 ROOT = os.path.join(os.path.dirname(__file__), "../..")
