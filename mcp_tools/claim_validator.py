@@ -71,6 +71,8 @@ class ClaimValidator(MCPToolBase):
         claim = params.get("claim", "")
         max_sources = params.get("max_sources", 5)
         search_mode = params.get("search_mode", "all")
+        if search_mode not in ("composite", "fulltext", "all"):
+            search_mode = "all"
 
         if not claim:
             return MCPToolResult(
