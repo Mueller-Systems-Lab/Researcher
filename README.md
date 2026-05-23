@@ -230,6 +230,10 @@ curl http://127.0.0.1:8086/v1/models
 ./research-serve.sh status
 ```
 
+## Local UI
+
+GPU-Dashboard läuft lokal unter `http://127.0.0.1:8888`. Details: [UI Local Readiness](docs/development/ui-local-readiness.md).
+
 ## Tests
 
 - Echte Playwright-Browser-/Screenshot-Tests liegen unter `tests/playwright/`.
