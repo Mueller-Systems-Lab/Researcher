@@ -7,10 +7,9 @@
 #   python -m pytest tests/test_darknet_retriever.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-import shutil
 from datetime import datetime
 
 # Projekt-Root zum Import-Pfad hinzufügen
@@ -104,8 +103,8 @@ def test_whoosh_index_stats():
 
 def test_darknet_retriever_basic():
     """Test: DarknetRetriever grundlegend."""
-    from darknet_search.retriever import DarknetRetriever
     from darknet_search.index import WhooshIndex
+    from darknet_search.retriever import DarknetRetriever
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Index vorbereiten

@@ -11,14 +11,20 @@ Nutzung:
   python3 scripts/deep_research.py "Dein Thema"
   python3 scripts/deep_research.py --lang de "Your Topic"
 """
-import argparse, json, re, requests, sys, textwrap
+
+import argparse
+import re
+import textwrap
+
+import requests
 
 DEFAULT_TOPIC = "Ivermectin COVID-19 klinische Studien Wirksamkeit Meta-Analyse"
+
 
 def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     print("=" * 65)
     print(f"  DEEP RESEARCH: {query[:55]}...")
-    print(f"  Pipeline: SearXNG → Extract → Synthesize → Report")
+    print("  Pipeline: SearXNG → Extract → Synthesize → Report")
     print("=" * 65)
 
     # ═══ Phase 1: SearXNG ═══
@@ -30,9 +36,11 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     ]
     all_results = {}
     for topic in subtopics:
-        r = requests.get("http://localhost:8080/search", params={
-            "q": topic, "format": "json", "language": lang
-        }, timeout=10)
+        r = requests.get(
+            "http://localhost:8080/search",
+            params={"q": topic, "format": "json", "language": lang},
+            timeout=10,
+        )
         results = r.json().get("results", [])[:5]
         all_results[topic] = results
         print(f"   {topic[:50]}: {len(results)} Treffer")
@@ -42,14 +50,15 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     sources = []
     for results in all_results.values():
         for res in results:
-            sources.append({
-                "title": res.get("title", "?"),
-                "url": res.get("url", "?"),
-                "snippet": res.get("content", "?")[:400],
-            })
+            sources.append(
+                {
+                    "title": res.get("title", "?"),
+                    "url": res.get("url", "?"),
+                    "snippet": res.get("content", "?")[:400],
+                }
+            )
     context_parts = [
-        f"[{i}] {s['title']}\n   {s['snippet']}"
-        for i, s in enumerate(sources, 1)
+        f"[{i}] {s['title']}\n   {s['snippet']}" for i, s in enumerate(sources, 1)
     ]
     print(f"   {len(sources)} Quellen gesammelt")
 
@@ -74,24 +83,31 @@ Write a comprehensive research report (1000-2000 words) with:
 
 Respond {lang_instr}. Structured with paragraphs. Facts only. No opinions."""
 
-    r = requests.post("http://localhost:11434/api/generate", json={
-        "model": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
-        "prompt": prompt,
-        "stream": False,
-        "raw": True,
-        "options": {"num_predict": 3000, "temperature": 0.2, "num_ctx": 4096}
-    }, timeout=300)
+    r = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
+            "prompt": prompt,
+            "stream": False,
+            "raw": True,
+            "options": {"num_predict": 3000, "temperature": 0.2, "num_ctx": 4096},
+        },
+        timeout=300,
+    )
 
     raw = r.json().get("response", "")
-    report = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-    report = re.sub(r'<\|im_start\|>.*?<\|im_end\|>', '', report, flags=re.DOTALL).strip()
+    report = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+    report = re.sub(
+        r"<\|im_start\|>.*?<\|im_end\|>", "", report, flags=re.DOTALL
+    ).strip()
 
-    print(f"\n{'='*65}\n  RESEARCH REPORT\n{'='*65}")
+    print(f"\n{'=' * 65}\n  RESEARCH REPORT\n{'=' * 65}")
     print(textwrap.fill(report, width=65) if False else report)
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  Quellen: {len(sources)} | Report: {len(report)} Zeichen")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
     return report
+
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Deep Research Pipeline")

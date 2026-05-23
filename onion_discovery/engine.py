@@ -9,10 +9,11 @@
 #   - LinkExtractor: Onion-Links finden
 #   - Classifier: Seiten klassifizieren
 #   - ReviewQueue: Human Approval
-#   - WhooshIndex: Persistente Speicherung
+#   - SearchIndexRepository (Port): Persistente Speicherung über Adapter
 #
 # ADR-006: Onion Zone disabled by default.
 # ADR-007: Discovery ≠ Crawling.
+# ADR-008: Index-Backend über Adapter-Port entkoppelt.
 #
 # Nutzung:
 #   from onion_discovery.engine import DiscoveryPipeline
@@ -23,18 +24,18 @@
 import hashlib
 import logging
 import os
-import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
 
-from onion_discovery.seed_queue import SeedQueue
-from onion_discovery.policy_gateway import PolicyGateway
-from onion_discovery.link_extractor import LinkExtractor
-from onion_discovery.classifier import Classifier, RISK_CRITICAL, RISK_HIGH
+from gpt_researcher.ports.search_index_repository import SearchIndexRepository
+from onion_discovery.classifier import Classifier
 from onion_discovery.human_review import ReviewQueue
+from onion_discovery.link_extractor import LinkExtractor
+from onion_discovery.policy_gateway import PolicyGateway
+from onion_discovery.seed_queue import SeedQueue
 
 logger = logging.getLogger(__name__)
 
@@ -44,17 +45,21 @@ class DiscoveryPipeline:
 
     Führt einen vollständigen Durchlauf aus:
     Seed → Policy Check → Fetch → Parse → Link Extract → Classify → Review → Index
+
+    Verwendet SearchIndexRepository (Port) statt direktem WhooshIndex-Import.
     """
 
     def __init__(
         self,
-        seed_queue: Optional[SeedQueue] = None,
-        policy_gateway: Optional[PolicyGateway] = None,
-        link_extractor: Optional[LinkExtractor] = None,
-        classifier: Optional[Classifier] = None,
-        review_queue: Optional[ReviewQueue] = None,
+        seed_queue: SeedQueue | None = None,
+        policy_gateway: PolicyGateway | None = None,
+        link_extractor: LinkExtractor | None = None,
+        classifier: Classifier | None = None,
+        review_queue: ReviewQueue | None = None,
+        index_backend: SearchIndexRepository | None = None,
         max_pages_per_run: int = 3,
         tor_proxy: str = "socks5h://127.0.0.1:9050",
+        on_before_persist: Callable[[str, dict], bool] | None = None,
     ):
         self.seed_queue = seed_queue or SeedQueue()
         self.policy = policy_gateway or PolicyGateway()
@@ -64,6 +69,35 @@ class DiscoveryPipeline:
         self.max_pages_per_run = max_pages_per_run
         self.tor_proxy = tor_proxy
         self._session = self._create_session()
+
+        # Index-Backend via Dependency Injection (Port/Adapter)
+        if index_backend is not None:
+            self._index = index_backend
+        else:
+            self._index = self._create_default_backend()
+
+        # Human Approval Hook vor persistenter Speicherung (Block 3.3)
+        # Default: auto-approve für lokalen Betrieb
+        self._on_before_persist = on_before_persist or (lambda url, meta: True)
+
+    def _create_default_backend(self) -> SearchIndexRepository:
+        """Erstellt das Default-Index-Backend basierend auf SEARCH_INDEX_BACKEND env."""
+        backend_name = os.getenv("SEARCH_INDEX_BACKEND", "whoosh").lower()
+        index_path = os.getenv("DARKNET_INDEX_PATH", "./darknet_index")
+
+        if backend_name == "sqlite_fts5":
+            from gpt_researcher.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
+
+            db_path = os.path.join(index_path, "darknet_index.sqlite3")
+            logger.info(f"DiscoveryPipeline: Verwende SQLiteFTS5Adapter ({db_path})")
+            return SQLiteFTS5Adapter(db_path)
+        else:
+            from gpt_researcher.adapters.whoosh_index_adapter import WhooshIndexAdapter
+
+            logger.info(
+                f"DiscoveryPipeline: Verwende WhooshIndexAdapter ({index_path})"
+            )
+            return WhooshIndexAdapter(index_path)
 
     def _create_session(self) -> requests.Session:
         """Erstellt eine requests.Session mit Tor-Proxy."""
@@ -81,7 +115,7 @@ class DiscoveryPipeline:
                 "Accept": "text/html,application/xhtml+xml",
             }
         )
-        session.timeout = 30
+        session.timeout = 30  # type: ignore[attr-defined]
         return session
 
     def enabled(self) -> bool:
@@ -199,13 +233,16 @@ class DiscoveryPipeline:
                     f"Risiko: {classification.risk_level})"
                 )
 
-            # 7. Direkt indexieren (wenn kein Review nötig)
+            # 7. Indexieren über Port (mit Human-Approval-Gate)
             if classification.indexable and not classification.requires_human_review:
                 try:
-                    from darknet_search.index import WhooshIndex
+                    # Human Approval Gate vor persistenter Speicherung (Block 3.3)
+                    if not self._on_before_persist(seed.url, {"title": title}):
+                        logger.info(f"Persistenz blockiert: {seed.url[:60]}")
+                        self.seed_queue.mark_completed(seed.url, status="blocked")
+                        continue
 
-                    idx = WhooshIndex()
-                    idx.add_post(
+                    success = self._index.index(
                         {
                             "url": seed.url,
                             "author": "onion_discovery",
@@ -215,9 +252,13 @@ class DiscoveryPipeline:
                             "forum_id": "onion_discovery",
                         }
                     )
-                    stats["sent_to_index"] += 1
+                    if success:
+                        stats["sent_to_index"] += 1
+                    else:
+                        stats["errors"] += 1
                 except Exception as e:
                     logger.warning(f"Index-Fehler: {e}", exc_info=True)
+                    stats["errors"] += 1
 
             # Seed als verarbeitet markieren
             self.seed_queue.mark_completed(

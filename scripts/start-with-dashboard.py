@@ -12,9 +12,7 @@ Nutzung:
 """
 
 import argparse
-import importlib.util
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -26,10 +24,9 @@ logger = logging.getLogger(__name__)
 
 # GPT Researcher App importieren
 sys.path.insert(0, str(ROOT / "gpt_researcher"))
-from backend.server.app import app as gpt_app
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from backend.server.app import app as gpt_app  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
 
 
 def create_combined_app(enable_gpu: bool = True) -> FastAPI:
@@ -66,6 +63,7 @@ def create_combined_app(enable_gpu: bool = True) -> FastAPI:
         """GPU-Daten als SSE-Stream (eingebettet)."""
         import asyncio
         import json
+
         from dashboard.gpu_monitor import GPUMonitor
 
         monitor = GPUMonitor()

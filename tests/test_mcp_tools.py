@@ -7,10 +7,10 @@
 #   python3 -m pytest tests/test_mcp_tools.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_registry_init():
-    from mcp_tools.registry import init_tools, list_tools, get_tool, get_all_manifests
+    from mcp_tools.registry import get_all_manifests, get_tool, init_tools, list_tools
 
     init_tools()
     tools = list_tools()
@@ -41,7 +41,7 @@ def test_registry_init():
 
 
 def test_registry_run_tool():
-    from mcp_tools.registry import init_tools, run_tool, list_tools
+    from mcp_tools.registry import init_tools, run_tool
 
     init_tools()
     result = run_tool("nonexistent", {})
@@ -101,9 +101,9 @@ def test_web_fetch_onion_blocked():
 
 @patch("mcp_tools.web_fetch.requests.Session.get")
 def test_web_fetch_connection_error(mock_get):
-    from mcp_tools.web_fetch import WebFetchTool
-
     from requests.exceptions import ConnectionError
+
+    from mcp_tools.web_fetch import WebFetchTool
 
     mock_get.side_effect = ConnectionError("DNS failed")
 
@@ -211,7 +211,6 @@ def test_audit_log_write_no_event():
 
 def test_audit_log_write_and_read():
     from mcp_tools.audit_log import AuditLog
-    import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = f"{tmpdir}/audit.jsonl"
@@ -237,7 +236,6 @@ def test_audit_log_write_and_read():
 
 def test_audit_log_stats():
     from mcp_tools.audit_log import AuditLog
-    import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = f"{tmpdir}/audit.jsonl"
@@ -262,7 +260,6 @@ def test_audit_log_stats():
 
 def test_audit_log_empty_read():
     from mcp_tools.audit_log import AuditLog
-    import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tool = AuditLog(log_file=f"{tmpdir}/empty.jsonl")
@@ -323,9 +320,9 @@ def test_human_review_reject_blocked_via_mcp():
 
 def test_human_review_request_and_approve_via_cli():
     """Kompletter Workflow: MCP-Request → CLI-Approve."""
+
     from mcp_tools.human_review import HumanReviewTool
     from onion_discovery.human_review import ReviewQueue
-    import tempfile, os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_file = f"{tmpdir}/reviews.json"
@@ -354,9 +351,9 @@ def test_human_review_request_and_approve_via_cli():
 
 def test_human_review_request_and_reject_via_cli():
     """Kompletter Workflow: MCP-Request → CLI-Reject."""
+
     from mcp_tools.human_review import HumanReviewTool
     from onion_discovery.human_review import ReviewQueue
-    import tempfile, os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_file = f"{tmpdir}/reviews.json"
@@ -381,39 +378,6 @@ def test_human_review_request_and_reject_via_cli():
         assert result["data"]["stats"].get("rejected", 0) >= 1
 
 
-def test_human_review_request_and_reject_via_cli():
-    """Kompletter Workflow: MCP-Request → CLI-Reject."""
-    from mcp_tools.human_review import HumanReviewTool
-    import tempfile, os
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        old_file = os.environ.get("ONION_REVIEW_FILE")
-        os.environ["ONION_REVIEW_FILE"] = f"{tmpdir}/reviews.json"
-        try:
-            tool = HumanReviewTool()
-            tool.review_queue.queue_file = f"{tmpdir}/reviews.json"
-
-            result = tool.run(
-                {
-                    "action": "request",
-                    "url": "http://bad.onion",
-                }
-            )
-            assert result["success"] is True
-            item_id = result["data"]["item_id"]
-
-            # Reject via CLI
-            from onion_discovery.human_review import ReviewQueue
-
-            rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
-            assert rq.reject(item_id, reviewer="admin", reason="Not relevant") is True
-        finally:
-            if old_file is not None:
-                os.environ["ONION_REVIEW_FILE"] = old_file
-            else:
-                del os.environ["ONION_REVIEW_FILE"]
-
-
 def test_human_review_reject_no_id():
     from mcp_tools.human_review import HumanReviewTool
 
@@ -424,7 +388,7 @@ def test_human_review_reject_no_id():
 
 # ─── SSRF-Schutz (T-019) ──────────────────────────────────────────────────────
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch  # noqa: E402
 
 
 @patch("mcp_tools.web_fetch.socket.getaddrinfo")
@@ -469,8 +433,9 @@ def test_web_fetch_ssrf_10_range(mock_getaddrinfo):
 @patch("mcp_tools.web_fetch.socket.getaddrinfo")
 def test_web_fetch_ssrf_public_ip_allowed(mock_getaddrinfo):
     """SSRF: Öffentliche IP wird erlaubt."""
-    from mcp_tools.web_fetch import WebFetchTool
     from requests.exceptions import ConnectionError
+
+    from mcp_tools.web_fetch import WebFetchTool
 
     mock_getaddrinfo.return_value = [(0, 0, 0, "", ("93.184.216.34", 80))]
 
@@ -510,9 +475,9 @@ def test_web_fetch_ssrf_ipv6_localhost(mock_getaddrinfo):
 @patch("mcp_tools.web_fetch.socket.getaddrinfo")
 def test_web_fetch_ssrf_resolution_failure(mock_getaddrinfo):
     """SSRF: Nicht auflösbarer Hostname gibt Fehler."""
-    from mcp_tools.web_fetch import WebFetchTool
-
     import socket
+
+    from mcp_tools.web_fetch import WebFetchTool
 
     mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
 

@@ -10,14 +10,13 @@
 # =============================================================================
 
 import logging
-from typing import Optional
 
-from mcp_tools.base import MCPToolBase
-from mcp_tools.web_fetch import WebFetchTool
-from mcp_tools.evidence_store import EvidenceStore
-from mcp_tools.claim_validator import ClaimValidator
 from mcp_tools.audit_log import AuditLog
+from mcp_tools.base import MCPToolBase
+from mcp_tools.claim_validator import ClaimValidator
+from mcp_tools.evidence_store import EvidenceStore
 from mcp_tools.human_review import HumanReviewTool
+from mcp_tools.web_fetch import WebFetchTool
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ def init_tools():
     logger.info(f"{len(_TOOLS)} MCP-Tools registriert")
 
 
-def get_tool(name: str) -> Optional[MCPToolBase]:
+def get_tool(name: str) -> MCPToolBase | None:
     """Holt ein Tool anhand seines Namens."""
     return _TOOLS.get(name)
 

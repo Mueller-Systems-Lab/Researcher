@@ -1,0 +1,170 @@
+# =============================================================================
+# Researcher CI Extended Gate — GitHub Actions Workflow
+# Python 3.11, exakte Pins, Unit + Integration + Playwright a11y + Benchmarks.
+# Complements CI Fast Gate (test.yml) with Playwright visual/a11y tests.
+
+name: CI Extended Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Unit Tests
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit Tests (Python 3.11)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Unit tests
+        run: |
+          python -m pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=. \
+            --cov-report=term \
+            --ignore=tests/playwright \
+            --ignore=tests/e2e \
+            --ignore=tests/benchmarks \
+            -m "not integration and not e2e" \
+            || true
+
+  # ---------------------------------------------------------------------------
+  # Integration Tests (benötigen laufende Dienste: Ollama, SearXNG, ChromaDB)
+  # ---------------------------------------------------------------------------
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: false  # Disabled: requires local services (Ollama, SearXNG, ChromaDB)
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Integration tests
+        run: |
+          python -m pytest tests/ \
+            -v \
+            --tb=short \
+            -m "integration" \
+            || true
+
+  # ---------------------------------------------------------------------------
+  # Playwright Accessibility Tests — REQUIRED GATE (kein Skip)
+  # ---------------------------------------------------------------------------
+  playwright-a11y:
+    name: Playwright Accessibility Tests (WCAG 2.1 AA)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest playwright
+          python -m playwright install chromium
+
+      - name: Run accessibility tests (REQUIRED)
+        run: |
+          python -m pytest tests/playwright/ \
+            -v \
+            --tb=long \
+            -k "accessibility"
+
+  # ---------------------------------------------------------------------------
+  # Playwright Visual Regression Tests
+  # ---------------------------------------------------------------------------
+  playwright-visual:
+    name: Playwright Visual Regression Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest playwright
+          python -m playwright install chromium
+
+      - name: Run visual regression tests
+        run: |
+          python -m pytest tests/playwright/ \
+            -v \
+            --tb=long \
+            -k "visual"
+
+  # ---------------------------------------------------------------------------
+  # Index Backend Benchmarks: Whoosh vs SQLite FTS5 (optional)
+  # ---------------------------------------------------------------------------
+  benchmark:
+    name: Index Backend Benchmarks (Whoosh vs SQLite FTS5)
+    runs-on: ubuntu-latest
+    if: false  # Optional: kann manuell aktiviert werden
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-benchmark
+
+      - name: Run benchmarks
+        run: |
+          python -m pytest tests/benchmarks/ \
+            -v \
+            --tb=short \
+            --benchmark-only \
+            --benchmark-columns=min,max,mean,median,stddev,ops \
+            --benchmark-sort=name

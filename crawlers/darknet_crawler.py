@@ -19,8 +19,7 @@
 
 import logging
 import time
-from dataclasses import dataclass, asdict, replace
-from typing import Optional
+from dataclasses import dataclass
 
 import requests
 from bs4 import BeautifulSoup
@@ -49,7 +48,7 @@ class DarknetCrawler:
     Alle HTTP-Anfragen laufen über Tor — keine direkten Verbindungen.
     """
 
-    def __init__(self, config_override: Optional[dict] = None):
+    def __init__(self, config_override: dict | None = None):
         # Tiefe Kopie der globalen Config pro Instanz (T-024)
         import copy
 
@@ -81,7 +80,7 @@ class DarknetCrawler:
         )
         return session
 
-    def _extract_csrf_token(self, html: str) -> Optional[str]:
+    def _extract_csrf_token(self, html: str) -> str | None:
         """Extrahiert CSRF-Token aus einem Login-Formular."""
         soup = BeautifulSoup(html, "lxml")
         for inp in soup.find_all("input"):
@@ -214,7 +213,7 @@ class DarknetCrawler:
 
         return posts
 
-    def crawl(self, max_pages: Optional[int] = None) -> list[ForumPost]:
+    def crawl(self, max_pages: int | None = None) -> list[ForumPost]:
         """Crawlt mehrere Seiten eines Threads.
 
         Args:
@@ -267,7 +266,7 @@ class DarknetCrawler:
     @staticmethod
     def _extract_attribute(
         soup: BeautifulSoup, selector: str, attribute: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Extrahiert ein Attribut aus einem Element per CSS-Selektor."""
         element = soup.select_one(selector)
         if element:

@@ -23,13 +23,13 @@
 | #32 | Qualität | Echte Playwright-Browsertests ergänzt: `tests/playwright/test_dashboard_visual_regression.py`. |
 | #33 | Qualität | `vectordb/store.py`: `query()`-Docstring präzisiert, `where_filter` ergänzt. |
 | #34 | Wartung | `onion_discovery/seed_queue.py`: `auto_save=False` eingeführt, Batch-Saves in `add_seeds()`. |
-| #35 | Wartung | ADR für Whoosh-Ablösung erstellt: `docs/adr/adr-008-whoosh-migration.md`. |
+| #35 | Wartung | ADR für Whoosh-Ablösung erstellt: `docs/adr/ADR-014-whoosh-migration.md`. |
 | #36 | Wartung | Trunkierte `md5`-IDs in `retriever.py`, `engine.py`, `human_review.py` auf `sha256()` umgestellt. |
 | #37 | Wartung | Produktionsweite `except Exception`-Blöcke mit `exc_info=True` / `logger.exception()` verbessert. |
 
 ## Neue Artefakte
 
-- `docs/adr/adr-008-whoosh-migration.md` — ADR zur Migration von Whoosh zu SQLite FTS5
+- `docs/adr/ADR-014-whoosh-migration.md` — ADR zur Migration von Whoosh zu SQLite FTS5 (renamed)
 - `tests/playwright/test_dashboard_visual_regression.py` — 3 echte Playwright-Tests
 - `tests/playwright/baselines/dashboard_visual_regression.png` — Visual-Baseline für das Dashboard
 

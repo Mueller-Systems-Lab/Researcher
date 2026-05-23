@@ -11,8 +11,8 @@
 #   python3 -m pytest tests/test_e2e.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -52,7 +52,7 @@ def test_e2e_all_packages_importable():
 
 def test_e2e_config_module():
     """E2E: Konfigurationsmodul funktioniert."""
-    from config.config import validate_env, print_config
+    from config.config import print_config, validate_env
 
     # validate_env sollte fehlende Variablen finden
     missing = validate_env()
@@ -97,9 +97,10 @@ def test_e2e_crawler_dataclass():
 
 def test_e2e_whoosh_index_to_retriever():
     """E2E: WhooshIndex → DarknetRetriever → GPT-Format Pipeline."""
+    from datetime import datetime
+
     from darknet_search.index import WhooshIndex
     from darknet_search.retriever import DarknetRetriever
-    from datetime import datetime
 
     with tempfile.TemporaryDirectory() as tmpdir:
         idx = WhooshIndex(tmpdir)

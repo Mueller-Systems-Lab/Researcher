@@ -7,11 +7,10 @@
 #   python3 -m pytest tests/test_onion_discovery.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -126,7 +125,6 @@ def test_policy_opt_out():
 
 def test_policy_rate_limit():
     from onion_discovery.policy_gateway import PolicyGateway
-    import time
 
     gateway = PolicyGateway(
         max_requests_per_host=2,
@@ -166,7 +164,7 @@ def test_link_extractor_html():
     extractor = LinkExtractor()
     links = extractor.extract("http://source.onion", html)
 
-    onion_links = [l for l in links if ".onion" in l["url"]]
+    onion_links = [link for link in links if ".onion" in link["url"]]
     assert len(onion_links) == 2
     assert onion_links[0]["anchor_text"] == "Forum 1"
 
@@ -179,7 +177,7 @@ def test_link_extractor_raw_text():
     html = f"Check out {v3_onion} for details"
     extractor = LinkExtractor()
     links = extractor.extract("http://source.onion", html)
-    onion_links = [l for l in links if ".onion" in l["url"]]
+    onion_links = [link for link in links if ".onion" in link["url"]]
     assert len(onion_links) >= 1, f"Sollte Onion-Link finden, aber: {links}"
 
 
@@ -192,7 +190,7 @@ def test_link_extractor_no_duplicates():
     """
     extractor = LinkExtractor()
     links = extractor.extract("http://source.onion", html)
-    same = [l for l in links if "same.onion" in l["url"]]
+    same = [link for link in links if "same.onion" in link["url"]]
     assert len(same) == 1  # Dedupliziert
 
 
@@ -203,7 +201,7 @@ def test_link_extractor_relative():
     extractor = LinkExtractor()
     links = extractor.extract("http://forum.onion", html)
     # Relative Links ohne .onion sollten ignoriert werden
-    onion_links = [l for l in links if ".onion" in l["url"]]
+    onion_links = [link for link in links if ".onion" in link["url"]]
     assert len(onion_links) == 0
 
 
@@ -298,7 +296,6 @@ def test_review_queue_reject():
 
 def test_review_queue_priority():
     from onion_discovery.human_review import ReviewQueue
-    from onion_discovery.classifier import RISK_CRITICAL
 
     with tempfile.TemporaryDirectory() as tmpdir:
         rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")

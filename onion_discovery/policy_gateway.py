@@ -16,12 +16,10 @@
 # =============================================================================
 
 import logging
-import os
 import re
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +38,9 @@ class PolicyGateway:
 
     def __init__(
         self,
-        allowlist: Optional[list[str]] = None,
-        blocklist: Optional[list[str]] = None,
-        opt_out: Optional[list[str]] = None,
+        allowlist: list[str] | None = None,
+        blocklist: list[str] | None = None,
+        opt_out: list[str] | None = None,
         max_requests_per_host: int = 2,
         global_delay: float = 10.0,
     ):

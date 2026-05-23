@@ -1,0 +1,27 @@
+# =============================================================================
+# Modelfile für qwen35-uncensored — Optimiert für 8 GB VRAM (GTX 1070)
+# =============================================================================
+# Ollama registrieren:
+#   cd ~/models/qwen35-uncensored
+#   ollama create qwen35-uncensored -f Modelfile
+#
+# VRAM-Budget (num_ctx=2048):
+#   Gewichte:   ~5.6 GB
+#   KV-Cache:   ~0.3 GB  (2048 * 36 layers * 2 * 2 bytes ≈ 295 MB)
+#   Overhead:   ~0.3 GB
+#   ─────────────────────
+#   Summe:      ~6.2 GB  ✅ passt in 8 GB
+# =============================================================================
+
+FROM ./Qwen3.5-9B-Uncensored-Q4_K_M.gguf
+
+# ── Kontext-Fenster (reduziert für VRAM-Budget) ─────────────────────
+PARAMETER num_ctx 2048
+
+# ── GPU-Layer: alle 36 Transformer-Layer auf GPU ────────────────────
+PARAMETER num_gpu 36
+
+# ── Generation ──────────────────────────────────────────────────────
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1

@@ -11,7 +11,6 @@
 # =============================================================================
 
 import logging
-from typing import Optional
 
 from mcp_tools.base import MCPToolBase, MCPToolResult
 
@@ -40,7 +39,9 @@ class EvidenceStore(MCPToolBase):
                 "action": {
                     "type": "string",
                     "enum": ["store", "search", "stats"],
-                    "description": "Aktion: store=speichern, search=suchen, stats=Statistiken",
+                    "description": (
+                        "Aktion: store=speichern, search=suchen, stats=Statistiken"
+                    ),
                 },
                 "claim": {
                     "type": "string",
@@ -66,7 +67,9 @@ class EvidenceStore(MCPToolBase):
                 "query_embedding": {
                     "type": "array",
                     "items": {"type": "number"},
-                    "description": "Optional: Embedding für die Suche (für action=search)",
+                    "description": (
+                        "Optional: Embedding für die Suche (für action=search)"
+                    ),
                 },
                 "n_results": {
                     "type": "integer",

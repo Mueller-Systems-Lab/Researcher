@@ -15,9 +15,8 @@
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class ReviewItem:
     risk_level: str = "medium"
     confidence: float = 0.0
     discovered_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    reviewed_at: Optional[str] = None
+    reviewed_at: str | None = None
     status: str = "pending"  # pending, approved, rejected
     reviewed_by: str = ""
     review_notes: str = ""
@@ -44,7 +43,7 @@ class ReviewItem:
 class ReviewQueue:
     """Review-Queue für Onion-Discovery-Freigaben."""
 
-    def __init__(self, queue_file: Optional[str] = None):
+    def __init__(self, queue_file: str | None = None):
         self.queue_file = queue_file or os.getenv(
             "ONION_REVIEW_FILE", "./onion_review_queue.json"
         )
@@ -105,7 +104,7 @@ class ReviewQueue:
         logger.info(f"Review-Item hinzugefügt: {url[:60]} (Risiko: {risk_level})")
         return True
 
-    def get_next_pending(self) -> Optional[ReviewItem]:
+    def get_next_pending(self) -> ReviewItem | None:
         """Holt das nächste zu reviewende Item (höchstes Risiko zuerst)."""
         from onion_discovery.classifier import RISK_LEVELS
 

@@ -1,11 +1,49 @@
 # Researcher — Lokales, unzensiertes Research-System
 
 [![CI](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml/badge.svg)](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-75%25-yellowgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-78%25-green)]()
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
+
+> **Current Status:** [v0.1.0-local-alpha](docs/release/v0.1.0-local-alpha.md)  
+> **Release:** [Changelog](CHANGELOG.md) · [Release Notes](docs/release/v0.1.0-local-alpha.md) · [Known Limitations](docs/release/known-limitations.md)
 
 Researcher ist ein vollständig lokales Research-System auf Basis von GPT Researcher. Es nutzt ein lokales LLM, lokale Websuche, einen Darknet-Crawler und einen lokalen Vektorspeicher — ohne externe API-Aufrufe.
 
-## Kurzstart
+## Shortcuts
+
+```bash
+make quality      # Lint + Typecheck + Security + Tests + Coverage (30s)
+make runtime-smoke    # Prüft Ollama, SearXNG, Tor, Cloud (5s)
+make research-happy-path  # Query → SearXNG → Ollama → Report
+make research-evaluate    # Report Quality (Overall: 99/100)
+```
+
+## Developer Quickstart (keine externen Dienste nötig)
+
+```bash
+# 1. Clone & Setup
+git clone https://github.com/xxammaxx/Researcher.git
+cd Researcher
+git submodule update --init --recursive
+
+# 2. Virtuelle Umgebung
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 3. Quality Gates (alle grün erwartet)
+make quality        # lint + typecheck + security + tests (~30s)
+make coverage       # Coverage >=78% (~10s)
+make test-e2e       # E2E Pipeline (~1s)
+
+# 4. Optional: kompletter CI-Lauf
+make ci-local       # quality + coverage + e2e (~45s)
+```
+
+> **Hinweis:** Für den Developer-Quickstart werden KEINE externen Dienste (Ollama, SearXNG, Tor, GPU) benötigt. Alle Tests laufen mit Mocks.
+
+## Kurzstart (mit Runtime-Diensten)
 
 1. Voraussetzungen installieren: Python, Docker, Ollama, Tor.
 2. Repository klonen und virtuelle Umgebung anlegen.
@@ -13,6 +51,15 @@ Researcher ist ein vollständig lokales Research-System auf Basis von GPT Resear
 4. Ollama starten, Modell registrieren, Embeddings laden.
 5. SearXNG per Docker Compose starten.
 6. Web-UI starten und eine Test-Recherche ausführen.
+
+## Optional: Runtime-Smoke-Test
+
+```bash
+make runtime-smoke        # Prüft Ollama, SearXNG, Tor, Cloud-Blocker
+make runtime-smoke-strict # Strict-Mode: alle Dienste müssen laufen
+```
+
+> Diese Tests sind optional und nicht Bestandteil von `make quality` oder CI.
 
 ## Architekturübersicht
 
@@ -79,6 +126,8 @@ cp .env.example .env
 
 Danach `.env` an die lokale Umgebung anpassen. Die vollständige Referenz steht weiter unten.
 
+Die aktiven Modellvariablen sind in `.env.example` dokumentiert: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL` und optional `ALLOW_OLLAMA_MODEL_FALLBACK`.
+
 ### 4) Ollama installieren und starten
 
 ```bash
@@ -112,7 +161,7 @@ docker compose -f searxng/docker-compose.yml up -d
 ### 8) Darknet-Crawler konfigurieren
 
 - Tor muss lokal auf `127.0.0.1:9050` laufen.
-- Der Crawler schreibt aktuell in den lokalen Whoosh-Index unter `DARKNET_INDEX_PATH`; die Ablösung durch SQLite FTS5 ist in `docs/adr/adr-008-whoosh-migration.md` dokumentiert.
+- Der Crawler schreibt aktuell in den lokalen Whoosh-Index unter `DARKNET_INDEX_PATH`; die Ablösung durch SQLite FTS5 ist in `docs/adr/ADR-014-whoosh-migration.md` dokumentiert.
 - Darknet-Zugriffe nur mit rechtlicher Prüfung und klarer Zielsetzung durchführen.
 
 ### 9) GPT Researcher Web-UI starten
@@ -192,6 +241,9 @@ curl http://127.0.0.1:8086/v1/models
 |---|---|
 | `LLM_PROVIDER` | Provider für die Textgenerierung; aktuell `ollama`. |
 | `OLLAMA_BASE_URL` | Basis-URL des lokalen Ollama-Servers. |
+| `OLLAMA_CHAT_MODEL` | Aktives Chat-/Summary-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
+| `OLLAMA_EMBEDDING_MODEL` | Aktives Embedding-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
+| `ALLOW_OLLAMA_MODEL_FALLBACK` | Erlaubt einen Chat-Modell-Fallback, falls das konfigurierte Modell fehlt; Embedding-Modelle werden nie als Chat-Fallback genutzt. |
 | `LLM_MODEL` | Modellname in Ollama, z. B. `qwen3.5-9b-uncensored-hauhaucs-aggressive:latest`. |
 | `RETRIEVER` | Retriever-Modus; `custom` aktiviert den CompositeRetriever. |
 | `SEARX_URL` | Basis-URL des lokalen SearXNG-Dienstes. |
@@ -199,7 +251,7 @@ curl http://127.0.0.1:8086/v1/models
 | `DARKNET_ENABLED` | Aktiviert oder deaktiviert die Darknet-Suche. |
 | `DARKNET_INDEX_PATH` | Pfad zum lokalen Darknet-Index (aktuell Whoosh; Migration zu SQLite FTS5 via ADR-008 geplant). |
 | `EMBEDDING_PROVIDER` | Provider für Embeddings; aktuell `ollama`. |
-| `OLLAMA_EMBEDDING_MODEL` | Embedding-Modell in Ollama, z. B. `nomic-embed-text:latest`. |
+| `EMBEDDING` | Legacy-GPT-Researcher-Embedding-Setting im Format `ollama:<model>`; in `.env.example` aktuell `ollama:nomic-embed-text:latest`. |
 | `CHROMA_PERSIST_DIRECTORY` | Persistenzverzeichnis für ChromaDB. |
 | `CHROMA_COLLECTION` | Name der ChromaDB-Collection. |
 | `EMBEDDING_BATCH_SIZE` | Batch-Größe für Embeddings; klein halten für CPU-Betrieb. |

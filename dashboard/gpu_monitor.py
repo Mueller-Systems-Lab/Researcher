@@ -9,14 +9,11 @@
 #   data = monitor.collect()
 # =============================================================================
 
-import json
 import logging
 import os
-import re
 import subprocess
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -172,5 +169,5 @@ class GPUMonitor:
             )
             return result.returncode == 0
         except Exception:
-            logger.debug("GPU-Monitor: is_available Prüfung fehlgeschlagen", exc_info=True)
+            logger.debug("GPU-Monitor: is_available check failed", exc_info=True)
             return False

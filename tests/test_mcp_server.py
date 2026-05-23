@@ -1,8 +1,11 @@
 # =============================================================================
 # Tests: MCP Server (T-026)
 # =============================================================================
-import sys, os, json, io
-from unittest.mock import patch, MagicMock
+import io
+import json
+import os
+import sys
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -29,7 +32,6 @@ def _make_handler(method="POST", path="/mcp", body=None):
 
 def test_mcp_server_get_info():
     """GET /mcp gibt Server-Info zurück."""
-    from mcp_tools.server import MCPHTTPHandler
 
     handler = _make_handler("GET", "/")
     handler.do_GET()

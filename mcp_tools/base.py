@@ -20,7 +20,7 @@ class MCPToolResult:
         success: bool,
         data: Any = None,
         error: str = "",
-        warnings: list[str] = None,
+        warnings: list[str] | None = None,
     ):
         self.success = success
         self.data = data or {}

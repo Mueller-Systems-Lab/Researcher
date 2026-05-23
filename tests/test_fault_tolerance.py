@@ -8,11 +8,11 @@
 #   python3 -m pytest tests/test_fault_tolerance.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,10 +20,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @patch("search.composite.requests.get")
 def test_fault_searxng_down_darknet_ok(mock_get):
     """Fehlertoleranz: SearXNG down, Darknet OK → nur Darknet."""
-    from search.composite import CompositeRetriever
-    from darknet_search.index import WhooshIndex
-
     from requests.exceptions import ConnectionError
+
+    from darknet_search.index import WhooshIndex
+    from search.composite import CompositeRetriever
 
     mock_get.side_effect = ConnectionError("SearXNG not reachable")
 
@@ -63,9 +63,9 @@ def test_fault_searxng_down_darknet_ok(mock_get):
 @patch("search.composite.requests.get")
 def test_fault_both_backends_down(mock_get):
     """Fehlertoleranz: Beide Backends down → leere Liste (kein Fehler)."""
-    from search.composite import CompositeRetriever
-
     from requests.exceptions import ConnectionError
+
+    from search.composite import CompositeRetriever
 
     mock_get.side_effect = ConnectionError("SearXNG not reachable")
 
@@ -95,8 +95,9 @@ def test_fault_vectorstore_chromadb_down():
 
 def test_fault_embedding_ollama_down():
     """Fehlertoleranz: Ollama nicht verfügbar (Embedding)."""
-    from vectordb.embedding import EmbeddingService
     import pytest
+
+    from vectordb.embedding import EmbeddingService
 
     svc = EmbeddingService(
         base_url="http://localhost:19999",
@@ -112,9 +113,9 @@ def test_fault_embedding_ollama_down():
 @patch("search.composite.requests.get")
 def test_fault_searxng_timeout(mock_get):
     """Fehlertoleranz: SearXNG timeout."""
-    from search.composite import CompositeRetriever
-
     from requests.exceptions import Timeout
+
+    from search.composite import CompositeRetriever
 
     mock_get.side_effect = Timeout("SearXNG timed out")
 

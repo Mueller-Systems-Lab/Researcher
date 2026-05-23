@@ -8,11 +8,11 @@
 #   python3 -m pytest tests/test_composite_integration.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @patch("search.composite.requests.get")
 def test_composite_full_pipeline(mock_get):
     """Integration: Komplette Composite-Pipeline mit beiden Backends."""
-    from search.composite import CompositeRetriever
     from darknet_search.index import WhooshIndex
+    from search.composite import CompositeRetriever
 
     # SearXNG Mock: 2 Ergebnisse
     mock_response = MagicMock()
@@ -65,7 +65,9 @@ def test_composite_full_pipeline(mock_get):
                 "author": "analyst",
                 "title": "Security Analysis",
                 "timestamp": datetime.now(),
-                "content": "Analysis of security research findings from multiple sources.",
+                "content": (
+                    "Analysis of security research findings from multiple sources."
+                ),
                 "forum_id": "f1",
             }
         )
@@ -100,9 +102,10 @@ def test_composite_full_pipeline(mock_get):
 @patch("search.composite.requests.get")
 def test_composite_mixed_sources(mock_get):
     """Integration: Gemischte Quellen und korrekte Sortierung."""
-    from search.composite import CompositeRetriever
-    from darknet_search.index import WhooshIndex
     from datetime import datetime
+
+    from darknet_search.index import WhooshIndex
+    from search.composite import CompositeRetriever
 
     mock_response = MagicMock()
     mock_response.json.return_value = {

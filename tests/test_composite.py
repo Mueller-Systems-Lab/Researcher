@@ -8,10 +8,10 @@
 #   python3 -m pytest tests/test_composite.py -v
 # =============================================================================
 
-import sys
 import os
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -64,10 +64,10 @@ def test_composite_searxng_success(mock_get):
 @patch("search.composite.requests.get")
 def test_composite_searxng_down(mock_get):
     """Test: SearXNG down — Fallback ohne Fehler."""
-    from search.composite import CompositeRetriever
-
     # SearXNG nicht erreichbar
     from requests.exceptions import ConnectionError
+
+    from search.composite import CompositeRetriever
 
     mock_get.side_effect = ConnectionError()
 
@@ -143,10 +143,10 @@ def test_composite_darknet_disabled(mock_get):
 @patch("search.composite.requests.get")
 def test_composite_with_darknet_results(mock_get):
     """Test: Composite mit beiden Backends."""
-    from search.composite import CompositeRetriever
-    from darknet_search.index import WhooshIndex
-    from darknet_search.retriever import DarknetRetriever
     from datetime import datetime
+
+    from darknet_search.index import WhooshIndex
+    from search.composite import CompositeRetriever
 
     # SearXNG mock (keine Ergebnisse)
     mock_response = MagicMock()

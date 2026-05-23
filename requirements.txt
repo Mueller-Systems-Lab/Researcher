@@ -11,10 +11,11 @@
 # ---------------------------------------------------------------------------
 # Core: GPT Researcher (Fork-Basis)
 # ---------------------------------------------------------------------------
-# Installiert als PyPI-Paket. Zieht fastapi, uvicorn, langchain, langchain-ollama,
-# langchain-community, openai, ollama, beautifulsoup4, lxml, requests,
-# python-dotenv, numpy, pydantic etc. als transitive Abhängigkeiten mit.
-gpt-researcher==0.14.8
+# GPT Researcher is provided via git submodule `gpt_researcher/`, NOT from PyPI.
+# Run before first install: git submodule update --init --recursive
+# The submodule is importable as `from gpt_researcher import GPTResearcher`
+# after adding the repo root to sys.path.
+# gpt-researcher==0.14.8  # DO NOT install from PyPI — use the git submodule
 
 # ---------------------------------------------------------------------------
 # Darknet-Crawler & Index
@@ -24,14 +25,17 @@ gpt-researcher==0.14.8
 requests[socks]>=2.34.2
 
 # Volltext-Suchindex (Pure-Python, dateibasiert, kein Server nötig)
+# DEPRECATED: unmaintained since 2021 — migrate to SQLite FTS5 (see ADR-013)
 whoosh>=2.7.4
 
 # ---------------------------------------------------------------------------
 # Vektordatenbank (Lernfähigkeit)
 # ---------------------------------------------------------------------------
 # ChromaDB für Embedding-Persistenz (lokale Vektordatenbank)
-# Stand 2026-05: chromadb 1.5.9 ist aktuellste Version
-chromadb>=0.5.20
+# Exakter Pin auf 1.5.9: getestete stabile Version mit PersistentClient,
+# keine Breaking Changes zu 0.5.x, Apache-2.0 Lizenz, aktiv maintained.
+# Lockfile-Release: https://pypi.org/project/chromadb/1.5.9/
+chromadb==1.5.9
 
 # ---------------------------------------------------------------------------
 # Sicherheitsfixes für transitive Dependencies
@@ -47,3 +51,4 @@ lxml>=6.1.0
 # pytest>=8.0.0
 # pytest-asyncio>=0.24.0
 # pytest-cov>=5.0.0
+bandit>=1.7.0

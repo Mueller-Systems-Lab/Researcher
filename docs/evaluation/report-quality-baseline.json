@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "created_from_issue": "#66/#67",
+  "description": "Baseline for Research Report Quality Regression Guard",
+  "query_count": 3,
+  "thresholds": {
+    "overall_mean_min": 85,
+    "overall_query_min": 75,
+    "source_coverage_mean_min": 80,
+    "traceability_mean_min": 85,
+    "hallucination_risk_mean_min": 85,
+    "local_first_mean_min": 100
+  },
+  "reference_scores": {
+    "overall_mean": 92,
+    "overall_min": 88,
+    "source_coverage_mean": 93,
+    "traceability_mean": 93,
+    "hallucination_risk_mean": 98,
+    "local_first_mean": 100
+  }
+}

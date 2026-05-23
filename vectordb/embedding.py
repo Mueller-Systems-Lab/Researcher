@@ -13,7 +13,6 @@
 import json
 import logging
 import os
-from typing import Optional
 
 import requests
 
@@ -28,8 +27,8 @@ class EmbeddingService:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None,
+        base_url: str | None = None,
+        model: str | None = None,
     ):
         self.base_url = base_url or os.getenv(
             "OLLAMA_BASE_URL", "http://localhost:11434"
