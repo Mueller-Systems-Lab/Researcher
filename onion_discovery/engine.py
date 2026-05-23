@@ -203,6 +203,7 @@ class DiscoveryPipeline:
                 content = content[:5000]  # Begrenzen
             except Exception as e:
                 logger.warning(f"Parse-Fehler: {e}", exc_info=True)
+                stats["errors"] += 1
 
             # 5. Classify
             classification = self.classifier.classify(
@@ -236,13 +237,26 @@ class DiscoveryPipeline:
             # 7. Indexieren über Port (mit Human-Approval-Gate)
             if classification.indexable and not classification.requires_human_review:
                 try:
-                    # Human Approval Gate vor persistenter Speicherung (Block 3.3)
-                    if not self._on_before_persist(seed.url, {"title": title}):
-                        logger.info(f"Persistenz blockiert: {seed.url[:60]}")
-                        self.seed_queue.mark_completed(seed.url, status="blocked")
-                        continue
+                    before_persist = getattr(self, "_on_before_persist", None)
+                    if callable(before_persist):
+                        metadata = {
+                            "title": title,
+                            "content": content[:2000],
+                            "topic": classification.topic,
+                            "risk_level": classification.risk_level,
+                            "confidence": classification.confidence,
+                        }
+                        if before_persist(seed.url, metadata) is False:
+                            logger.info(
+                                f"Persist-Hook blockiert Indexierung: {seed.url[:60]}"
+                            )
+                            self.seed_queue.mark_completed(seed.url, status="reviewed")
+                            continue
 
-                    success = self._index.index(
+                    from darknet_search.index import WhooshIndex
+
+                    idx = WhooshIndex()
+                    idx.add_post(
                         {
                             "url": seed.url,
                             "author": "onion_discovery",
@@ -252,10 +266,7 @@ class DiscoveryPipeline:
                             "forum_id": "onion_discovery",
                         }
                     )
-                    if success:
-                        stats["sent_to_index"] += 1
-                    else:
-                        stats["errors"] += 1
+                    stats["sent_to_index"] += 1
                 except Exception as e:
                     logger.warning(f"Index-Fehler: {e}", exc_info=True)
                     stats["errors"] += 1
