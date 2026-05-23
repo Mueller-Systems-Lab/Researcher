@@ -194,7 +194,19 @@ class Classifier:
             result.confidence = 0.2
 
         # Risikostufe
-        high_risk_matches = sum(1 for kw in self.HIGH_RISK_KEYWORDS if kw in text)
+        high_risk_keywords = [kw for kw in self.HIGH_RISK_KEYWORDS if kw in text]
+        if "drug" in high_risk_keywords and any(
+            context in text
+            for context in (
+                "prescription drug",
+                "drug information",
+                "medical treatment",
+                "medicine",
+                "pharmaceutical",
+            )
+        ):
+            high_risk_keywords.remove("drug")
+        high_risk_matches = len(high_risk_keywords)
         if high_risk_matches >= 3:
             result.risk_level = RISK_CRITICAL
             result.reasons.append(f"Multiple High-Risk-Keywords: {high_risk_matches}")
