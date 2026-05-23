@@ -64,6 +64,8 @@ select = ["E", "F", "W", "I", "N", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Playwright-Tests: Enthalten eingebettetes JavaScript (String-Literale)
 "tests/playwright/*.py" = ["E501"]
+# Security-Tests: Lange Docstrings für Angriffsvektor-Dokumentation
+"tests/security/*.py" = ["E501"]
 # Scripts mit sys.path-Manipulation vor Imports (architekturbedingt)
 "scripts/deep_research.py" = ["E501"]
 "scripts/patch_gpt_researcher.py" = ["E402"]
