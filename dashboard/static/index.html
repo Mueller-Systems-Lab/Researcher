@@ -104,6 +104,8 @@
 
 <h1>⚙ GPU-Dashboard</h1>
 
+<div id="query-display" style="margin-bottom:12px;color:#8b949e;font-size:0.9em"></div>
+
 <div id="error" class="error" style="display:none" role="alert" aria-live="assertive"></div>
 
 <div class="grid" id="metrics" aria-label="GPU-Metriken" role="region">
@@ -145,6 +147,12 @@
 
 <script>
 const eventSource = new EventSource('/api/gpu/stream');
+
+// Query-Parameter 'q' sicher anzeigen (textContent, kein innerHTML)
+const queryParam = new URLSearchParams(window.location.search).get('q');
+if (queryParam) {
+  document.getElementById('query-display').textContent = '🔍 Suche: ' + queryParam;
+}
 
 eventSource.onmessage = function(event) {
   try {
