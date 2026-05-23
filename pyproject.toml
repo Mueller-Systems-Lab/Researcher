@@ -78,6 +78,11 @@ select = ["E", "F", "W", "I", "N", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "e2e: End-to-End-Tests mit gemockten oder optionalen externen Abhängigkeiten",
+    "asyncio: AsyncIO-basierte Tests",
+    "playwright: Browser- und Playwright-Tests",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",

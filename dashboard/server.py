@@ -12,7 +12,9 @@ import json
 import logging
 import os
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from typing import Optional
+from urllib.parse import urlparse
 
 from dashboard.gpu_monitor import GPUMonitor
 
@@ -21,27 +23,11 @@ logger = logging.getLogger(__name__)
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8888"))
 UPDATE_INTERVAL = 2.0  # Sekunden zwischen Updates
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-
-# CORS-Whitelist aus .env (kommagetrennt), default: localhost-only
-_ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.getenv(
-        "ALLOWED_ORIGINS", "http://localhost:8081,http://127.0.0.1:8081"
-    ).split(",")
-    if o.strip()
-]
-
-
-def _make_cors_headers(extra: dict | None = None) -> dict:
-    """Erzeugt CORS-Header basierend auf ALLOWED_ORIGINS."""
-    headers = {
-        "Access-Control-Allow-Origin": _ALLOWED_ORIGINS[0]
-        if _ALLOWED_ORIGINS
-        else "http://localhost:8081",
-    }
-    if extra:
-        headers.update(extra)
-    return headers
+ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.getenv("DASHBOARD_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+}
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -51,17 +37,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
     monitor = GPUMonitor()
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
+        parsed = urlparse(self.path)
+        request_path = parsed.path
+        if request_path == "/" or request_path == "/index.html":
             self._serve_static("index.html", "text/html")
-        elif self.path == "/api/gpu":
+        elif request_path == "/api/gpu":
             self._serve_gpu_json()
-        elif self.path == "/api/gpu/stream":
+        elif request_path == "/api/gpu/stream":
             self._serve_gpu_sse()
-        elif self.path == "/health":
+        elif request_path == "/health":
             self._serve_health()
         else:
             # Static files
-            file_path = self.path.lstrip("/")
+            file_path = request_path.lstrip("/")
             if os.path.exists(os.path.join(STATIC_DIR, file_path)):
                 content_type = "text/plain"
                 if file_path.endswith(".css"):
@@ -77,7 +65,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": "Not Found"}).encode())
 
-    def _resolve_static(self, filename: str) -> str | None:
+    def _send_cors_header(self):
+        """Setzt CORS nur für erlaubte Origins; fremde Origins werden geblockt."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return
+        host_origin = f"http://{self.headers.get('Host', '')}"
+        if origin == host_origin or origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+
+    def _resolve_static(self, filename: str) -> Optional[str]:
         """Löst einen Dateinamen sicher innerhalb von STATIC_DIR auf.
 
         Verhindert Path-Traversal, indem der normalisierte Pfad
@@ -121,8 +119,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-            for key, val in _make_cors_headers().items():
-                self.send_header(key, val)
+            self._send_cors_header()
             self.end_headers()
             self.wfile.write(content)
         except Exception as e:
@@ -135,8 +132,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         data = self.monitor.collect_dict()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        for key, val in _make_cors_headers().items():
-            self.send_header(key, val)
+        self._send_cors_header()
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(json.dumps(data, indent=2).encode())
@@ -146,8 +142,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        for key, val in _make_cors_headers().items():
-            self.send_header(key, val)
+        self._send_cors_header()
         self.send_header("Connection", "keep-alive")
         self.end_headers()
 
@@ -195,7 +190,7 @@ def run_server(
     print(f"  GPU-Dashboard: http://{host}:{port}")
     print(f"  Live-Stream:   http://{host}:{port}/api/gpu/stream")
     print(f"  JSON-API:      http://{host}:{port}/api/gpu")
-    print("  Drücke Ctrl+C zum Beenden")
+    print(f"  Drücke Ctrl+C zum Beenden")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
