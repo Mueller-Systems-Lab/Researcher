@@ -16,6 +16,7 @@ source = [
     "dashboard",
     "mcp_tools",
     "onion_discovery",
+    "research_orchestrator",
     "research_planner",
     "search",
     "vectordb",

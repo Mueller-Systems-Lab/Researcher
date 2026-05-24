@@ -76,7 +76,7 @@ lint:
 lint-types:
 	python3 -m mypy . --ignore-missing-imports || true
 
-TYPECHECK_PROJECT_PATHS := config crawlers darknet_search search dashboard vectordb mcp_tools onion_discovery research_planner scripts
+TYPECHECK_PROJECT_PATHS := config crawlers darknet_search search dashboard vectordb mcp_tools onion_discovery research_orchestrator research_planner scripts
 typecheck:
 	python3 -m mypy $(TYPECHECK_PROJECT_PATHS) --ignore-missing-imports
 
