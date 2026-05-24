@@ -4,9 +4,13 @@
 
 **UI PARTIAL**
 
+## Stand 2026-05-23
+
+GPU-Dashboard ✅ | GPT Researcher Backend startbar, aber LLM-Instabilität blockiert vollen E2E-Flow.
+
 ## Begründung
 
-Researcher besitzt ein funktionierendes lokales GPU-Dashboard mit Live-Metriken (SSE-Stream). Das Dashboard startet zuverlässig, lädt im Browser und zeigt GPU-Daten korrekt an. Es fehlt jedoch ein Research-Flow (Query-Eingabe → Report anzeigen). Die Research-Pipeline existiert als CLI/API, ist aber nicht über das UI bedienbar.
+Researcher besitzt ein funktionierendes lokales GPU-Dashboard (Port 8888) und das GPT-Researcher-Frontend aus dem Submodul ist über den Backend-Server (Port 8000) erreichbar. Die `.env`-Konfiguration ist vollständig Local-First (Ollama + SearXNG, keine Cloud-Keys nötig). Der volle Query→Research→Report-Flow konnte jedoch nicht verifiziert werden, weil lokale LLM-Modelle (qwen3.5 ~6.6GB) beim Laden crashen und der Backend-Startup dadurch 120s+ dauert ohne HTTP-ready zu werden.
 
 ## Gefundene UI-Komponenten
 
@@ -78,10 +82,19 @@ RUN_PLAYWRIGHT_TESTS=true pytest tests/playwright/ -v
 
 ## Bekannte Grenzen
 
-1. Kein Research-Flow im UI — nur GPU-Monitoring
-2. Combined Server benötigt GPT-Researcher Submodul (FastAPI)
-3. SSE-Stream kann `networkidle`-Wait in Playwright blockieren
-4. XSS-Test-Assertion erwartet exakten String (Präfix-Fix nötig)
+1. LLM-Modell-Instabilität: qwen3.5 crasht ("llama runner process has terminated")
+2. Backend-Startup: 120s+ ohne HTTP-ready (Modell-Laden blockiert)
+3. Kein Query→Research→Report-Flow über UI verifiziert
+4. SSE-Stream kann `networkidle`-Wait in Playwright blockieren
+5. XSS-Test-Assertion erwartet exakten String (Präfix-Fix nötig)
+
+## GPT Researcher Submodul
+
+- `gpt_researcher/frontend/`: Lightweight HTML + NextJS
+- `gpt_researcher/backend/`: FastAPI-Server
+- Start: `python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 --app-dir gpt_researcher`
+- Frontend-URL: `http://127.0.0.1:8000`
+- `.env`: FAST_LLM=ollama, RETRIEVER=searx — **keine Cloud-Keys nötig**
 
 ## Nächste UI-Issues
 
