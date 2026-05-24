@@ -15,6 +15,7 @@ source = [
     "darknet_search",
     "dashboard",
     "mcp_tools",
+    "evidence_store",
     "onion_discovery",
     "search",
     "vectordb",
