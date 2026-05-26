@@ -16,7 +16,12 @@ source = [
     "dashboard",
     "mcp_tools",
     "onion_discovery",
+    "research_orchestrator",
     "research_planner",
+    "research_workers",
+    "searcher_pipeline",
+    "evidence_store",
+    "deep_report",
     "search",
     "vectordb",
 ]
