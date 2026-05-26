@@ -1,0 +1,273 @@
+"""Tests für Runtime Guard — DR-08: Local Model Runtime Guard."""
+
+from __future__ import annotations
+
+from config.local_llm_runtime import (
+    RuntimeStatus,
+    can_start_deep_research,
+    check_endpoint_local,
+    is_garbled,
+    run_guard,
+)
+
+# ── Endpoint Checks ──────────────────────────────────────────────────────
+
+
+def test_localhost_allowed():
+    """127.0.0.1 ist erlaubt."""
+    assert check_endpoint_local("http://127.0.0.1:8080") is True
+
+
+def test_localhost_ipv6_allowed():
+    """::1 (IPv6) ist erlaubt."""
+    assert check_endpoint_local("http://[::1]:8080") is True
+
+
+def test_cloud_openai_blocked():
+    """api.openai.com wird blockiert."""
+    assert check_endpoint_local("https://api.openai.com/v1") is False
+
+
+def test_cloud_anthropic_blocked():
+    """api.anthropic.com wird blockiert."""
+    assert check_endpoint_local("https://api.anthropic.com") is False
+
+
+def test_cloud_tavily_blocked():
+    """api.tavily.com wird blockiert."""
+    assert check_endpoint_local("https://api.tavily.com") is False
+
+
+def test_external_ip_blocked():
+    """Externe IP wird blockiert."""
+    assert check_endpoint_local("http://192.168.1.1:8080") is False
+
+
+def test_cloud_groq_blocked():
+    """Groq Cloud wird blockiert."""
+    assert check_endpoint_local("https://api.groq.com") is False
+
+
+def test_cloud_mistral_blocked():
+    """Mistral Cloud wird blockiert."""
+    assert check_endpoint_local("https://api.mistral.ai/v1") is False
+
+
+# ── Garbled Detection ────────────────────────────────────────────────────
+
+
+def test_garbled_empty_string():
+    """Leerer Output ist garbled."""
+    assert is_garbled("") is True
+
+
+def test_garbled_whitespace_only():
+    """Nur Whitespace ist garbled."""
+    assert is_garbled("   \n  ") is True
+
+
+def test_garbled_repeated_characters():
+    """Wiederholte Zeichen (>20) sind garbled."""
+    assert is_garbled("aaaaaaaaaaaaaaaaaaaaa") is True
+
+
+def test_garbled_replacement_char():
+    """Unicode Replacement Character \ufffd ist garbled."""
+    assert is_garbled("Something \ufffd broken") is True
+
+
+def test_garbled_null_byte():
+    """Null-Byte ist garbled."""
+    assert is_garbled("text\x00broken") is True
+
+
+def test_clean_text_not_garbled():
+    """Sauberer Text ist nicht garbled."""
+    assert is_garbled("This is a normal response from the model.") is False
+
+
+def test_german_text_not_garbled():
+    """Deutscher Text mit Umlauten ist nicht garbled."""
+    assert is_garbled("Öffentliche Förderung für KI-Startups in Österreich.") is False
+
+
+# ── Status Classes ───────────────────────────────────────────────────────
+
+
+def test_status_enum_values():
+    """Alle Status-Klassen sind definiert."""
+    assert RuntimeStatus.LOCAL_LLM_READY.value == "LOCAL_LLM_READY"
+    assert RuntimeStatus.MODEL_GARBLED.value == "MODEL_GARBLED"
+    assert RuntimeStatus.MODEL_TIMEOUT.value == "MODEL_TIMEOUT"
+    assert RuntimeStatus.MODEL_CRASH.value == "MODEL_CRASH"
+    assert RuntimeStatus.CLOUD_BLOCKED.value == "CLOUD_BLOCKED"
+    assert (
+        RuntimeStatus.LOCAL_OPENAI_COMPAT_ALLOWED.value == "LOCAL_OPENAI_COMPAT_ALLOWED"
+    )
+
+
+def test_can_start_deep_research_ready():
+    """LOCAL_LLM_READY → Deep Research kann starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    result = RuntimeGuardResult(status=RuntimeStatus.LOCAL_LLM_READY)
+    assert can_start_deep_research(result) is True
+
+
+def test_can_start_deep_research_blocked():
+    """MODEL_GARBLED → Deep Research darf nicht starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    result = RuntimeGuardResult(status=RuntimeStatus.MODEL_GARBLED)
+    assert can_start_deep_research(result) is False
+
+
+def test_can_start_deep_research_cloud():
+    """CLOUD_BLOCKED → Deep Research darf nicht starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    result = RuntimeGuardResult(status=RuntimeStatus.CLOUD_BLOCKED)
+    assert can_start_deep_research(result) is False
+
+
+# ── Guard Function (without live model) ──────────────────────────────────
+
+
+def test_run_guard_cloud_endpoint_rejected():
+    """run_guard blockiert Cloud-Endpoints sofort."""
+    result = run_guard(
+        base_url="https://api.openai.com/v1",
+        model="gpt-4",
+        test_generation=False,
+    )
+    assert result.status == RuntimeStatus.CLOUD_BLOCKED
+    assert result.cloud_detected is True
+
+
+def test_run_guard_nonexistent_local_handled():
+    """run_guard behandelt nicht-erreichbaren localhost."""
+    result = run_guard(
+        base_url="http://127.0.0.1:19999",
+        model="qwen3.5",
+        test_generation=False,
+        timeout=1.0,
+    )
+    assert result.status in (
+        RuntimeStatus.MODEL_CRASH,
+        RuntimeStatus.MODEL_TIMEOUT,
+    )
+
+
+def test_runtime_guard_result_has_fields():
+    """RuntimeGuardResult hat alle Pflichtfelder."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult()
+    assert r.status == RuntimeStatus.LOCAL_LLM_BLOCKED
+    assert r.errors == []
+    assert r.warnings == []
+    assert r.model == ""
+
+
+def test_garbled_detects_truncated_unicode():
+    """Verdächtige Unicode-Sequenzen sind garbled."""
+    assert is_garbled("Hello\ufffd\ufffd\ufffdWorld") is True
+
+
+# ── Additional Coverage ──────────────────────────────────────────────────
+
+
+def test_endpoint_local_ipv6_bracket():
+    """IPv6 mit Brackets ist local."""
+    assert check_endpoint_local("http://[::1]:11434") is True
+
+
+def test_endpoint_cloud_cohere_blocked():
+    """Cohere Cloud wird blockiert."""
+    assert check_endpoint_local("https://api.cohere.ai/v1") is False
+
+
+def test_endpoint_cloud_together_blocked():
+    """Together Cloud wird blockiert."""
+    assert check_endpoint_local("https://api.together.xyz") is False
+
+
+def test_endpoint_cloud_azure_blocked():
+    """Azure OpenAI wird blockiert."""
+    assert check_endpoint_local("https://openai.azure.com") is False
+
+
+def test_endpoint_cloud_perplexity_blocked():
+    """Perplexity Cloud wird blockiert."""
+    assert check_endpoint_local("https://api.perplexity.ai") is False
+
+
+def test_endpoint_cloud_google_blocked():
+    """Google Generative Language wird blockiert."""
+    assert check_endpoint_local("https://generativelanguage.googleapis.com") is False
+
+
+def test_garbled_ratio_control_chars():
+    """Hoher Anteil an Steuerzeichen → garbled."""
+    text = "\x00\x01\x02\x03\x04\x05\x06\x07\x08"
+    assert is_garbled(text) is True
+
+
+def test_garbled_short_valid_text():
+    """Kurzer valider Text ist nicht garbled."""
+    assert is_garbled("OK") is False
+
+
+def test_garbled_special_chars_valid():
+    """Sonderzeichen in validem Text sind OK."""
+    assert is_garbled("Café résumé naïve") is False
+
+
+def test_can_start_local_llm_partial():
+    """LOCAL_LLM_PARTIAL → Deep Research kann starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult(status=RuntimeStatus.LOCAL_LLM_PARTIAL)
+    assert can_start_deep_research(r) is True
+
+
+def test_can_start_openai_compat():
+    """LOCAL_OPENAI_COMPAT_ALLOWED → Deep Research kann starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult(status=RuntimeStatus.LOCAL_OPENAI_COMPAT_ALLOWED)
+    assert can_start_deep_research(r) is True
+
+
+def test_can_start_timeout():
+    """MODEL_TIMEOUT → Deep Research darf nicht starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult(status=RuntimeStatus.MODEL_TIMEOUT)
+    assert can_start_deep_research(r) is False
+
+
+def test_can_start_crash():
+    """MODEL_CRASH → Deep Research darf nicht starten."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult(status=RuntimeStatus.MODEL_CRASH)
+    assert can_start_deep_research(r) is False
+
+
+def test_guard_result_defaults():
+    """RuntimeGuardResult Default-Werte."""
+    from config.local_llm_runtime import RuntimeGuardResult
+
+    r = RuntimeGuardResult(model="qwen", endpoint="http://127.0.0.1:8080")
+    assert r.model == "qwen"
+    assert r.latency_ms == 0.0
+    assert r.max_context == 0
+    assert r.generation_sample == ""
+    assert r.cloud_detected is False
+
+
+def test_garbled_mixed_printable():
+    """Gemischter Text mit wenigen Control-Chars ist OK."""
+    text = "Normal text with\na newline and\ttab."
+    assert is_garbled(text) is False
