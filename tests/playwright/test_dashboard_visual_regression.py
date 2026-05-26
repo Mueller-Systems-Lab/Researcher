@@ -22,6 +22,15 @@ from pathlib import Path
 
 import pytest
 
+def _is_playwright_available():
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+
 try:
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import sync_playwright
@@ -37,12 +46,12 @@ BASELINE_IMAGE = BASELINE_DIR / "dashboard_visual_regression.png"
 sys.path.insert(0, str(ROOT))
 
 
-def _is_enabled() -> bool:
+def _is_playwright_available() -> bool:
     return os.getenv("RUN_PLAYWRIGHT_TESTS", "").lower() in {"true", "1", "yes"}
 
 
 pytestmark = pytest.mark.skipif(
-    not _is_enabled(), reason="RUN_PLAYWRIGHT_TESTS=true is required"
+    not _is_playwright_available(), reason="RUN_PLAYWRIGHT_TESTS=true is required"
 )
 
 
