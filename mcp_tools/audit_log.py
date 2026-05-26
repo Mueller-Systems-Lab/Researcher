@@ -127,9 +127,16 @@ class AuditLog(MCPToolBase):
                     "timestamp": entry["timestamp"],
                 },
             ).to_dict()
-        except Exception as e:
-            logger.exception(f"Fehler beim Audit-Log-Schreiben: {e}")
-            return MCPToolResult(False, error=f"Kann nicht schreiben: {e}").to_dict()
+        except OSError as e:
+            logger.error(f"Audit-Log-I/O-Fehler: {e}", exc_info=True)
+            return MCPToolResult(
+                False, error=f"Audit-Log kann nicht geschrieben werden: {e}"
+            ).to_dict()
+        except (ValueError, TypeError) as e:
+            logger.error(f"Audit-Log-Datenfehler: {e}", exc_info=True)
+            return MCPToolResult(
+                False, error=f"Audit-Log-Daten ungültig: {e}"
+            ).to_dict()
 
     def _read_entries(self, params: dict) -> dict:
         limit = params.get("limit", 50)

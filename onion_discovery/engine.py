@@ -201,8 +201,8 @@ class DiscoveryPipeline:
                     if text:
                         content += text + "\n"
                 content = content[:5000]  # Begrenzen
-            except Exception as e:
-                logger.warning(f"Parse-Fehler: {e}", exc_info=True)
+            except (ValueError, TypeError, ImportError, AttributeError) as e:
+                logger.warning(f"HTML-Parse-Fehler: {e}", exc_info=True)
                 stats["errors"] += 1
 
             # 5. Classify

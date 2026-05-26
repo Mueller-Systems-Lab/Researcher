@@ -21,8 +21,8 @@ class VectorStore:
     """ChromaDB-Wrapper für persistente Vektorspeicherung.
 
     Speichert Embeddings auf Disk (kein RAM-Problem).
-    Graceful Degradation: Wenn ChromaDB nicht verfügbar ist,
-    werden Operationen übersprungen statt abzubrechen.
+    Bietet explizite Fehlererkennung: Prüfe `available`-Property
+    vor Operationen. Letzter Fehler in `last_error` abrufbar.
     """
 
     def __init__(
@@ -38,6 +38,12 @@ class VectorStore:
         )
         self._collection = None
         self._client = None
+        self.last_error: str | None = None
+
+    @property
+    def available(self) -> bool:
+        """Prüft, ob ChromaDB verfügbar und die Collection bereit ist."""
+        return self._get_collection() is not None
 
     def _get_client(self):
         """Lazy-Initialisierung des ChromaDB-Clients."""
@@ -48,11 +54,13 @@ class VectorStore:
                 self._client = chromadb.PersistentClient(path=self.persist_directory)
                 logger.info(f"ChromaDB verbunden: {self.persist_directory}")
             except ImportError:
+                self.last_error = "chromadb nicht installiert"
                 logger.warning(
                     "chromadb nicht installiert. Installiere: pip install chromadb"
                 )
                 return None
             except Exception as e:
+                self.last_error = f"ChromaDB nicht verfügbar: {e}"
                 logger.warning(
                     f"ChromaDB nicht verfügbar: {e}. Betrieb ohne Vektorspeicherung."
                 )
@@ -71,6 +79,7 @@ class VectorStore:
                 )
                 logger.info(f"Collection '{self.collection_name}' bereit")
             except Exception as e:
+                self.last_error = f"Collection-Fehler: {e}"
                 logger.warning(f"Collection-Fehler: {e}")
                 return None
         return self._collection
@@ -148,10 +157,15 @@ class VectorStore:
 
         Returns:
             Liste von Ergebnis-Dicts mit keys: document, metadata, distance, id.
-            Leere Liste bei Fehler oder wenn ChromaDB nicht verfügbar.
+            Leere Liste wenn ChromaDB nicht verfügbar ist (prüfe `available`-
+            Property oder `last_error` für Fehlerdetails).
         """
         collection = self._get_collection()
         if collection is None:
+            logger.warning(
+                f"ChromaDB-Query fehlgeschlagen — nicht verfügbar: "
+                f"{self.last_error or 'unbekannter Fehler'}"
+            )
             return []
 
         kwargs: dict = {
@@ -186,20 +200,29 @@ class VectorStore:
                     )
             return output
         except Exception as e:
-            logger.warning(f"Fehler bei ChromaDB-Query: {e}", exc_info=True)
+            self.last_error = f"ChromaDB-Query-Fehler: {e}"
+            logger.error(f"Fehler bei ChromaDB-Query: {e}", exc_info=True)
             return []
 
     @property
     def count(self) -> int:
-        """Anzahl der Dokumente in der Collection."""
+        """Anzahl der Dokumente in der Collection.
+
+        Returns:
+            Anzahl der Dokumente, oder -1 wenn ChromaDB nicht verfügbar
+            (prüfe `available`-Property für Status).
+        """
         collection = self._get_collection()
         if collection is None:
-            return 0
+            self.last_error = "ChromaDB nicht verfügbar — count=-1"
+            logger.warning(f"ChromaDB-Count: nicht verfügbar ({self.last_error})")
+            return -1
         try:
             return collection.count()
-        except Exception:
-            logger.debug("Fehler bei ChromaDB-Count", exc_info=True)
-            return 0
+        except Exception as e:
+            self.last_error = f"ChromaDB-Count-Fehler: {e}"
+            logger.error(f"Fehler bei ChromaDB-Count: {e}", exc_info=True)
+            return -1
 
     def delete_collection(self):
         """Löscht die gesamte Collection."""

@@ -32,6 +32,9 @@ class CompositeRetriever:
 
     Fragt parallel SearXNG (Web) und DarknetRetriever (Forum) ab,
     merged Ergebnisse anhand der URL und dedupliziert.
+
+    Fehlerzustände sind über `last_errors` abrufbar — leere Ergebnisse
+    bedeuten entweder "keine Ergebnisse" ODER "Backend nicht erreichbar".
     """
 
     def __init__(
@@ -52,6 +55,10 @@ class CompositeRetriever:
             "1",
             "yes",
         )
+        self.last_errors: dict[str, str | None] = {
+            "searxng": None,
+            "darknet": None,
+        }
 
     def _search_searxng(self, max_results: int) -> list[dict]:
         """Sucht in SearXNG.
@@ -92,10 +99,14 @@ class CompositeRetriever:
             return results
 
         except requests.exceptions.ConnectionError:
-            logger.warning("SearXNG nicht erreichbar — Fallback: nur Darknet")
+            self.last_errors["searxng"] = (
+                f"SearXNG nicht erreichbar unter {self.searx_url}"
+            )
+            logger.warning(self.last_errors["searxng"])
             return []
         except requests.RequestException as e:
-            logger.warning(f"SearXNG-Fehler: {e}")
+            self.last_errors["searxng"] = f"SearXNG-Fehler: {e}"
+            logger.warning(self.last_errors["searxng"])
             return []
 
     def _search_darknet(self, max_results: int) -> list[dict]:
@@ -117,7 +128,12 @@ class CompositeRetriever:
             logger.info(f'Darknet: {len(results)} Ergebnisse für "{self.query}"')
             return results
         except Exception as e:
-            logger.warning(f"Darknet-Suche fehlgeschlagen: {e}")
+            self.last_errors["darknet"] = f"Darknet-Suche fehlgeschlagen: {e}"
+            logger.error(
+                f"Darknet-Suche fehlgeschlagen: {e}. "
+                f"Index: {getattr(self, 'darknet_index_dir', '?')}",
+                exc_info=True,
+            )
             return []
 
     @staticmethod

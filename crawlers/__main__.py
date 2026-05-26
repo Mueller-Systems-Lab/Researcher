@@ -45,7 +45,7 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.INFO)
 
     # Konfiguration anzeigen
     print("=" * 60)

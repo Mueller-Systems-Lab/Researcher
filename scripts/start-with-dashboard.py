@@ -16,9 +16,13 @@ import logging
 import sys
 from pathlib import Path
 
-# Projekt-Root
-ROOT = Path(__file__).parent.resolve()
+# Projekt-Root (scripts/..)
+ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(ROOT))
+
+from dotenv import load_dotenv
+
+load_dotenv(ROOT / ".env")
 
 logger = logging.getLogger(__name__)
 

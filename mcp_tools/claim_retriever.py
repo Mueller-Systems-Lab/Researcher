@@ -25,7 +25,7 @@ def _sanitize_url(url: str) -> str:
     return url
 
 
-def retrieve_composite(claim: str, max_sources: int = 5) -> list[dict]:
+def retrieve_composite(claim: str, max_sources: int = 5) -> dict:
     """Sucht über CompositeRetriever (SearXNG Web-Suche).
 
     Args:
@@ -33,9 +33,12 @@ def retrieve_composite(claim: str, max_sources: int = 5) -> list[dict]:
         max_sources: Maximale Anzahl Quellen.
 
     Returns:
-        Liste von Ergebnis-Dicts.
+        Dict mit:
+          - "results": Liste von Ergebnis-Dicts
+          - "errors": dict mit Fehlerdetails pro Backend (None wenn OK)
+          - "total": Anzahl Ergebnisse
     """
-    results = []
+    result: dict = {"results": [], "errors": {}, "total": 0}
     try:
         from search.composite import CompositeRetriever
 
@@ -43,7 +46,7 @@ def retrieve_composite(claim: str, max_sources: int = 5) -> list[dict]:
         retriever.darknet_enabled = False  # Nur Web für Validierung
         search_results = retriever.search(max_results=max_sources)
         for r in search_results:
-            results.append(
+            result["results"].append(
                 {
                     "url": _sanitize_url(r.get("url", "")),
                     "title": r.get("title", ""),
@@ -53,12 +56,18 @@ def retrieve_composite(claim: str, max_sources: int = 5) -> list[dict]:
                     "match_type": "keyword",
                 }
             )
+        result["errors"] = retriever.last_errors
+        result["total"] = len(result["results"])
+    except ImportError as e:
+        result["errors"]["import"] = f"CompositeRetriever nicht importierbar: {e}"
+        logger.error(result["errors"]["import"], exc_info=True)
     except Exception as e:
-        logger.warning(f"CompositeRetriever nicht verfügbar: {e}")
-    return results
+        result["errors"]["runtime"] = f"Retrieval-Fehler: {e}"
+        logger.error(result["errors"]["runtime"], exc_info=True)
+    return result
 
 
-def retrieve_fulltext(claim: str, max_sources: int = 5) -> list[dict]:
+def retrieve_fulltext(claim: str, max_sources: int = 5) -> dict:
     """Sucht im Volltext-Index (Whoosh/SQLite FTS5).
 
     Args:
@@ -66,16 +75,19 @@ def retrieve_fulltext(claim: str, max_sources: int = 5) -> list[dict]:
         max_sources: Maximale Anzahl Quellen.
 
     Returns:
-        Liste von Ergebnis-Dicts.
+        Dict mit:
+          - "results": Liste von Ergebnis-Dicts
+          - "errors": dict mit Fehlerdetails (None wenn OK)
+          - "total": Anzahl Ergebnisse
     """
-    results = []
+    result: dict = {"results": [], "errors": {}, "total": 0}
     try:
         from darknet_search.index import WhooshIndex
 
         idx = WhooshIndex()
         index_results = idx.search(claim, limit=max_sources)
         for r in index_results:
-            results.append(
+            result["results"].append(
                 {
                     "url": _sanitize_url(r.get("url", "")),
                     "title": r.get("title", ""),
@@ -85,6 +97,11 @@ def retrieve_fulltext(claim: str, max_sources: int = 5) -> list[dict]:
                     "match_type": "fulltext",
                 }
             )
+        result["total"] = len(result["results"])
+    except ImportError as e:
+        result["errors"]["import"] = f"WhooshIndex nicht importierbar: {e}"
+        logger.error(result["errors"]["import"], exc_info=True)
     except Exception as e:
-        logger.warning(f"Whoosh-Index nicht verfügbar: {e}")
-    return results
+        result["errors"]["runtime"] = f"Index-Suche fehlgeschlagen: {e}"
+        logger.error(result["errors"]["runtime"], exc_info=True)
+    return result

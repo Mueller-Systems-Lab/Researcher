@@ -138,9 +138,14 @@ class WebFetchTool(MCPToolBase):
 
         except socket.gaierror as e:
             return f"Hostname nicht auflösbar: {host} ({e})"
-        except Exception as e:
-            logger.warning(f"SSRF-Validierungsfehler für {url}: {e}")
-            return f"SSRF-Validierung fehlgeschlagen: {e}"
+        except (ValueError, ipaddress.AddressValueError) as e:
+            logger.warning(f"SSRF-Validierung: ungültige Adresse für {url}: {e}")
+            return f"SSRF-Validierung: ungültige Adresse: {e}"
+        except (socket.error, OSError) as e:
+            logger.warning(
+                f"SSRF-Validierungs-Netzwerkfehler für {url}: {e}", exc_info=True
+            )
+            return f"SSRF-Validierungs-Netzwerkfehler: {e}"
 
     def run(self, params: dict) -> dict:
         url = params.get("url", "")

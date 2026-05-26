@@ -81,15 +81,26 @@ class ClaimValidator(MCPToolBase):
 
         warnings: list[str] = []
         results: list[dict] = []
+        retriever_errors: dict = {}
 
-        # 1. Retrieval
+        # 1. Retrieval (mit transparenter Fehlerweitergabe)
         if search_mode in ("composite", "all"):
-            composite_results = retrieve_composite(claim, max_sources)
-            results.extend(composite_results)
+            comp = retrieve_composite(claim, max_sources)
+            results.extend(comp.get("results", []))
+            if comp.get("errors"):
+                retriever_errors["composite"] = comp["errors"]
+                for bk, err in comp["errors"].items():
+                    if err:
+                        warnings.append(f"CompositeRetriever ({bk}): {err}")
 
         if search_mode in ("fulltext", "all"):
-            fulltext_results = retrieve_fulltext(claim, max_sources)
-            results.extend(fulltext_results)
+            ft = retrieve_fulltext(claim, max_sources)
+            results.extend(ft.get("results", []))
+            if ft.get("errors"):
+                retriever_errors["fulltext"] = ft["errors"]
+                for bk, err in ft["errors"].items():
+                    if err:
+                        warnings.append(f"Volltextsuche ({bk}): {err}")
 
         # 2. Scoring
         confidence = calculate_confidence(results, claim, max_sources)
@@ -102,6 +113,7 @@ class ClaimValidator(MCPToolBase):
                 "sources": results[:max_sources],
                 "source_count": len(results),
                 "assessment": assess(confidence),
+                "retriever_errors": retriever_errors or None,
             },
             warnings=warnings if warnings else None,
         ).to_dict()

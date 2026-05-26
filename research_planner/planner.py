@@ -197,7 +197,6 @@ Rules:
 - Last node should synthesize findings
 - Dependencies must form a valid DAG (no cycles)
 - Include risk_level for each node"""
-    time.sleep(0)  # no-op, placeholder for potential rate-limit integration
 
 
 def _parse_llm_output(data: dict, query: str) -> ResearchPlan | None:

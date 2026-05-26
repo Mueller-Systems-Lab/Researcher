@@ -187,14 +187,14 @@ def run_server(
         port: Port (default: 8888).
     """
     server = HTTPServer((host, port), DashboardHandler)
-    print(f"  GPU-Dashboard: http://{host}:{port}")
-    print(f"  Live-Stream:   http://{host}:{port}/api/gpu/stream")
-    print(f"  JSON-API:      http://{host}:{port}/api/gpu")
-    print(f"  Drücke Ctrl+C zum Beenden")
+    logger.info("Dashboard gestartet: http://%s:%s", host, port)
+    logger.info("Live-Stream:   http://%s:%s/api/gpu/stream", host, port)
+    logger.info("JSON-API:      http://%s:%s/api/gpu", host, port)
+    logger.info("Drücke Ctrl+C zum Beenden")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n  Server gestoppt")
+        logger.info("Dashboard-Server gestoppt")
         server.server_close()
 
 
