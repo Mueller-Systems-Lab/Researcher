@@ -172,10 +172,12 @@ class EvidenceStore(MCPToolBase):
 
     def _get_stats(self) -> dict:
         store = self._get_store()
+        store_count = store.count
         return MCPToolResult(
             True,
             data={
-                "total_evidence": store.count,
-                "chromadb_available": store._get_collection() is not None,
+                "total_evidence": max(store_count, 0),  # -1 means unavailable
+                "chromadb_available": store.available,
+                "last_error": store.last_error,
             },
         ).to_dict()

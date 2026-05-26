@@ -29,6 +29,8 @@ from config.ollama_models import (
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8085/v1")
+LLAMA_SERVER_MODEL = "gemma4-obliterated"  # Aktuell aktives Chat-Modell
 SEARXNG_URL = os.getenv("SEARX_URL", "http://localhost:8080")
 SEARXNG_TIMEOUT = int(os.getenv("SEARXNG_TIMEOUT_SECONDS", "15"))
 TOR_HOST = os.getenv("TOR_SOCKS_HOST", "127.0.0.1")
@@ -160,6 +162,71 @@ def check_tor() -> bool:
         return False
 
 
+def check_llama_server() -> bool:
+    """Prüft, ob llama-server (OpenAI-kompatibler Chat-Endpoint) erreichbar ist."""
+    model_url = f"{LLAMA_SERVER_URL}/models"
+    chat_url = f"{LLAMA_SERVER_URL}/chat/completions"
+
+    try:
+        # Schritt 1: Models-Endpoint prüfen
+        r = requests.get(model_url, timeout=(5, 10))
+        if r.status_code != 200:
+            print(f"  {_status(False)} llama-server API returned {r.status_code}")
+            print(f"     URL: {model_url}")
+            return False
+
+        data = r.json()
+        models = []
+        # llama-server kann Modelle in "models" (mit name) oder "data" (mit id) haben
+        if "data" in data and isinstance(data["data"], list):
+            models.extend(m.get("id", "") for m in data["data"])
+        if "models" in data and isinstance(data["models"], list):
+            models.extend(m.get("name", "") for m in data["models"])
+
+        if LLAMA_SERVER_MODEL in models:
+            print(f"  {_status(True)} llama-server model: {LLAMA_SERVER_MODEL}")
+        else:
+            print(f"  ⚠️  llama-server: '{LLAMA_SERVER_MODEL}' nicht gefunden")
+            if models:
+                print(f"     Verfügbar: {', '.join(models[:3])}")
+            return False
+
+        # Schritt 2: Kurzen Chat-Test (optional, kein Fail wenn fehlschlägt)
+        try:
+            test = requests.post(
+                chat_url,
+                json={
+                    "model": LLAMA_SERVER_MODEL,
+                    "messages": [{"role": "user", "content": "OK"}],
+                    "max_tokens": 4,
+                    "temperature": 0.01,
+                },
+                timeout=(5, 15),
+            )
+            if test.status_code == 200:
+                result = test.json()
+                content = (
+                    result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                )
+                if content:
+                    print(f"  {_status(True)} llama-server chat response: OK")
+                else:
+                    print(f"  ⚠️  llama-server chat: empty response")
+            else:
+                print(f"  ⚠️  llama-server chat test: HTTP {test.status_code}")
+        except (requests.ConnectionError, requests.Timeout):
+            print(f"  ⚠️  llama-server chat test: timeout (nicht kritisch)")
+
+        return True
+    except requests.ConnectionError:
+        print(f"  {_status(False)} llama-server nicht erreichbar ({LLAMA_SERVER_URL})")
+        print("     Starte: bash serve_gemma4_obliterated.sh")
+        return False
+    except requests.Timeout:
+        print(f"  {_status(False)} llama-server Timeout ({LLAMA_SERVER_URL})")
+        return False
+
+
 def check_cloud_blocker() -> bool:
     """Prüft, ob Cloud-Provider ohne ALLOW_CLOUD aktiv sind."""
     if os.getenv("ALLOW_CLOUD", "").lower() in ("true", "1", "yes"):
@@ -167,10 +234,11 @@ def check_cloud_blocker() -> bool:
         return True
 
     violations: list[str] = []
-    for var in ("LLM_PROVIDER", "RETRIEVER"):
+    for var in ("LLM_PROVIDER", "RETRIEVER", "FAST_LLM"):
         val = os.getenv(var, "").lower()
         for provider in CLOUD_PROVIDERS:
-            if provider in val:
+            # Bei FAST_LLM (Format "provider:model") nur den Provider-Teil prüfen
+            if provider in val.split(":")[0]:
                 violations.append(f"{var}={val}")
 
     if violations:
@@ -189,7 +257,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Runtime Smoke Test")
     parser.add_argument(
         "--only",
-        choices=["ollama", "searxng", "tor", "cloud"],
+        choices=["ollama", "searxng", "tor", "cloud", "llama-server"],
         help="Nur einen Dienst prüfen",
     )
     args = parser.parse_args()
@@ -214,15 +282,27 @@ def main() -> None:
         if not only:
             print()
 
-    # Ollama
+    # Ollama (nur Embeddings)
     if only in (None, "ollama"):
-        print("🦙 Ollama:")
+        print("🦙 Ollama Embeddings:")
         results["ollama"] = check_ollama()
         if not results["ollama"] and _is_strict("ollama"):
             exit_code = max(exit_code, 1)
             print("   ❌ REQUIRE_OLLAMA=true → Fehler")
         elif not results["ollama"] and not only:
             print("   ℹ️  Ollama ist optional. Starte: ollama serve")
+        if not only:
+            print()
+
+    # llama-server (Chat)
+    if only in (None, "llama-server"):
+        print("🌐 llama-server Chat:")
+        results["llama-server"] = check_llama_server()
+        if not results["llama-server"] and _is_strict("llama-server"):
+            exit_code = max(exit_code, 1)
+            print("   ❌ REQUIRE_LLAMA_SERVER=true → Fehler")
+        elif not results["llama-server"] and not only:
+            print("   ℹ️  llama-server ist optional. Starte: research-serve.sh gemma4")
         if not only:
             print()
 

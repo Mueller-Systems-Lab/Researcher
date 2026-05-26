@@ -57,7 +57,7 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.INFO)
 
     from onion_discovery.engine import DiscoveryPipeline
     from onion_discovery.human_review import ReviewQueue

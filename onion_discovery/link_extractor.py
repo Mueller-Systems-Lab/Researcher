@@ -59,8 +59,10 @@ class LinkExtractor:
 
         try:
             soup = BeautifulSoup(html, "lxml")
-        except Exception:
-            logger.warning("BeautifulSoup konnte HTML nicht parsen", exc_info=True)
+        except (ValueError, TypeError, ImportError) as e:
+            logger.warning(
+                f"BeautifulSoup konnte HTML nicht parsen: {e}", exc_info=True
+            )
             soup = None
 
         # 1. Links aus <a href="...">-Tags

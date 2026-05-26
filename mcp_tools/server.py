@@ -192,14 +192,15 @@ def run_server(host: str = "127.0.0.1", port: int = MCP_PORT):
     MCPHTTPHandler.tools_initialized = True
 
     server = HTTPServer((host, port), MCPHTTPHandler)
-    print(f"  MCP-Server: http://{host}:{port}/mcp")
-    print(f"  Health:     http://{host}:{port}/health")
-    print(f"  Tools:      {[m['name'] for m in get_all_manifests()]}")
-    print("  Drücke Ctrl+C zum Beenden")
+    tool_names = [m["name"] for m in get_all_manifests()]
+    logger.info("MCP-Server gestartet: http://%s:%s/mcp", host, port)
+    logger.info("Health:     http://%s:%s/health", host, port)
+    logger.info("Tools:      %s", tool_names)
+    logger.info("Drücke Ctrl+C zum Beenden")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n  Server gestoppt")
+        logger.info("MCP-Server gestoppt")
         server.server_close()
 
 

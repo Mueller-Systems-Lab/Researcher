@@ -75,7 +75,7 @@ check_env() {
     fi
 
     # GPT Researcher installiert?
-    if python -c "import gpt_researcher" 2>/dev/null; then
+    if python3 -c "import gpt_researcher" 2>/dev/null; then
         check_ok "GPT Researcher (Python-Modul) installiert"
     else
         check_fail "GPT Researcher nicht installiert"
@@ -99,7 +99,7 @@ start_ui() {
         DASHBOARD_FLAG="--no-gpu"
     fi
 
-    python "$SCRIPT_DIR/scripts/start-with-dashboard.py" $DASHBOARD_FLAG "$@"
+    python3 "$SCRIPT_DIR/scripts/start-with-dashboard.py" $DASHBOARD_FLAG "$@"
 }
 
 # ---- Main ----

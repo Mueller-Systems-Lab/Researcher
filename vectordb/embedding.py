@@ -49,10 +49,10 @@ class EmbeddingService:
 
         Raises:
             ConnectionError: Wenn Ollama nicht erreichbar ist.
-            ValueError: Wenn die Antwort ungültig ist.
+            ValueError: Wenn der Text leer oder die Antwort ungültig ist.
         """
         if not text or not text.strip():
-            return []
+            raise ValueError("embed() erwartet nicht-leeren Text")
 
         try:
             response = requests.post(
@@ -83,18 +83,31 @@ class EmbeddingService:
             batch_size: Batch-Größe (klein halten für CPU).
 
         Returns:
-            Liste von Embedding-Vektoren.
+            Liste von Embedding-Vektoren. Fehlerhafte Einträge werden als
+            leere Listen markiert (mit Warning-Log).
+
+        Raises:
+            ConnectionError: Wenn Ollama nicht erreichbar ist.
         """
         results = []
+        errors = 0
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             for text in batch:
                 try:
                     vec = self.embed(text)
                     results.append(vec)
+                except ConnectionError:
+                    raise  # Nicht erreichbar → sofort abbrechen
                 except Exception as e:
-                    logger.warning(f"Embedding-Fehler bei Batch {i}: {e}")
+                    errors += 1
+                    logger.error(
+                        f"Embedding-Fehler Text {i} (Batch {i // batch_size}): {e}",
+                        exc_info=True,
+                    )
                     results.append([])
+        if errors:
+            logger.warning(f"embed_batch: {errors}/{len(texts)} Texte fehlgeschlagen")
         return results
 
     @property
