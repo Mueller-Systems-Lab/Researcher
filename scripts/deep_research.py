@@ -1,49 +1,97 @@
 #!/usr/bin/env python3
 """
-Deep Research Pipeline — SearXNG + Qwen3.5 Uncensored
-======================================================
+Deep Research Pipeline — SearXNG + Lokales LLM
+================================================
 GPT-Researcher-ähnlicher Workflow mit Thinking-Fix:
-  Phase 1: SearXNG Web-Suche (mehrere Sub-Themen)
+  Phase 1: SearXNG Web-Suche (via zentraler Konfiguration)
   Phase 2: Quellen sammeln + strukturieren
-  Phase 3: LLM-Synthese via Ollama raw generate
+  Phase 3: LLM-Synthese via Ollama (via zentraler Modellkonfiguration)
 
 Nutzung:
   python3 scripts/deep_research.py "Dein Thema"
   python3 scripts/deep_research.py --lang de "Your Topic"
+
+Konfiguration:
+  Alle URLs und Modellnamen kommen aus config/services.py und
+  config/ollama_models.py. Keine hardcodierten Werte.
 """
 
 import argparse
+import os
 import re
+import sys
 import textwrap
 
 import requests
 
+# Projekt-Root zum Pfad hinzufügen
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from config.ollama_models import load_ollama_model_config, resolve_chat_model
+from config.services import OLLAMA_BASE_URL, SEARXNG_SEARCH_URL
+
 DEFAULT_TOPIC = "Ivermectin COVID-19 klinische Studien Wirksamkeit Meta-Analyse"
+
+# Zentrale Modellkonfiguration laden
+_ollama_config = load_ollama_model_config()
+
+
+def _get_available_models() -> list[str]:
+    """Holt verfügbare Ollama-Modelle via /api/tags."""
+    try:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=(5, 10))
+        r.raise_for_status()
+        return [m.get("name", "") for m in r.json().get("models", [])]
+    except Exception:
+        return []
+
+
+def _resolve_model() -> str:
+    """Löst das Chat-Modell über die zentrale Ollama-Konfiguration auf."""
+    available = _get_available_models()
+    resolution = resolve_chat_model(_ollama_config, available)
+    if resolution.status in ("missing", "no_models", "config_error"):
+        print(f"   ⚠️  Modell nicht verfügbar: {resolution.message}")
+        print(f"   Fallback auf Konfigurationswert: {_ollama_config.chat_model}")
+        return _ollama_config.chat_model
+    print(f"   Modell: {resolution.used_model} (Status: {resolution.status})")
+    return resolution.used_model or _ollama_config.chat_model
 
 
 def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     print("=" * 65)
     print(f"  DEEP RESEARCH: {query[:55]}...")
-    print("  Pipeline: SearXNG → Extract → Synthesize → Report")
+    print(f"  Pipeline: SearXNG ({SEARXNG_SEARCH_URL}) → Extract → Synthesize → Report")
     print("=" * 65)
+
+    # Modell auflösen
+    model_name = _resolve_model()
 
     # ═══ Phase 1: SearXNG ═══
     print("\n🔍 Phase 1: SearXNG Web-Suche...")
+    # Dynamische Subtopics basierend auf Query
     subtopics = [
-        f"{query} RCT randomisierte Studien",
-        f"{query} Meta-Analyse Cochrane Review",
-        f"{query} Regulierungsbehörden FDA EMA Bewertung",
+        f"{query}",
+        f"{query} Studie Analyse",
+        f"{query} Meta Bewertung",
     ]
     all_results = {}
     for topic in subtopics:
-        r = requests.get(
-            "http://localhost:8080/search",
-            params={"q": topic, "format": "json", "language": lang},
-            timeout=10,
-        )
-        results = r.json().get("results", [])[:5]
-        all_results[topic] = results
-        print(f"   {topic[:50]}: {len(results)} Treffer")
+        try:
+            r = requests.get(
+                SEARXNG_SEARCH_URL,
+                params={"q": topic, "format": "json", "language": lang},
+                timeout=10,
+            )
+            r.raise_for_status()
+            results = r.json().get("results", [])[:5]
+            all_results[topic] = results
+            print(f"   {topic[:50]}: {len(results)} Treffer")
+        except requests.ConnectionError:
+            print(f"   ❌ SearXNG nicht erreichbar ({SEARXNG_SEARCH_URL})")
+        except Exception as e:
+            print(f"   ⚠️  SearXNG-Fehler für '{topic[:30]}': {e}")
 
     # ═══ Phase 2: Sammeln ═══
     print("\n📄 Phase 2: Quellen strukturieren...")
@@ -63,7 +111,7 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     print(f"   {len(sources)} Quellen gesammelt")
 
     # ═══ Phase 3: LLM ═══
-    print("\n🧠 Phase 3: LLM-Synthese (Qwen3.5 Uncensored)...")
+    print(f"\n🧠 Phase 3: LLM-Synthese ({model_name})...")
     lang_instr = "auf Deutsch" if lang == "de" else "in English"
 
     prompt = f"""Research Assistant. Create a detailed research report based on the sources below.
@@ -83,10 +131,11 @@ Write a comprehensive research report (1000-2000 words) with:
 
 Respond {lang_instr}. Structured with paragraphs. Facts only. No opinions."""
 
+    ollama_api_url = f"{OLLAMA_BASE_URL}/api/generate"
     r = requests.post(
-        "http://localhost:11434/api/generate",
+        ollama_api_url,
         json={
-            "model": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
+            "model": model_name,
             "prompt": prompt,
             "stream": False,
             "raw": True,

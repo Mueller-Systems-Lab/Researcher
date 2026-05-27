@@ -1,6 +1,9 @@
 """
 Patched GPT Researcher: Startet die vollständige Deep-Research-Pipeline
-mit SearXNG-Suche + Qwen3.5-Uncensored LLM (Thinking-Fix).
+mit SearXNG-Suche + Lokalem LLM (Thinking-Fix).
+
+Konfiguration: Liest alle Werte aus .env / Umgebungsvariablen.
+Setzt Fallback-Defaults NUR wenn keine .env vorhanden ist.
 """
 
 import asyncio
@@ -15,21 +18,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "gpt_researcher"))
 sys.path.insert(0, ROOT)
 
-# Env-Konfiguration
-os.environ.update(
-    {
-        "FAST_LLM": "ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive",
-        "SMART_LLM": "ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive",
-        "STRATEGIC_LLM": "ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive",
-        "EMBEDDING": "ollama:nomic-embed-text",
-        "OLLAMA_BASE_URL": "http://localhost:11434",
-        "RETRIEVER": "searx",
-        "SEARX_URL": "http://localhost:8080",
-        "OPENAI_API_KEY": "sk-dummy",
-        "TEMPERATURE": "0.3",
-        "MAX_CONCURRENT_REQUESTS": "1",
-    }
-)
+# Env-Konfiguration aus .env / Umgebungsvariablen laden
+# Fallback-Defaults nur wenn keine Variable gesetzt ist (z.B. kein .env)
+os.environ.setdefault("FAST_LLM", "ollama:qwen3.5-uncensored-no-thinking:latest")
+os.environ.setdefault("SMART_LLM", "ollama:qwen3.5-uncensored-no-thinking:latest")
+os.environ.setdefault("STRATEGIC_LLM", "ollama:qwen3.5-uncensored-no-thinking:latest")
+os.environ.setdefault("EMBEDDING", "ollama:nomic-embed-text:latest")
+os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
+os.environ.setdefault("RETRIEVER", "searx")
+os.environ.setdefault("SEARX_URL", "http://localhost:8080")
+os.environ.setdefault("OPENAI_API_KEY", "not-needed")
+os.environ.setdefault("TEMPERATURE", "0.3")
+os.environ.setdefault("MAX_CONCURRENT_REQUESTS", "1")
 
 # --- Monkey-Patch: ChatOllama → UncensoredChatOllama ---
 import langchain_ollama  # noqa: E402
@@ -44,9 +44,12 @@ print("✅ ChatOllama → UncensoredChatOllama (thinking→content)")
 print("\n1️⃣ LLM-Test...")
 from langchain_ollama import ChatOllama  # noqa: E402
 
+_llm_model = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5-uncensored-no-thinking:latest")
+_llm_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
 llm = ChatOllama(
-    model="qwen3.5-9b-uncensored-hauhaucs-aggressive",
-    base_url="http://localhost:11434",
+    model=_llm_model,
+    base_url=_llm_url,
     temperature=0.3,
     num_predict=50,
 )
@@ -57,13 +60,17 @@ print(f'   Antwort: "{resp.content[:80]}"')
 print("\n2️⃣ SearXNG-Test...")
 import requests  # noqa: E402
 
-r = requests.get("http://localhost:8080/search?q=test&format=json", timeout=5)
+_searx_url = os.getenv("SEARX_URL", "http://localhost:8080")
+r = requests.get(f"{_searx_url}/search?q=test&format=json", timeout=5)
 print(f"   {len(r.json().get('results', []))} Ergebnisse")
 
 # --- Full GPT Researcher Deep Research ---
 print("\n3️⃣ 🚀 GPT Researcher Deep Research...")
 
-QUERY = "Ivermectin COVID-19 klinische Studien Wirksamkeit 2020-2025"
+QUERY = os.getenv(
+    "RESEARCH_DEFAULT_QUERY",
+    "Ivermectin COVID-19 klinische Studien Wirksamkeit 2020-2025",
+)
 
 
 async def run():
