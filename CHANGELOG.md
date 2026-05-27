@@ -35,7 +35,8 @@
 - `coverage_html/` zu `.gitignore` hinzugefügt
 
 ### Known Limitations (aktualisiert)
-- qwen3.5-Modellinstabilität (crasht gelegentlich: "llama runner process has terminated")
+- Aktuelles Chat-Modell: **Gemma 4 E4B OBLITERATED** via llama-server (Port 8081, ~3.8 GB VRAM)
+- qwen3.5-Ära beendet: Historisches Modell, durch Gemma 4 obliterated ersetzt
 - ChromaDB 1.5.9 `count()` gibt `-1` statt `0` bei fehlender DB — lokal abgefangen
 - SSE-Stream blockiert Playwright `networkidle`-Wait
 - Submodul `gpt_researcher`: Vendor-Findings report-only (20 dokumentiert)

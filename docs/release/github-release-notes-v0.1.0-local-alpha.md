@@ -38,11 +38,12 @@ make typecheck              # 0 Errors
 ## Known Limitations
 
 - **Alpha-Release** — keine Produktionsvalidierung
-- **qwen3.5-Modellinstabilität** — lokale LLM-Modelle crashen gelegentlich
+- **Chat-Modell: Gemma 4 OBLITERATED** via llama-server (Port 8081, ~3.8 GB VRAM) — stabiler als qwen3.5-Vorgänger
+- **Embedding: nomic-embed-text** via Ollama (Port 11434)
 - **ChromaDB 1.5.9** — `count()` gibt `-1` statt `0` bei fehlender DB (lokal abgefangen)
 - **SSE blockiert Playwright** — `networkidle`-Wait hängt wegen SSE-Stream
 - **SearXNG** benötigt lokalen Docker
-- **Ollama-Modelle** müssen lokal verfügbar sein
+- **Ollama nur noch für Embedding** (nomic-embed-text), Chat läuft eigenständig via llama.cpp
 - **Report-Evaluation** ist heuristisch, keine Faktenverifikation
 
 Siehe `docs/release/known-limitations.md` für Details.

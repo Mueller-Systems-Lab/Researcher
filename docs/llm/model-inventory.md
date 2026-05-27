@@ -1,20 +1,27 @@
 ---
 title: Lokales LLM-Model-Inventar
-date: 2026-05-20
+date: 2026-05-27
 ---
 
 # Local LLM Model Inventory
 
 ## Stand
 
-2026-05-20 — Recherchiert aus Repository-Code, `.env.example`, `scripts/runtime_smoke.py`, `scripts/research_happy_path.py` sowie offiziellen Quellen (Ollama Library, Hugging Face Model Cards, Ollama API-/Modelfile-Doku).
+2026-05-27 — Aktuelles Chat-Modell: **Gemma 4 E4B OBLITERATED** via llama-server.  
+qwen3.5-Ära beendet (deprecated, durch Gemma 4 obliterated ersetzt).
+
+## Aktuelle Modelle (2026-05)
+
+| Modell | Rolle | Backend | Port | VRAM | Start |
+|--------|-------|---------|------|------|-------|
+| **gemma4-obliterated** | Chat / Summary / Report | llama-server (eigenständig) | 8081 | ~3.8 GB | `./serve_gemma4_obliterated_researcher.sh` |
+| **nomic-embed-text:latest** | Embedding | Ollama | 11434 | 274 MB (CPU-seitig) | `ollama run nomic-embed-text` |
 
 ## Internet-Recherche: Bestätigungen und Korrekturen
 
 - `nomic-embed-text:latest` ist ein reines Embedding-Modell und kann **keinen Text generieren**. Quellen: https://ollama.com/library/nomic-embed-text, https://huggingface.co/nomic-ai/nomic-embed-text-v1.5
-- `qwen3.5-uncensored-no-thinking:latest` ist **kein öffentliches Ollama-Library-Modell**, sondern ein **lokaler Modelfile-Name** im Projekt. Quellen: https://ollama.com/library/qwen3.5, https://huggingface.co/Qwen/Qwen3.5-9B
-- Offizielle Basis für das Qwen-Chatmodell ist `Qwen/Qwen3.5-9B` bzw. `qwen3.5:9b`. Quellen: https://huggingface.co/Qwen/Qwen3.5-9B, https://ollama.com/library/qwen3.5
-- Community-Varianten mit `uncensored` existieren auf Hugging Face, sind aber **keine offiziellen Alibaba-/Qwen-Releases**. Quelle: https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+- **Gemma 4 E4B OBLITERATED** ist ein Community-Uncensored-Fork von Googles Gemma 4 (E4B = Expert-4B). Läuft via llama.cpp/llama-server, nicht via Ollama. Quelle: Projekt-eigene GGUF-Datei in `/home/xxammaxx/Schreibtisch/gemma4/llama.cpp/models/`.
+- **qwen3.5-Ära (deprecated)**: Historisches Chat-Modell. `qwen3.5-uncensored-no-thinking:latest` war ein lokaler Modelfile-Name im Projekt, Basis `Qwen/Qwen3.5-9B`. Ersetzt durch Gemma 4 obliterated (stabiler, weniger VRAM).
 
 ## Hardware-Kontext (verifiziert im Projekt)
 

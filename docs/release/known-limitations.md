@@ -24,7 +24,9 @@
 
 ## Runtime Stability
 
-- **qwen3.5-Modellinstabilität**: Lokale LLM-Modelle (qwen3.5-uncensored-no-thinking, qwen3.5:9b) crashen gelegentlich mit "llama runner process has terminated". Startup dauert 40-120s.
+- **Gemma 4 OBLITERATED (Chat)**: Aktuelles Chat-/Summary-Modell. Läuft via llama-server (Port 8081, ~3.8 GB VRAM). Deutlich stabiler als der qwen3.5-Vorgänger. Keine Ollama-Abhängigkeit für Chat — eigener Prozess.
+- **qwen3.5 (Deprecated)**: Historisches Chat-Modell. Crashte gelegentlich mit "llama runner process has terminated". Vollständig durch Gemma 4 obliterated ersetzt.
+- **nomic-embed-text (Embedding)**: Läuft weiterhin via Ollama (Port 11434). 274 MB, stabil.
 - **ChromaDB 1.5.9 count-Verhalten**: `count()` gibt `-1` statt `0` bei fehlender Verbindung. Wird lokal in `vectordb/store.py` abgefangen.
 - **SSE blockiert Playwright**: Der Server-Sent-Events-Stream (SSE) der Dashboard-API verhindert, dass Playwright `networkidle` als Wait-Strategy verwenden kann.
 

@@ -1,27 +1,41 @@
 ---
 title: Model-Auswahlrichtlinie
-date: 2026-05-20
+date: 2026-05-27
 ---
 
 # Model Selection Policy
 
 ## Stand
 
-2026-05-20
+2026-05-27
 
 ## Ziel
 
 - Nur lokale Modelle, kein Cloud-Fallback.
-- Ziel ist reproduzierbares Verhalten auf der GTX-1070-Workstation.
+- Ziel ist reproduzierbares Verhalten auf der GTX-1070-Workstation (8 GB VRAM).
 
 ## Chat/Summary-Modell
 
-- Aktuelle Wahl: `qwen3.5-uncensored-no-thinking:latest`
-- Herkunft: Community-Uncensored-Fork von `Qwen/Qwen3.5-9B`
-- Fallback: `qwen3.5:9b` (offiziell, falls Uncensored nicht verfügbar)
-- Eignung: Research-Summaries und Report-Generierung auf Deutsch
+- Aktuelle Wahl: **Gemma 4 E4B OBLITERATED** (`gemma4-obliterated`)
+- Backend: Eigenständiger `llama-server` (Port 8081), **kein Ollama**
+- VRAM: ~3.8 GB (passt zusammen mit GPU-Dashboard auf GTX 1070)
+- Start: `./serve_gemma4_obliterated_researcher.sh`
+- Precision-Trap: `-ctk f32 -ctv f32` zwingend auf Pascal-GPUs (GTX 1070), da FP16-KV-Cache bei Gemma 4 garbled Output erzeugt
+- Alias im Server: `gemma4-obliterated`
+- Eignung: Research-Summaries, Report-Generierung, Chat
+- Stabilität: ✅ deutlich stabiler als qwen3.5-Vorgänger
 
-Quelle: https://huggingface.co/Qwen/Qwen3.5-9B, https://ollama.com/library/qwen3.5, https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+### Historisch (qwen3.5, deprecated)
+
+- Frühere Wahl: `qwen3.5-uncensored-no-thinking:latest` (via Ollama, 6.6 GB VRAM)
+- Crashte gelegentlich mit "llama runner process has terminated"
+- Vollständig durch Gemma 4 obliterated ersetzt
+- Das GGUF `Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf` liegt noch im Projektroot
+
+Quellen:
+- https://huggingface.co/google/gemma-4 (Gemma 4 Basis)
+- https://huggingface.co/Qwen/Qwen3.5-9B (qwen3.5, deprecated)
+- https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive (qwen3.5, deprecated)
 
 ## Embedding-Modell
 
