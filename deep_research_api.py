@@ -52,7 +52,7 @@ def _load_plan(plan_id: str) -> dict | None:
     plan_path = os.path.join(_PLANS_DIR, f"{plan_id}.json")
     if not os.path.exists(plan_path):
         return None
-    with open(plan_path, "r", encoding="utf-8") as f:
+    with open(plan_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -72,8 +72,8 @@ def handle_deep_research_plan(
 
     try:
         from research_planner.planner import generate_plan
-        from research_planner.validation import validate_plan
         from research_planner.serialization import plan_to_json
+        from research_planner.validation import validate_plan
 
         plan = generate_plan(
             query,
@@ -144,7 +144,6 @@ def handle_deep_research_approve(
 
     try:
         from research_planner.approval import approve_plan
-        from research_planner.models import ResearchPlan
         from research_planner.serialization import plan_from_dict
 
         plan_obj = plan_from_dict(plan)
@@ -153,7 +152,7 @@ def handle_deep_research_approve(
         plan["approved_at"] = _now()
         _save_plan(plan_id, plan)
         _json_response(handler, 200, {"plan_id": plan_id, "status": "approved"})
-    except ImportError as e:
+    except ImportError:
         # Fallback: manual approval
         plan["status"] = "approved"
         plan["approved_at"] = _now()
@@ -196,7 +195,6 @@ def handle_deep_research_run(
 
     try:
         from research_orchestrator.orchestrator import create_run, resume_run
-        from research_planner.models import ResearchPlan
         from research_planner.serialization import plan_from_dict
 
         plan_obj = plan_from_dict(plan)
@@ -309,16 +307,16 @@ def handle_deep_research_get_report(
     report_path = os.path.join(REPORT_DIR, "runs", run_id, "report.md")
     if os.path.exists(report_path):
         try:
-            with open(report_path, "r", encoding="utf-8") as f:
+            with open(report_path, encoding="utf-8") as f:
                 report = f.read()
             _json_response(handler, 200, {"report": report, "format": "markdown"})
             return
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error("Failed to read report for %s: %s", run_id, e)
 
     # Fallback: generate outline from run state data
     try:
-        from deep_report.outline import load_run_data_for_outline, generate_outline
+        from deep_report.outline import generate_outline, load_run_data_for_outline
 
         run_data = load_run_data_for_outline(run_id)
         if run_data:
@@ -367,7 +365,7 @@ def handle_deep_research_get_evaluation(
     eval_path = os.path.join(REPORT_DIR, "runs", run_id, "evaluation.json")
     if os.path.exists(eval_path):
         try:
-            with open(eval_path, "r", encoding="utf-8") as f:
+            with open(eval_path, encoding="utf-8") as f:
                 evaluation = json.load(f)
             _json_response(handler, 200, evaluation)
             return

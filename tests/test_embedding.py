@@ -38,8 +38,13 @@ def test_embedding_empty_text():
     from vectordb.embedding import EmbeddingService
 
     svc = EmbeddingService(base_url="http://localhost:11434")
-    assert svc.embed("") == []
-    assert svc.embed("   ") == []
+    # embed() wirft ValueError bei leerem Text (dokumentiertes Verhalten)
+    import pytest
+
+    with pytest.raises(ValueError, match="nicht-leeren Text"):
+        svc.embed("")
+    with pytest.raises(ValueError, match="nicht-leeren Text"):
+        svc.embed("   ")
 
 
 def test_embedding_batch_empty():

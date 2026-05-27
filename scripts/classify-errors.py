@@ -10,9 +10,14 @@
 from __future__ import annotations
 
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# defusedxml is the safe replacement for xml.etree.ElementTree (B314).
+# The script only processes CI-generated JUnit XML, not external input.
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:  # pragma: no cover
+    import xml.etree.ElementTree as ET  # nosec B314
 
 INFRA_KEYWORDS = [
     "connectionerror",
@@ -64,7 +69,7 @@ def classify(text: str) -> str:
 
 def parse_junit(junit_path: str) -> list[dict]:
     """Parse JUnit XML and return list of failures with classification."""
-    tree = ET.parse(junit_path)
+    tree = ET.parse(junit_path)  # nosec B314
     root = tree.getroot()
     failures = []
 

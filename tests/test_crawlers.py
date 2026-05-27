@@ -6,12 +6,11 @@
 #   - responses Library für realistische HTTP-Mocks
 #   - monkeypatch für Umgebungsvariablen
 # =============================================================================
-import sys
 import os
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
-import responses
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -61,8 +60,9 @@ def test_forum_post_dataclass():
 # ============================================================================
 @patch("crawlers.darknet_crawler.requests.Session.get")
 def test_crawler_extract_text_from_html(mock_get):
-    from crawlers.darknet_crawler import DarknetCrawler
     from bs4 import BeautifulSoup
+
+    from crawlers.darknet_crawler import DarknetCrawler
 
     crawler = DarknetCrawler()
     html = '<div class="content">Hello <b>World</b></div>'
@@ -73,8 +73,9 @@ def test_crawler_extract_text_from_html(mock_get):
 
 @patch("crawlers.darknet_crawler.requests.Session.get")
 def test_crawler_extract_attribute(mock_get):
-    from crawlers.darknet_crawler import DarknetCrawler
     from bs4 import BeautifulSoup
+
+    from crawlers.darknet_crawler import DarknetCrawler
 
     crawler = DarknetCrawler()
     html = '<time datetime="2026-05-16">May 16</time>'
@@ -85,8 +86,9 @@ def test_crawler_extract_attribute(mock_get):
 
 @patch("crawlers.darknet_crawler.requests.Session.get")
 def test_crawler_extract_not_found(mock_get):
-    from crawlers.darknet_crawler import DarknetCrawler
     from bs4 import BeautifulSoup
+
+    from crawlers.darknet_crawler import DarknetCrawler
 
     crawler = DarknetCrawler()
     soup = BeautifulSoup("<p>No data</p>", "lxml")
@@ -278,8 +280,9 @@ def test_crawler_crawl_thread_page(mock_get):
 
 @patch("crawlers.darknet_crawler.requests.Session.get")
 def test_crawler_crawl_thread_page_http_error(mock_get):
-    from crawlers.darknet_crawler import DarknetCrawler
     from requests.exceptions import HTTPError
+
+    from crawlers.darknet_crawler import DarknetCrawler
 
     mock_response = MagicMock()
     mock_response.raise_for_status.side_effect = HTTPError("404")

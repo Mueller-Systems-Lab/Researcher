@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
 
 from research_workers.gap_analyzer import analyze_gaps
 from research_workers.query_decomposer import DecomposedQueries, decompose_node
@@ -175,6 +174,7 @@ def _store_sources(
                 source = EvidenceSource(
                     url=r.get("url", ""),
                     title=r.get("title", ""),
+                    run_id=run_id,
                 )
                 save_source(source)
                 source_ids.append(source.source_id)

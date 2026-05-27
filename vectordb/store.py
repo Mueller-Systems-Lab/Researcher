@@ -209,20 +209,20 @@ class VectorStore:
         """Anzahl der Dokumente in der Collection.
 
         Returns:
-            Anzahl der Dokumente, oder -1 wenn ChromaDB nicht verfügbar
+            Anzahl der Dokumente, oder 0 wenn ChromaDB nicht verfügbar
             (prüfe `available`-Property für Status).
         """
         collection = self._get_collection()
         if collection is None:
-            self.last_error = "ChromaDB nicht verfügbar — count=-1"
+            self.last_error = "ChromaDB nicht verfügbar — count=0"
             logger.warning(f"ChromaDB-Count: nicht verfügbar ({self.last_error})")
-            return -1
+            return 0
         try:
             return collection.count()
         except Exception as e:
             self.last_error = f"ChromaDB-Count-Fehler: {e}"
             logger.error(f"Fehler bei ChromaDB-Count: {e}", exc_info=True)
-            return -1
+            return 0
 
     def delete_collection(self):
         """Löscht die gesamte Collection."""

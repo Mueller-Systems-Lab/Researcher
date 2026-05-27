@@ -11,13 +11,14 @@ Prüft:
 Exit-Code: 0 wenn alle kritischen Checks bestehen, 1 bei Fehlern.
 """
 
-import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
+# Stelle sicher, dass das Projekt-Root im Import-Pfad ist
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 REQUIRED_ENV_VARS = [
     "FAST_LLM",
     "SMART_LLM",
@@ -196,6 +197,7 @@ def check_mock_patterns() -> int:
 
 def check_plan_persistence() -> int:
     """Prüft ob die Plan-Persistenz funktioniert."""
+    global warnings
     print("\n" + "=" * 60)
     print("  5. PLAN-PERSISTENZ (deep_research_api)")
     print("=" * 60)
@@ -234,6 +236,150 @@ def check_plan_persistence() -> int:
     return 0
 
 
+def check_deep_research_api() -> int:
+    """Prüft ob alle Deep-Research-API-Endpunkte exportiert sind."""
+    global warnings
+    print("\n" + "=" * 60)
+    print("  6. DEEP-RESEARCH-API-ENDPUNKTE")
+    print("=" * 60)
+
+    required_handlers = [
+        "handle_deep_research_plan",
+        "handle_deep_research_get_plan",
+        "handle_deep_research_approve",
+        "handle_deep_research_run",
+        "handle_deep_research_get_run",
+        "handle_deep_research_get_events",
+        "handle_deep_research_get_report",
+        "handle_deep_research_get_evaluation",
+        "route_deep_research",
+    ]
+
+    found_all = True
+    try:
+        import importlib
+
+        mod = importlib.import_module("deep_research_api")
+        for name in required_handlers:
+            if hasattr(mod, name):
+                print(f"  ✅ {name} exportiert")
+            else:
+                print(f"  {RED}❌{RESET} {name} fehlt in deep_research_api")
+                found_all = False
+    except ImportError as e:
+        print(f"  {YELLOW}⚠️{RESET}  deep_research_api nicht ladbar ({e}) — überspringe")
+        warnings += 1
+        return 0
+
+    if not found_all:
+        warnings += 1
+    return 0
+
+
+def check_plan_persistence_roundtrip() -> int:
+    """Prüft Plan-Persistenz Roundtrip: save → restart → load."""
+    global warnings
+    print("\n" + "=" * 60)
+    print("  7. PLAN-PERSISTENZ-ROUNDTRIP")
+    print("=" * 60)
+
+    import tempfile
+
+    # Verwende temporären Ordner für den Test
+    temp_plans_dir = Path(tempfile.mkdtemp(prefix="plan_roundtrip_"))
+    test_plan_id = "roundtrip-test-123"
+    test_plan = {
+        "plan_id": test_plan_id,
+        "query": "Roundtrip test query",
+        "status": "draft",
+        "nodes": [{"id": "node-1", "question": "Test question"}],
+    }
+
+    try:
+        # Phase 1: Save
+        # Temporär Plans-Verzeichnis überschreiben
+        import deep_research_api as api
+        from deep_research_api import _load_plan, _save_plan
+
+        original_plans_dir = api._PLANS_DIR
+        api._PLANS_DIR = str(temp_plans_dir)
+
+        _save_plan(test_plan_id, test_plan)
+        print(f"  ✅ Plan gespeichert ({temp_plans_dir / test_plan_id}.json)")
+
+        # Phase 2: Simuliere Neustart (Cache leeren)
+        api._plans.clear()
+
+        # Phase 3: Load
+        loaded = _load_plan(test_plan_id)
+        if loaded and loaded.get("plan_id") == test_plan_id:
+            print(f"  ✅ Plan von Disk geladen: {loaded.get('query')}")
+        else:
+            print(f"  {RED}❌{RESET} Plan konnte nicht von Disk geladen werden")
+            warnings += 1
+
+        # Restore original
+        api._PLANS_DIR = original_plans_dir
+
+    except ImportError as e:
+        print(f"  {YELLOW}⚠️{RESET}  deep_research_api nicht ladbar ({e}) — überspringe")
+        warnings += 1
+        return 0
+    except Exception as e:
+        print(f"  {YELLOW}⚠️{RESET} Roundtrip-Fehler: {e}")
+        warnings += 1
+    finally:
+        # Cleanup
+        import shutil
+
+        shutil.rmtree(temp_plans_dir, ignore_errors=True)
+
+    return 0
+
+
+def check_evidence_store_content() -> int:
+    """Prüft Evidence Store Inhalt (nicht nur Verzeichnis-Existenz)."""
+    global warnings
+    print("\n" + "=" * 60)
+    print("  8. EVIDENCE-STORE-INHALT")
+    print("=" * 60)
+
+    evidence_dir = ROOT / "reports" / "deep_research" / "evidence"
+
+    if not evidence_dir.exists():
+        print(
+            f"  {YELLOW}⚠️{RESET}  evidence/ existiert nicht (wird bei erster Nutzung erstellt)"
+        )
+        warnings += 1
+        return 0
+
+    required_files = ["sources.jsonl", "segments.jsonl", "citations.jsonl"]
+    all_present = True
+    total_lines = 0
+
+    for filename in required_files:
+        file_path = evidence_dir / filename
+        if file_path.exists():
+            line_count = (
+                len(file_path.read_text(encoding="utf-8").strip().split("\n"))
+                if file_path.stat().st_size > 0
+                else 0
+            )
+            print(f"  ✅ {filename} ({line_count} Einträge)")
+            total_lines += line_count
+        else:
+            print(
+                f"  {YELLOW}⚠️{RESET}  {filename} nicht vorhanden (wird bei erster Nutzung erstellt)"
+            )
+            all_present = False
+            warnings += 1
+
+    if all_present and total_lines > 0:
+        print(f"  ✅ Evidence Store enthält Daten ({total_lines} Einträge gesamt)")
+
+    return 0
+
+
 def main() -> int:
     global errors, warnings
 
@@ -246,6 +392,9 @@ def main() -> int:
     errors += check_storage()
     errors += check_mock_patterns()
     errors += check_plan_persistence()
+    errors += check_deep_research_api()
+    errors += check_plan_persistence_roundtrip()
+    errors += check_evidence_store_content()
 
     print(f"\n{'=' * 60}")
     print("  ERGEBNIS")

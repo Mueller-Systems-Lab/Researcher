@@ -6,7 +6,6 @@ Events are appended to events.jsonl in reports/deep_research/runs/<run_id>/.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any

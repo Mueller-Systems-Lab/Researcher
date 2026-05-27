@@ -57,12 +57,22 @@ def test_e2e_config_module():
     # validate_env sollte fehlende Variablen finden
     missing = validate_env()
     assert isinstance(missing, list)
-    # print_config sollte keinen Fehler werfen
+    # print_config verwendet logger.info() (logging, stdout/stderr-neutral).
+    # Wir leiten logging auf ein StringIO um.
     import io
-    from contextlib import redirect_stdout
+    import logging
 
-    with io.StringIO() as buf, redirect_stdout(buf):
-        print_config()
+    logger = logging.getLogger("config.config")
+    logger.setLevel(logging.INFO)
+
+    with io.StringIO() as buf:
+        handler = logging.StreamHandler(buf)
+        handler.setLevel(logging.INFO)
+        logger.addHandler(handler)
+        try:
+            print_config()
+        finally:
+            logger.removeHandler(handler)
         output = buf.getvalue()
     assert "Konfiguration" in output
 

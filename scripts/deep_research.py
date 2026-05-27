@@ -75,7 +75,9 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
 
         plan = generate_plan(query, language=lang)
         subtopics = [node.question for node in plan.nodes]
-        print(f"   Plan: {len(plan.nodes)} Nodes, {len(plan.edges)} Dependencies")
+        print(
+            f"   Plan: {len(plan.nodes)} Nodes, {len(plan.dependencies)} Dependencies"
+        )
         for i, node in enumerate(plan.nodes, 1):
             print(f"   [{i}] {node.question[:60]}...")
     except ImportError:

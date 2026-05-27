@@ -141,7 +141,7 @@ class WebFetchTool(MCPToolBase):
         except (ValueError, ipaddress.AddressValueError) as e:
             logger.warning(f"SSRF-Validierung: ungültige Adresse für {url}: {e}")
             return f"SSRF-Validierung: ungültige Adresse: {e}"
-        except (socket.error, OSError) as e:
+        except OSError as e:
             logger.warning(
                 f"SSRF-Validierungs-Netzwerkfehler für {url}: {e}", exc_info=True
             )

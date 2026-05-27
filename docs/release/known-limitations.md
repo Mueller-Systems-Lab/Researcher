@@ -22,10 +22,16 @@
 
 ---
 
+## Runtime Stability
+
+- **qwen3.5-Modellinstabilität**: Lokale LLM-Modelle (qwen3.5-uncensored-no-thinking, qwen3.5:9b) crashen gelegentlich mit "llama runner process has terminated". Startup dauert 40-120s.
+- **ChromaDB 1.5.9 count-Verhalten**: `count()` gibt `-1` statt `0` bei fehlender Verbindung. Wird lokal in `vectordb/store.py` abgefangen.
+- **SSE blockiert Playwright**: Der Server-Sent-Events-Stream (SSE) der Dashboard-API verhindert, dass Playwright `networkidle` als Wait-Strategy verwenden kann.
+
 ## Testing
 
 - **No live E2E in CI**: E2E tests use mocks. Real runtime tests require `RUN_E2E_TESTS=true` and running services.
-- **Playwright CI not finalized**: Visual regression and accessibility tests need Playwright + Chromium.
+- **Playwright CI not finalized**: Visual regression and accessibility tests need Playwright + Chromium. SSE-Stream blockiert networkidle-Wait.
 - **Benchmarks optional**: `make test-benchmarks` takes ~3min, not in `make quality`.
 - **Coverage floor**: 78.5% covers project code. Submodule code not measured.
 
@@ -59,8 +65,10 @@
 
 ## Next Steps (v0.2.0+)
 
-1. Broader query evaluation dataset
+1. Broader query evaluation dataset (deutsche Umlaut-Queries eingeführt ✅)
 2. Truth-adjacent evaluation (cross-reference, contradiction detection)
-3. Playwright CI integration
+3. Playwright CI integration (SSE-Blockade als bekanntes Problem dokumentiert)
 4. Upstream PR for security hardening
 5. Production darknet crawl validation
+6. LLM-Modell-Stabilität verbessern (Ollama-Config, Fallback-Mechanismen)
+7. Security-Regression-Tests vollständig in CI integrieren

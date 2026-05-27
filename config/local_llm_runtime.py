@@ -68,6 +68,13 @@ _CLOUD_PATTERNS = [
 ]
 
 
+def _validate_url_scheme(url: str) -> None:
+    """Validate URL uses only http or https scheme (Bandit B310 mitigation)."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
+
+
 def check_endpoint_local(base_url: str) -> bool:
     """Verify the endpoint is a local address (not cloud)."""
     parsed = urlparse(base_url)
@@ -96,8 +103,9 @@ def check_model_present(
         import urllib.request
 
         url = f"{base_url.rstrip('/')}/v1/models"
+        _validate_url_scheme(url)
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
             models = [m.get("id", "") for m in data.get("data", [])]
             if model in models:
@@ -131,12 +139,13 @@ def check_generation(
             }
         ).encode("utf-8")
 
+        _validate_url_scheme(url)
         req = urllib.request.Request(
             url,
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
             output = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             latency = (time.time() - start) * 1000

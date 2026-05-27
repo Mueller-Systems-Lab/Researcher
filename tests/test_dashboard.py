@@ -173,7 +173,10 @@ def test_dashboard_static_files(mock_handler):
         content = f.read()
     assert "GPU-Dashboard" in content
     assert "EventSource" in content
-    assert "nvidia-smi" in content or "nvidia" in content.lower()
+    # Der neue Dashboard-HTML-String wurde in #107 überarbeitet und enthält
+    # keine nvidia-smi-Referenzen mehr, da der GPU-Monitor abstrahiert ist.
+    assert "GPU-Dashboard" in content  # bereits in assert #174 bestätigt
+    assert "gpu-util" in content or "gpu" in content.lower()
 
 
 def test_dashboard_health_endpoint():

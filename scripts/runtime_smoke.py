@@ -176,7 +176,7 @@ def check_llama_server() -> bool:
             return False
 
         data = r.json()
-        models = []
+        models: list[str] = []
         # llama-server kann Modelle in "models" (mit name) oder "data" (mit id) haben
         if "data" in data and isinstance(data["data"], list):
             models.extend(m.get("id", "") for m in data["data"])
@@ -211,11 +211,11 @@ def check_llama_server() -> bool:
                 if content:
                     print(f"  {_status(True)} llama-server chat response: OK")
                 else:
-                    print(f"  ⚠️  llama-server chat: empty response")
+                    print("  ⚠️  llama-server chat: empty response")
             else:
                 print(f"  ⚠️  llama-server chat test: HTTP {test.status_code}")
         except (requests.ConnectionError, requests.Timeout):
-            print(f"  ⚠️  llama-server chat test: timeout (nicht kritisch)")
+            print("  ⚠️  llama-server chat test: timeout (nicht kritisch)")
 
         return True
     except requests.ConnectionError:

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+
 def _is_playwright_available():
     try:
         from playwright.sync_api import sync_playwright  # noqa: F401

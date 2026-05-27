@@ -1,45 +1,52 @@
-# v0.1.0-local-alpha — Local Research Alpha
+# v0.1.0-local-alpha — Erste lokale Research-Release
 
-First validated local research pipeline release.
+Erste validierte lokale Research-Pipeline-Release, vollständig ohne Cloud-Abhängigkeiten.
 
 ## Highlights
 
-- ✅ **Local Research Happy-Path**: Query → SearXNG → Ollama → Report
-- ✅ **6-in-1 Quality Gate** (`make quality`): lint, typecheck, security, tests, coverage — all blocking
-- ✅ **Runtime Smoke Checks**: Ollama, SearXNG, Tor, Cloud-Blocker
-- ✅ **Report Quality Evaluation**: 4 scores (Source, Traceability, Hallucination, Local-First)
-- ✅ **Multi-Query Regression Guard**: baseline thresholds
-- ✅ **Security Regression Tests**: 14 tests (timeouts, cloud-blocker, hashing, SQL, SSL)
-- ✅ **Fresh Clone Onboarding**: clone → venv → green gates in <5 minutes
-- ✅ **Zero Cloud Dependencies**: no OpenAI, Tavily, Anthropic, or other cloud providers
+- ✅ **716 Tests bestanden**, 0 Failed, 85.06% Coverage
+- ✅ **0 Lint Errors**, **0 Typecheck Errors**, **0 Security Findings (Medium+)**
+- ✅ **ChromaDB count-Bug** gefixt (count=-1 → 0 bei fehlender Verbindung)
+- ✅ **Security-Gate**: B310 (urlopen) + B314 (XML-Parsing) behoben, `defusedxml` integriert
+- ✅ **Integrationstest** der kompletten Research-Pipeline (16 Tests)
+- ✅ **Mock-Audit**: 20 Mock-Probleme durch echte Implementierungen ersetzt
+- ✅ **Evidence Store**: Run-ID-Scoping für isolierte Quellen pro Research-Durchlauf
+- ✅ **Verbindungs-Checker** erweitert: API, Plan-Roundtrip, Evidence Store
+- ✅ **14 Security-Regression-Tests** (Timeouts, Cloud-Blocker, Hashing, SQL, SSL)
+- ✅ **Zero Cloud Dependencies**: OpenAI, Tavily, Anthropic standardmäßig blockiert
+
+## Quality Metrics
+
+| Metrik | Wert |
+|---|---|
+| **Tests** | 716 passed, 0 failed |
+| **Coverage** | 85.06% (≥81%) |
+| **Lint** | 0 ruff Errors |
+| **Typecheck** | 0 mypy Errors (91 source files) |
+| **Security (Projekt)** | 0 Medium/High Bandit Findings |
+| **Security (Vendor)** | 20 dokumentiert, report-only |
 
 ## Verification
 
 ```bash
-make quality
-SEARXNG_TIMEOUT_SECONDS=30 make runtime-smoke
-ALLOW_OLLAMA_MODEL_FALLBACK=true make research-happy-path
-make research-evaluate
+make coverage-fast          # 716 passed
+make security-project       # 0 Medium/High
+make lint                   # 0 Errors
+make typecheck              # 0 Errors
 ```
-
-Expected: All green. Report: Overall 99/100.
-
-## Quality Metrics
-
-- **Test Suite**: 255 tests, 78.5% coverage
-- **Lint**: 0 ruff errors
-- **Type Check**: 0 mypy errors (project code)
-- **Security**: 0 Medium/High Bandit findings (project code)
 
 ## Known Limitations
 
-- Alpha release — no production research validation
-- SearXNG requires local Docker
-- Ollama models must be locally available
-- Report evaluation is heuristic, not truth verification
+- **Alpha-Release** — keine Produktionsvalidierung
+- **qwen3.5-Modellinstabilität** — lokale LLM-Modelle crashen gelegentlich
+- **ChromaDB 1.5.9** — `count()` gibt `-1` statt `0` bei fehlender DB (lokal abgefangen)
+- **SSE blockiert Playwright** — `networkidle`-Wait hängt wegen SSE-Stream
+- **SearXNG** benötigt lokalen Docker
+- **Ollama-Modelle** müssen lokal verfügbar sein
+- **Report-Evaluation** ist heuristisch, keine Faktenverifikation
 
-See `docs/release/known-limitations.md` for full details.
+Siehe `docs/release/known-limitations.md` für Details.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md).
+Siehe [CHANGELOG.md](CHANGELOG.md).

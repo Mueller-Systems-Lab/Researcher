@@ -45,6 +45,10 @@ chromadb==1.5.9
 # hier explizit gepinnt für Sicherheit.
 lxml>=6.1.0
 
+# defusedxml: Schutz vor XML External Entity (XXE) Attacks
+# Verwendet in scripts/classify-errors.py als Fallback für CI-JUnit-XML-Parsing
+defusedxml>=0.7.1
+
 # ---------------------------------------------------------------------------
 # Dev & Testing (optional, für CI/Qualitätssicherung)
 # ---------------------------------------------------------------------------

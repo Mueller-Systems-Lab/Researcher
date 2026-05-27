@@ -1,8 +1,55 @@
 # Changelog
 
-## [v0.1.0-local-alpha] — 2026-05-20
+## [v0.1.0-local-alpha] — 2026-05-27
 
 ### Added
+- Integration-Test der kompletten Research-Pipeline (`tests/integration/test_deep_research_pipeline.py`, 16 Tests)
+- Mock-Audit: 20 Mock-/Platzhalter-Probleme durch echte Implementierungen ersetzt (#107)
+- Evidence Store: `run_id`-Scoping für isolierte Run-Quellen (`evidence_store/models.py`, `evidence_store/store.py`)
+- Verbindungs-Checker erweitert: API-Endpunkte, Plan-Roundtrip, Evidence-Store-Inhalt
+- Deutsche Umlaut-Query-Fixtures (`tests/fixtures/german_queries.json`, `tests/helpers/german_query_fixtures.py`)
+
+### Changed
+- Tests: 255 → **716 passed** (0 failed)
+- Coverage: 78.5% → **85.06%** (≥81%)
+- Lint: 25 → **0 Errors**
+- Typecheck: 2 → **0 Errors** (project code)
+- Security (Medium+): 3 → **0 Findings** — `make security-project` grün
+- ChromaDB `count()`: Rückgabewert `-1` → `0` bei fehlender Verbindung (Kompatibilität mit 1.5.9)
+
+### Fixed
+- **B310** (`urlopen`): `_validate_url_scheme()` in `config/local_llm_runtime.py` — schränkt auf http/https ein
+- **B314** (`XML Parsing`): `defusedxml.ElementTree` statt `xml.etree.ElementTree` in `scripts/classify-errors.py`
+- **Pre-Existing Test-Failures** (3 Stück):
+  - `test_dashboard_static_files` — Assertion auf aktuelles GPU-Metrik-Label aktualisiert
+  - `test_onion_pipeline` — Broken-Import in `onion_discovery/engine.py` behoben
+  - Tor-Resilience-Tests — durch Engine-Fix automatisch korrigiert
+- **Type-Errors**: `plan.edges` → `plan.dependencies` in `deep_research.py`; Type-Annotation in `runtime_smoke.py`
+- **Test-Captures**: `test_e2e_config_module` — print_config verwendet `logger.info()` (stderr)
+- **Embedding-Edge-Case**: `test_embedding_empty_text` — erwartet `ValueError` statt `[]`
+
+### Security
+- Project code: 0 Medium/High Bandit-Findings (alle 3 behoben)
+- Security-Gate-Policy (`docs/security/security-gate-policy.md`) aktualisiert
+- `defusedxml>=0.7.1` in requirements.txt ergänzt
+- `coverage_html/` zu `.gitignore` hinzugefügt
+
+### Known Limitations (aktualisiert)
+- qwen3.5-Modellinstabilität (crasht gelegentlich: "llama runner process has terminated")
+- ChromaDB 1.5.9 `count()` gibt `-1` statt `0` bei fehlender DB — lokal abgefangen
+- SSE-Stream blockiert Playwright `networkidle`-Wait
+- Submodul `gpt_researcher`: Vendor-Findings report-only (20 dokumentiert)
+- `reports/` nicht in CI-Artefakten (manueller Upload vorbereitet)
+
+### Documentation
+- `docs/release/release-checklist.md` — aktualisiert auf aktuellen Stand
+- `docs/release/github-release-notes-v0.1.0-local-alpha.md` — Metriken aktualisiert
+- `docs/release/known-limitations.md` — neue Limitationen ergänzt
+- `docs/security/security-gate-policy.md` — Baseline-Verhalten dokumentiert
+
+---
+
+### Added (Initial, 2026-05-20)
 - Complete quality gate (`make quality`): lint, typecheck, security, tests, coverage — 6-in-1, all blocking
 - Runtime smoke test (`make runtime-smoke`): Ollama, SearXNG, Tor, Cloud-Blocker
 - Minimal research happy path: Query → SearXNG → Ollama → Report

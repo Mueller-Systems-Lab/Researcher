@@ -40,6 +40,7 @@ def save_source(source: EvidenceSource) -> None:
         "robots_status": source.robots_status,
         "cache_status": source.cache_status,
         "content_hash": source.content_hash,
+        "run_id": source.run_id,
     }
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -68,9 +69,15 @@ def load_sources() -> list[EvidenceSource]:
                 robots_status=data.get("robots_status", "unknown"),
                 cache_status=data.get("cache_status", "miss"),
                 content_hash=data.get("content_hash", ""),
+                run_id=data.get("run_id", ""),
             )
         )
     return sources
+
+
+def load_sources_by_run_id(run_id: str) -> list[EvidenceSource]:
+    """Load all sources scoped to a specific run ID."""
+    return [s for s in load_sources() if s.run_id == run_id]
 
 
 def find_source_by_url(url: str) -> EvidenceSource | None:

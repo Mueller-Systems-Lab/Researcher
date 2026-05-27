@@ -8,10 +8,10 @@
 #   RUN_PLAYWRIGHT_TESTS=true python3 -m pytest tests/playwright/ -v
 # =============================================================================
 
-import os
-import sys
 import json
+import os
 import socket
+import sys
 import time
 from contextlib import contextmanager
 from threading import Thread
@@ -20,6 +20,18 @@ from urllib.parse import quote
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
+
+def _is_playwright_available() -> bool:
+    """Check if Playwright is installed and environment enables browser tests."""
+    if os.getenv("RUN_PLAYWRIGHT_TESTS", "").lower() not in ("true", "1", "yes"):
+        return False
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 def _is_enabled():
@@ -64,6 +76,7 @@ class _FakeMonitor:
 def _dashboard_server():
     """Startet einen isolierten Dashboard-Server für einen Test."""
     from http.server import HTTPServer
+
     from dashboard.server import DashboardHandler
 
     old_monitor = DashboardHandler.monitor
@@ -81,7 +94,9 @@ def _dashboard_server():
         DashboardHandler.monitor = old_monitor
 
 
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 def test_dashboard_screenshot():
     """
     Startet Dashboard-Server, macht Screenshot, vergleicht mit Baseline.
@@ -127,7 +142,9 @@ def test_dashboard_screenshot():
 
 
 @pytest.mark.playwright
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 def test_gpu_sse_stream():
     """GPU-Monitoring SSE-Stream im Browser validieren."""
     try:
@@ -179,7 +196,9 @@ def test_gpu_sse_stream():
 
 
 @pytest.mark.playwright
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 def test_dashboard_cors_blocks_foreign_origin():
     """CORS: Request von nicht-Whitelisted Origin wird blockiert."""
     try:
@@ -215,7 +234,9 @@ def test_dashboard_cors_blocks_foreign_origin():
 
 
 @pytest.mark.playwright
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 def test_dashboard_xss_query_parameter_escaped():
     """XSS: Script im Query-Parameter löst keinen Dialog aus."""
     try:
@@ -249,7 +270,9 @@ def test_dashboard_xss_query_parameter_escaped():
 
 
 @pytest.mark.playwright
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 @pytest.mark.parametrize("viewport", [(375, 812), (1920, 1080)])
 def test_dashboard_responsive(viewport):
     """Dashboard ist auf Mobile und Desktop nutzbar."""
@@ -274,7 +297,9 @@ def test_dashboard_responsive(viewport):
             browser.close()
 
 
-@pytest.mark.skipif(not _is_playwright_available(), reason="Playwright nicht installiert")
+@pytest.mark.skipif(
+    not _is_playwright_available(), reason="Playwright nicht installiert"
+)
 def test_dashboard_health():
     """Prüft, ob der Dashboard-Health-Endpoint funktioniert."""
     import requests

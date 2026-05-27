@@ -1,7 +1,7 @@
 # Security Gate Policy
 
-**Datum:** 2026-05-19  
-**Version:** 1.0  
+**Datum:** 2026-05-27  
+**Version:** 1.1  
 **Scope:** Researcher CI/CD Security Gates  
 
 ---
@@ -64,9 +64,10 @@ reports/bandit-full.txt
 - `make lint` — blocking (0 Errors erwartet)
 - `make lint-types` — non-blocking (`|| true`)
 - `make security` — non-blocking (`|| true`)
+- `make security-project` — jetzt ✅ grün (0 Medium+ Findings)
 - `make coverage` — blocking (≥78%)
 
-### Empfohlene Ergänzung
+### Empfohlene CI-Ergänzung (für Artefakt-Upload)
 ```yaml
 - name: Security scan project code
   run: make security-project
@@ -103,7 +104,8 @@ Siehe:
 | ID | Typ | Begründung |
 |---|---|---|
 | B607 | nvidia-smi Partial-Path | Standard-Systemtool, GPU-Monitor optional |
-| B310 | urlopen in Playwright | Test-only, nur localhost |
+| B310 | urlopen in Playwright + local_llm_runtime | Test-only + Scheme via _validate_url_scheme geprüft |
+| B314 | ET.parse in classify-errors.py | defusedxml verwendet, Fallback nur CI-JUnit-XML |
 | B105 | Test-Credentials | Mock-Werte in Test-Fixtures |
 
 ### Submodul (nach Fixes)

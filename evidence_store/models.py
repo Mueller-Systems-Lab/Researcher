@@ -21,12 +21,11 @@ class EvidenceSource:
     canonical_url: str = ""
     title: str = ""
     domain: str = ""
-    retrieved_at: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    retrieved_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     robots_status: str = "unknown"
     cache_status: str = "miss"
     content_hash: str = ""
+    run_id: str = ""  # Run isolation: empty = global, set = scoped to a specific run
     source_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
     def __post_init__(self) -> None:

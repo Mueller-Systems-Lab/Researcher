@@ -295,17 +295,22 @@ def _load_sources_from_evidence_store(
     """Load evidence sources associated with a research run.
 
     Reads from the evidence store's sources.jsonl file and filters
-    by sources that were retrieved during this run (if run-scoped
-    metadata is available), otherwise returns all sources.
+    by run_id to prevent cross-run data leakage.
+    Falls back to returning all sources only when no run-scoped
+    sources exist (e.g., legacy data without run_id).
     """
     try:
-        from evidence_store.store import load_sources
+        from evidence_store.store import load_sources, load_sources_by_run_id
     except ImportError:
         logger.warning("evidence_store not available for outline sources")
         return []
 
     try:
-        raw_sources = load_sources()
+        # Prefer run-scoped sources
+        raw_sources = load_sources_by_run_id(run_id)
+        if not raw_sources:
+            # Fallback: legacy sources without run_id (pre #108)
+            raw_sources = [s for s in load_sources() if not s.run_id]
     except Exception as exc:
         logger.warning("Failed to load evidence sources: %s", exc)
         return []

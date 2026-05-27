@@ -26,11 +26,11 @@ import logging
 import os
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
 
-from gpt_researcher.ports.search_index_repository import SearchIndexRepository
 from onion_discovery.classifier import Classifier
 from onion_discovery.human_review import ReviewQueue
 from onion_discovery.link_extractor import LinkExtractor
@@ -56,7 +56,7 @@ class DiscoveryPipeline:
         link_extractor: LinkExtractor | None = None,
         classifier: Classifier | None = None,
         review_queue: ReviewQueue | None = None,
-        index_backend: SearchIndexRepository | None = None,
+        index_backend: Any | None = None,
         max_pages_per_run: int = 3,
         tor_proxy: str = "socks5h://127.0.0.1:9050",
         on_before_persist: Callable[[str, dict], bool] | None = None,
@@ -80,24 +80,39 @@ class DiscoveryPipeline:
         # Default: auto-approve für lokalen Betrieb
         self._on_before_persist = on_before_persist or (lambda url, meta: True)
 
-    def _create_default_backend(self) -> SearchIndexRepository:
+    def _create_default_backend(self) -> Any | None:
         """Erstellt das Default-Index-Backend basierend auf SEARCH_INDEX_BACKEND env."""
         backend_name = os.getenv("SEARCH_INDEX_BACKEND", "whoosh").lower()
         index_path = os.getenv("DARKNET_INDEX_PATH", "./darknet_index")
 
-        if backend_name == "sqlite_fts5":
-            from gpt_researcher.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
+        try:
+            if backend_name == "sqlite_fts5":
+                from gpt_researcher.adapters.sqlite_fts5_adapter import (
+                    SQLiteFTS5Adapter,
+                )
 
-            db_path = os.path.join(index_path, "darknet_index.sqlite3")
-            logger.info(f"DiscoveryPipeline: Verwende SQLiteFTS5Adapter ({db_path})")
-            return SQLiteFTS5Adapter(db_path)
-        else:
-            from gpt_researcher.adapters.whoosh_index_adapter import WhooshIndexAdapter
+                db_path = os.path.join(index_path, "darknet_index.sqlite3")
+                logger.info(
+                    f"DiscoveryPipeline: Verwende SQLiteFTS5Adapter ({db_path})"
+                )
+                return SQLiteFTS5Adapter(db_path)
+            else:
+                from gpt_researcher.adapters.whoosh_index_adapter import (
+                    WhooshIndexAdapter,
+                )
 
-            logger.info(
-                f"DiscoveryPipeline: Verwende WhooshIndexAdapter ({index_path})"
+                logger.info(
+                    f"DiscoveryPipeline: Verwende WhooshIndexAdapter ({index_path})"
+                )
+                return WhooshIndexAdapter(index_path)
+        except ImportError as exc:
+            logger.warning(
+                "Index-Backend '%s' nicht verfügbar (%s) — "
+                "Discovery arbeitet ohne persistente Speicherung",
+                backend_name,
+                exc,
             )
-            return WhooshIndexAdapter(index_path)
+            return None
 
     def _create_session(self) -> requests.Session:
         """Erstellt eine requests.Session mit Tor-Proxy."""
@@ -201,7 +216,7 @@ class DiscoveryPipeline:
                     if text:
                         content += text + "\n"
                 content = content[:5000]  # Begrenzen
-            except (ValueError, TypeError, ImportError, AttributeError) as e:
+            except Exception as e:
                 logger.warning(f"HTML-Parse-Fehler: {e}", exc_info=True)
                 stats["errors"] += 1
 

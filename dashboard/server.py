@@ -12,8 +12,7 @@ import json
 import logging
 import os
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Optional
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 from dashboard.gpu_monitor import GPUMonitor
@@ -81,7 +80,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
 
-    def _resolve_static(self, filename: str) -> Optional[str]:
+    def _resolve_static(self, filename: str) -> str | None:
         """Löst einen Dateinamen sicher innerhalb von STATIC_DIR auf.
 
         Verhindert Path-Traversal, indem der normalisierte Pfad
