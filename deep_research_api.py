@@ -28,7 +28,8 @@ REPORT_DIR = os.getenv("DEEP_REPORT_DIR", "reports/deep_research")
 # CORS: allow same-origin + configured origins
 _ALLOWED_ORIGINS_STR = os.getenv(
     "DASHBOARD_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:8000,http://localhost:8888",
+    "http://localhost:3000,http://localhost:8000,http://localhost:8888,"
+    "http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1:8888",
 )
 
 # In-memory plan registry with filesystem persistence fallback.
@@ -134,6 +135,10 @@ def handle_deep_research_approve(
     """POST /api/deep-research/plans/{id}/approve — approve plan for execution."""
     plan = _plans.get(plan_id)
     if plan is None:
+        plan = _load_plan(plan_id)
+        if plan is not None:
+            _plans[plan_id] = plan  # cache in memory
+    if plan is None:
         _json_error(handler, 404, f"Plan '{plan_id}' not found")
         return
 
@@ -174,6 +179,10 @@ def handle_deep_research_run(
 
     plan_id = body["plan_id"]
     plan = _plans.get(plan_id)
+    if plan is None:
+        plan = _load_plan(plan_id)
+        if plan is not None:
+            _plans[plan_id] = plan  # cache in memory
     if plan is None:
         _json_error(handler, 404, f"Plan '{plan_id}' not found")
         return
@@ -280,6 +289,7 @@ def handle_deep_research_get_events(
         from research_orchestrator.storage import load_events
 
         events = load_events(run_id)
+        _json_response(handler, 200, {"run_id": run_id, "events": events})
     except ImportError:
         _json_error(handler, 501, "Orchestrator storage not available")
     except Exception as e:

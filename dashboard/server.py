@@ -27,7 +27,8 @@ ALLOWED_ORIGINS = {
     origin.strip()
     for origin in os.getenv(
         "DASHBOARD_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:8000,http://localhost:8888",
+        "http://localhost:3000,http://localhost:8000,http://localhost:8888,"
+        "http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1:8888",
     ).split(",")
     if origin.strip()
 }

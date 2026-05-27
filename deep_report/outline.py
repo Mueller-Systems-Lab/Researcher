@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -182,7 +183,7 @@ def load_run_data_for_outline(run_id: str) -> dict[str, Any]:
         Dict with keys: node_results (dict), query (str), language (str).
         Returns empty dict if run data not found.
     """
-    runs_dir = Path("reports/deep_research/runs")
+    runs_dir = Path(os.getenv("DEEP_REPORT_DIR", "reports/deep_research")) / "runs"
     run_dir = runs_dir / run_id
 
     if not run_dir.exists():
@@ -260,16 +261,31 @@ def _merge_sources(
     evidence: list[dict[str, str]],
     artifacts: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    """Merge sources from evidence store and worker artifacts, deduplicating by URL."""
-    seen_urls: set[str] = set()
-    merged: list[dict[str, str]] = []
+    """Merge sources from evidence store and worker artifacts.
 
-    for src in evidence + artifacts:
+    Artifact sources (run-scoped) take priority. Evidence store sources
+    are only used as fallback when no artifact sources exist —
+    this prevents cross-run data leakage in reports.
+    """
+    if artifacts:
+        # Run-scoped artifact sources exist — use them exclusively
+        seen_urls: set[str] = set()
+        merged: list[dict[str, str]] = []
+        for src in artifacts:
+            url = src.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                merged.append(src)
+        return merged
+
+    # No artifact sources — fall back to evidence store (global, non-scoped)
+    seen_urls = set()
+    merged = []
+    for src in evidence:
         url = src.get("url", "")
         if url and url not in seen_urls:
             seen_urls.add(url)
             merged.append(src)
-
     return merged
 
 

@@ -79,6 +79,24 @@ def research_worker(
         # 4. Store retrieved sources in Evidence Store
         source_ids = _store_sources(search_results, run_id=run_id)
 
+        # Warn if queries were expected but no results returned
+        if queries.primary_queries and not search_results:
+            logger.warning(
+                "Node %s: %d primary queries returned zero search results "
+                "(SearXNG may be unavailable, run=%s)",
+                node_id,
+                len(queries.primary_queries),
+                run_id,
+            )
+        if search_results and not source_ids:
+            logger.warning(
+                "Node %s: %d search results found but zero stored in evidence store "
+                "(store may be unavailable, run=%s)",
+                node_id,
+                len(search_results),
+                run_id,
+            )
+
         # 5. Serialize to JSON artifact (queries + results)
         artifact = _build_artifact(queries, search_results, source_ids, node_id)
         logger.info(
