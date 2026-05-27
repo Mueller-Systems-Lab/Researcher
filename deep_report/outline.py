@@ -208,8 +208,10 @@ def load_run_data_for_outline(run_id: str) -> dict[str, Any]:
             "question": data.get("node_questions", {}).get(nid, ""),
         }
 
-    # Load sources from evidence store
-    sources = _load_sources_from_evidence_store(run_id)
+    # Load sources: merge evidence store + worker artifact search_results
+    evidence_sources = _load_sources_from_evidence_store(run_id)
+    artifact_sources = _extract_sources_from_artifacts(node_results)
+    sources = _merge_sources(evidence_sources, artifact_sources)
 
     return {
         "node_results": node_results,
@@ -217,6 +219,58 @@ def load_run_data_for_outline(run_id: str) -> dict[str, Any]:
         "language": data.get("language", "unknown"),
         "sources": sources,
     }
+
+
+def _extract_sources_from_artifacts(
+    node_results: dict[str, dict[str, Any]],
+) -> list[dict[str, str]]:
+    """Extract search_results from worker JSON artifacts."""
+    sources: list[dict[str, str]] = []
+    for nid, nd in node_results.items():
+        for artifact_str in nd.get("artifacts", []):
+            try:
+                artifact = json.loads(artifact_str)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for sr in artifact.get("search_results", []):
+                sources.append(
+                    {
+                        "url": sr.get("url", ""),
+                        "title": sr.get("title", "Untitled"),
+                        "domain": _extract_domain(sr.get("url", "")),
+                        "retrieved": nd.get("status", "unknown"),
+                    }
+                )
+    return sources
+
+
+def _extract_domain(url: str) -> str:
+    """Extract domain from URL for display."""
+    if not url:
+        return "unknown"
+    try:
+        from urllib.parse import urlparse
+
+        return urlparse(url).netloc or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _merge_sources(
+    evidence: list[dict[str, str]],
+    artifacts: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Merge sources from evidence store and worker artifacts, deduplicating by URL."""
+    seen_urls: set[str] = set()
+    merged: list[dict[str, str]] = []
+
+    for src in evidence + artifacts:
+        url = src.get("url", "")
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            merged.append(src)
+
+    return merged
 
 
 def _load_sources_from_evidence_store(

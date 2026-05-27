@@ -68,14 +68,25 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     # Modell auflösen
     model_name = _resolve_model()
 
-    # ═══ Phase 1: SearXNG ═══
-    print("\n🔍 Phase 1: SearXNG Web-Suche...")
-    # Dynamische Subtopics basierend auf Query
-    subtopics = [
-        f"{query}",
-        f"{query} Studie Analyse",
-        f"{query} Meta Bewertung",
-    ]
+    # ═══ Phase 1: Query-Planung via Research Planner ═══
+    print("\n📋 Phase 1: Query-Dekomposition via Research Planner...")
+    try:
+        from research_planner.planner import generate_plan
+
+        plan = generate_plan(query, language=lang)
+        subtopics = [node.question for node in plan.nodes]
+        print(f"   Plan: {len(plan.nodes)} Nodes, {len(plan.edges)} Dependencies")
+        for i, node in enumerate(plan.nodes, 1):
+            print(f"   [{i}] {node.question[:60]}...")
+    except ImportError:
+        print("   ⚠️  Planner nicht verfügbar, verwende Query direkt")
+        subtopics = [query]
+    except Exception as e:
+        print(f"   ⚠️  Planner-Fehler: {e}, verwende Query direkt")
+        subtopics = [query]
+
+    # ═══ Phase 2: SearXNG ═══
+    print("\n🔍 Phase 2: SearXNG Web-Suche...")
     all_results = {}
     for topic in subtopics:
         try:
@@ -93,8 +104,8 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
         except Exception as e:
             print(f"   ⚠️  SearXNG-Fehler für '{topic[:30]}': {e}")
 
-    # ═══ Phase 2: Sammeln ═══
-    print("\n📄 Phase 2: Quellen strukturieren...")
+    # ═══ Phase 3: Sammeln ═══
+    print("\n📄 Phase 3: Quellen strukturieren...")
     sources = []
     for results in all_results.values():
         for res in results:
@@ -110,8 +121,8 @@ def deep_research(query: str, lang: str = "de", num_sources: int = 15):
     ]
     print(f"   {len(sources)} Quellen gesammelt")
 
-    # ═══ Phase 3: LLM ═══
-    print(f"\n🧠 Phase 3: LLM-Synthese ({model_name})...")
+    # ═══ Phase 4: LLM ═══
+    print(f"\n🧠 Phase 4: LLM-Synthese ({model_name})...")
     lang_instr = "auf Deutsch" if lang == "de" else "in English"
 
     prompt = f"""Research Assistant. Create a detailed research report based on the sources below.
