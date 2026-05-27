@@ -21,11 +21,15 @@ from dashboard.gpu_monitor import GPUMonitor
 logger = logging.getLogger(__name__)
 
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8888"))
-UPDATE_INTERVAL = 2.0  # Sekunden zwischen Updates
+UPDATE_INTERVAL = float(os.getenv("DASHBOARD_UPDATE_INTERVAL", "2.0"))
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 ALLOWED_ORIGINS = {
     origin.strip()
-    for origin in os.getenv("DASHBOARD_ALLOWED_ORIGINS", "").split(",")
+    for origin in os.getenv(
+        "DASHBOARD_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:8000,http://localhost:8888,"
+        "http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1:8888",
+    ).split(",")
     if origin.strip()
 }
 
@@ -67,8 +71,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _send_cors_header(self):
         """Setzt CORS nur für erlaubte Origins; fremde Origins werden geblockt."""
-        origin = self.headers.get("Origin")
-        if not origin:
+        try:
+            origin = self.headers.get("Origin", "")
+        except AttributeError:
+            # Test handlers may not have headers attribute
             return
         host_origin = f"http://{self.headers.get('Host', '')}"
         if origin == host_origin or origin in ALLOWED_ORIGINS:
@@ -148,13 +154,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         try:
             while True:
-                data = self.monitor.collect_dict()
-                line = f"data: {json.dumps(data)}\n\n"
-                self.wfile.write(line.encode())
-                self.wfile.flush()
+                try:
+                    data = self.monitor.collect_dict()
+                    line = f"data: {json.dumps(data)}\n\n"
+                    self.wfile.write(line.encode())
+                    self.wfile.flush()
+                except Exception as e:
+                    # Send error event instead of dropping connection
+                    error_data = json.dumps({"error": str(e), "warning_level": "error"})
+                    try:
+                        self.wfile.write(f"data: {error_data}\n\n".encode())
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError):
+                        logger.debug("SSE client disconnected after collection error")
+                        break
                 time.sleep(UPDATE_INTERVAL)
         except (BrokenPipeError, ConnectionResetError):
-            pass  # Client disconnected
+            logger.debug("SSE client disconnected (stream closed)")
         except Exception as e:
             logger.debug(f"SSE-Client getrennt: {e}")
 

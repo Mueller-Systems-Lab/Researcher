@@ -17,10 +17,10 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# VRAM-Warngrenze (90 % von 8 GB = 7.2 GB → 7372 MiB)
-VRAM_WARN_MIB = 7372
-VRAM_CRITICAL_MIB = 7680
-VRAM_TOTAL_MIB = 8192
+# VRAM-Standardwerte (werden durch nvidia-smi überschrieben, sobald verfügbar)
+VRAM_WARN_PCT = 0.85  # Warnung bei 85% Auslastung
+VRAM_CRITICAL_PCT = 0.92  # Kritisch bei 92% Auslastung
+VRAM_TOTAL_MIB = 8192  # Fallback: 8 GB
 
 
 @dataclass
@@ -40,10 +40,17 @@ class GPUData:
 
 
 class GPUMonitor:
-    """Sammelt GPU-Daten via nvidia-smi."""
+    """Sammelt GPU-Daten via nvidia-smi.
 
-    def __init__(self, warn_mib: int = VRAM_WARN_MIB):
-        self.warn_mib = warn_mib
+    VRAM-Warnschwellen werden dynamisch aus dem tatsächlichen
+    memory.total-Wert berechnet (default: 85% warn, 92% kritisch).
+    """
+
+    def __init__(
+        self, warn_pct: float = VRAM_WARN_PCT, critical_pct: float = VRAM_CRITICAL_PCT
+    ):
+        self.warn_pct = warn_pct
+        self.critical_pct = critical_pct
 
     def collect(self) -> GPUData:
         """Sammelt aktuelle GPU-Daten.
@@ -141,20 +148,28 @@ class GPUMonitor:
             return []
 
     def collect_dict(self) -> dict:
-        """Sammelt Daten und gibt Dict zurück (für SSE/JSON)."""
+        """Sammelt Daten und gibt Dict zurück (für SSE/JSON).
+
+        VRAM-Warnschwellen werden dynamisch aus dem tatsächlichen
+        memory.total-Mittel berechnet, nicht aus hardcodierten Werten.
+        """
         data = self.collect()
         result = asdict(data)
 
-        # Warnungen
+        # Dynamische Warnschwellen basierend auf tatsächlichem VRAM
+        total_mib = data.memory_total_mib or VRAM_TOTAL_MIB
+        warn_mib = int(total_mib * self.warn_pct)
+        critical_mib = int(total_mib * self.critical_pct)
+
         warnings = []
-        if data.memory_used_mib >= VRAM_CRITICAL_MIB:
+        if data.memory_used_mib >= critical_mib:
             warnings.append("critical")
-        elif data.memory_used_mib >= self.warn_mib:
+        elif data.memory_used_mib >= warn_mib:
             warnings.append("warning")
 
         result["warning_level"] = warnings[0] if warnings else "ok"
         result["memory_percent"] = round(
-            data.memory_used_mib / max(1, data.memory_total_mib) * 100, 1
+            data.memory_used_mib / max(1, total_mib) * 100, 1
         )
         return result
 

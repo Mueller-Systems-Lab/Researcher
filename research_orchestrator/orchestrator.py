@@ -75,9 +75,14 @@ def create_run(
             "research_orchestrator.state", fromlist=["NodeState"]
         ).NodeState(node_id=node_id)
 
-    # Store dependency info from plan
+    # Store plan metadata for context building
+    state.query = plan.query
+    state.language = plan.language
     for node in plan.nodes:
         state.node_deps[node.node_id] = node.depends_on
+        state.node_questions[node.node_id] = node.question
+        state.node_rationales[node.node_id] = node.rationale
+        state.node_expected_sources[node.node_id] = node.expected_sources
 
     event = emit_event(EventType.RUN_CREATED, run_id, message=f"Plan: {plan.plan_id}")
     save_state(state)
@@ -103,14 +108,17 @@ def start_run(
     Args:
         state: The RunState (must be CREATED or resuming an existing run).
         worker: A worker function that executes a single node.
-                If None, uses a no-op dummy worker.
+                If None, defaults to the real research_worker.
         resume: If True, skip already-completed nodes.
 
     Returns:
         The final RunState.
     """
     if worker is None:
-        worker = _dummy_worker
+        from research_workers.worker import research_worker
+
+        worker = research_worker
+        logger.info("Using default research_worker for run %s.", state.run_id)
 
     if state.status == RunStatus.CREATED or (
         resume and state.status == RunStatus.RUNNING
@@ -271,11 +279,6 @@ def resume_run(run_id: str, worker: WorkerFn | None = None) -> RunState | None:
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
-def _dummy_worker(node_id: str, question: str, context: dict) -> tuple[bool, list[str]]:
-    """No-op worker for testing — always succeeds."""
-    return True, []
-
-
 def _deps_satisfied(node_id: str, state: RunState) -> bool:
     """Check if all dependencies of node_id are completed."""
     deps = state.node_deps.get(node_id, [])
@@ -299,12 +302,21 @@ def _node_depends_on(node_id: str, dep_id: str, state: RunState) -> bool:
 
 
 def _build_node_contexts(state: RunState) -> dict[str, dict]:
-    """Build context dicts for each node (minimal — full context from DR-03)."""
+    """Build context dicts for each node from plan metadata.
+
+    Uses the real question, rationale, and expected_sources
+    stored during create_run() instead of placeholder text.
+    """
     contexts: dict[str, dict] = {}
     for node_id in state.topo_order:
         contexts[node_id] = {
             "node_id": node_id,
-            "question": f"Research task: {node_id}",
+            "question": state.node_questions.get(node_id, f"Research task: {node_id}"),
+            "rationale": state.node_rationales.get(node_id, ""),
+            "expected_sources": state.node_expected_sources.get(node_id, []),
             "run_id": state.run_id,
+            "query": state.query,
+            "language": state.language,
+            "dependency_results": {},
         }
     return contexts

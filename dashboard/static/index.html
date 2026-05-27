@@ -12,6 +12,7 @@
     color: #c9d1d9;
     padding: 20px;
   }
+  #metrics { transition: opacity 0.5s ease; opacity: 0; }
   h1 {
     font-size: 1.5em;
     margin-bottom: 20px;
@@ -98,6 +99,30 @@
   .status-dot.warning { background: #d29922; }
   .status-dot.critical { background: #da3633; }
   .status-dot.error-dot { background: #8b949e; }
+  .loading-skeleton {
+    background: linear-gradient(90deg, #161b22 25%, #21262d 50%, #161b22 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+    height: 1.2em;
+    width: 80%;
+    margin: 8px auto;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .loading-text { color: #58a6ff; font-size: 0.9em; margin-top: 8px; animation: pulse 1.5s infinite; }
+  .connection-status {
+    font-size: 0.8em;
+    margin-top: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .connection-status.connected { color: #3fb950; }
+  .connection-status.disconnected { color: #da3633; background: #21262d; }
+  .connection-status.connecting { color: #d29922; background: #21262d; }
 </style>
 </head>
 <body>
@@ -106,7 +131,17 @@
 
 <div id="query-display" style="margin-bottom:12px;color:#8b949e;font-size:0.9em"></div>
 
+<div id="connection-status" class="connection-status connecting">🔄 Verbinde zum GPU-Monitor...</div>
+
 <div id="error" class="error" style="display:none" role="alert" aria-live="assertive"></div>
+
+<!-- Loading-Skeleton (wird bei erstem Datenempfang ausgeblendet) -->
+<div id="loading-overlay" style="text-align:center;padding:40px;">
+  <div class="loading-text">GPU-Daten werden geladen...</div>
+  <div class="loading-skeleton"></div>
+  <div class="loading-skeleton" style="width:60%"></div>
+  <div class="loading-skeleton" style="width:70%"></div>
+</div>
 
 <div class="grid" id="metrics" aria-label="GPU-Metriken" role="region">
   <div class="card" role="status" aria-label="GPU-Auslastung">
@@ -146,28 +181,66 @@
 <p style="margin-top:20px;color:#8b949e;font-size:0.8em" id="timestamp" aria-live="polite" aria-atomic="true"></p>
 
 <script>
-const eventSource = new EventSource('/api/gpu/stream');
+let reconnectAttempts = 0;
+let eventSource = null;
+const MAX_RECONNECT_DELAY = 30000; // 30s max delay
 
-// Query-Parameter 'q' sicher anzeigen (textContent, kein innerHTML)
-const queryParam = new URLSearchParams(window.location.search).get('q');
-if (queryParam) {
-  document.getElementById('query-display').textContent = '🔍 Suche: ' + queryParam;
+function connectSSE() {
+  eventSource = new EventSource('/api/gpu/stream');
+
+  // Query-Parameter 'q' sicher anzeigen (textContent, kein innerHTML)
+  const queryParam = new URLSearchParams(window.location.search).get('q');
+  if (queryParam) {
+    document.getElementById('query-display').textContent = '🔍 Suche: ' + queryParam;
+  }
+
+  eventSource.onopen = function() {
+    reconnectAttempts = 0;
+    document.getElementById('connection-status').textContent = '✅ Verbunden';
+    document.getElementById('connection-status').className = 'connection-status connected';
+    document.getElementById('loading-overlay').style.display = 'none';
+    document.getElementById('metrics').style.opacity = '1';
+  };
+
+  eventSource.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      updateDashboard(data);
+      // Hide loading state on first data
+      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById('metrics').style.opacity = '1';
+    } catch (e) {
+      if (typeof console !== 'undefined') {
+        // Keep parse errors silent in production
+      }
+    }
+  };
+
+  eventSource.onerror = function() {
+    // Show error message
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = '⚠ Verbindung zum GPU-Monitor unterbrochen. Versuche erneut zu verbinden...';
+    document.getElementById('error').className = 'error';
+    document.getElementById('connection-status').textContent = '⚠ Verbindung unterbrochen';
+    document.getElementById('connection-status').className = 'connection-status disconnected';
+
+    // Exponential backoff reconnect
+    eventSource.close();
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+    if (typeof console !== 'undefined') {
+      console.log('SSE reconnect in ' + (delay / 1000) + 's (attempt ' + reconnectAttempts + ')');
+    }
+    setTimeout(function() {
+      document.getElementById('connection-status').textContent = '🔄 Erneute Verbindung (' + reconnectAttempts + ')...';
+      document.getElementById('connection-status').className = 'connection-status connecting';
+      connectSSE();
+    }, delay);
+  };
 }
 
-eventSource.onmessage = function(event) {
-  try {
-    const data = JSON.parse(event.data);
-    updateDashboard(data);
-  } catch (e) {
-    console.error('Parse error:', e);
-  }
-};
-
-eventSource.onerror = function() {
-  document.getElementById('error').style.display = 'block';
-  document.getElementById('error').textContent = '⚠ Verbindung zum GPU-Monitor unterbrochen. Stelle sicher, dass nvidia-smi verfügbar ist.';
-  document.getElementById('error').className = 'error';
-};
+// Initial connection
+connectSSE();
 
 function updateDashboard(data) {
   if (data.error) {

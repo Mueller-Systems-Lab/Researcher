@@ -44,21 +44,8 @@ REQUEST_TIMEOUT = (5, 30)
 # Harmlose Default-Query
 DEFAULT_QUERY = "What is a search engine?"
 
-# Blockierte Query-Begriffe (Safety Guard)
-BLOCKED_TERMS = {
-    "exploit",
-    "cve",
-    "vulnerability",
-    "target.com",
-    "credential",
-    "password dump",
-    "darknet",
-    "onion forum",
-    "person:",
-    "site:",
-    "malware",
-    "ransomware",
-}
+# Blockierte Query-Begriffe (Safety Guard) — zentral in config/blocked_terms.py
+from config.blocked_terms import BLOCKED_TERMS  # noqa: E402
 
 CLOUD_PROVIDERS = ["openai", "tavily", "google-genai", "anthropic"]
 

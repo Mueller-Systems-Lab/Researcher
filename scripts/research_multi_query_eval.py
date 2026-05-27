@@ -22,21 +22,8 @@ DEFAULT_QUERIES = [
     "What is a web crawler?",
 ]
 
-# Blockierte Begriffe (Query-Safety-Guard)
-BLOCKED_TERMS = {
-    "exploit",
-    "cve",
-    "vulnerability",
-    "target.com",
-    "credential",
-    "password dump",
-    "darknet",
-    "onion forum",
-    "person:",
-    "site:",
-    "malware",
-    "ransomware",
-}
+# Blockierte Begriffe (Query-Safety-Guard) — zentral in config/blocked_terms.py
+from config.blocked_terms import BLOCKED_TERMS  # noqa: E402
 
 RESEARCH_SCRIPT = os.path.join(os.path.dirname(__file__), "research_happy_path.py")
 EVAL_SCRIPT = os.path.join(os.path.dirname(__file__), "evaluate_research_report.py")

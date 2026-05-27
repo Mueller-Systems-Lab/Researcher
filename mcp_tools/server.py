@@ -25,12 +25,41 @@ logger = logging.getLogger(__name__)
 
 MCP_PORT = int(os.getenv("MCP_PORT", "8765"))
 
+# Allowed CORS origins (from env or secure defaults)
+_ALLOWED_ORIGINS: set[str] = set()
+
+
+def _get_allowed_origins() -> set[str]:
+    """Return the set of allowed CORS origins, loaded once from env."""
+    global _ALLOWED_ORIGINS
+    if not _ALLOWED_ORIGINS:
+        origins_str = os.getenv(
+            "ALLOWED_ORIGINS",
+            "http://localhost:3000,http://localhost:8000,http://localhost:8888,"
+            "http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1:8888",
+        )
+        _ALLOWED_ORIGINS = {o.strip() for o in origins_str.split(",") if o.strip()}
+    return _ALLOWED_ORIGINS
+
 
 class MCPHTTPHandler(BaseHTTPRequestHandler):
     """HTTP-Handler für MCP JSON-RPC 2.0."""
 
     # Tools einmalig initialisieren
     tools_initialized = False
+
+    def do_OPTIONS(self):
+        """CORS preflight handler."""
+        self.send_response(204)
+        origin = self.headers.get("Origin", "")
+        allowed = _get_allowed_origins()
+        if origin in allowed:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.end_headers()
 
     def do_GET(self):
         if self.path == "/mcp" or self.path == "/":
@@ -100,11 +129,12 @@ class MCPHTTPHandler(BaseHTTPRequestHandler):
                 }
             )
         elif method == "resources/list":
+            resources = self._handle_list_resources()
             self._respond_json(
                 {
                     "jsonrpc": "2.0",
                     "id": req_id,
-                    "result": {"resources": []},
+                    "result": resources,
                 }
             )
         else:
@@ -125,6 +155,28 @@ class MCPHTTPHandler(BaseHTTPRequestHandler):
             MCPHTTPHandler.tools_initialized = True
         tools = get_all_manifests()
         return {"tools": tools}
+
+    def _handle_list_resources(self) -> dict:
+        """Return registered tool manifests as MCP resources.
+
+        Each registered tool exposes its manifest as a resource
+        so MCP clients can discover capabilities.
+        """
+        if not MCPHTTPHandler.tools_initialized:
+            init_tools()
+            MCPHTTPHandler.tools_initialized = True
+        tools = get_all_manifests()
+        resources = []
+        for tool in tools:
+            resources.append(
+                {
+                    "uri": f"tool:///{tool['name']}",
+                    "name": tool.get("description", tool["name"]),
+                    "description": tool.get("description", ""),
+                    "mimeType": "application/json",
+                }
+            )
+        return {"resources": resources}
 
     def _handle_call_tool(self, params: dict) -> dict:
         name = params.get("name", "")
@@ -172,7 +224,14 @@ class MCPHTTPHandler(BaseHTTPRequestHandler):
     def _respond_json(self, data: dict, status: int = 200):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # Restricted CORS: nur konfigurierte Origins erlauben
+        origin = self.headers.get("Origin", "")
+        allowed = _get_allowed_origins()
+        if origin in allowed or not origin:
+            self.send_header(
+                "Access-Control-Allow-Origin", origin or "http://localhost:8888"
+            )
+            self.send_header("Vary", "Origin")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
 

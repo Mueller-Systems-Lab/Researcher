@@ -34,6 +34,13 @@ def save_state(state: RunState) -> None:
         "max_parallel": state.max_parallel,
         "topo_order": state.topo_order,
         "errors": state.errors,
+        "query": state.query,
+        "language": state.language,
+        "node_questions": state.node_questions,
+        "node_rationales": state.node_rationales,
+        "node_expected_sources": {
+            k: list(v) for k, v in state.node_expected_sources.items()
+        },
         "node_states": {
             nid: {
                 "node_id": ns.node_id,
@@ -74,6 +81,11 @@ def load_state(run_id: str) -> RunState | None:
         max_parallel=data.get("max_parallel", 1),
         topo_order=data.get("topo_order", []),
         errors=data.get("errors", []),
+        query=data.get("query", ""),
+        language=data.get("language", "unknown"),
+        node_questions=data.get("node_questions", {}),
+        node_rationales=data.get("node_rationales", {}),
+        node_expected_sources=data.get("node_expected_sources", {}),
     )
 
     for nid, nd in data.get("node_states", {}).items():
