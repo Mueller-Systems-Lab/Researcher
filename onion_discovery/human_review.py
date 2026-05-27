@@ -133,10 +133,19 @@ class ReviewQueue:
         pending.sort(key=lambda x: x.discovered_at)
         return pending[:limit]
 
-    def approve(self, item_id: str, reviewer: str = "admin", notes: str = "") -> bool:
-        """Genehmigt ein Item (erlaubt Indexierung)."""
+    def approve(self, item_id: str, reviewer: str = "", notes: str = "") -> bool:
+        """Genehmigt ein Item (erlaubt Indexierung).
+
+        Args:
+            item_id: ID des zu genehmigenden Items.
+            reviewer: Name/Kennung des Reviewers. Wird aus Umgebungsvariable
+                      REVIEWER_DEFAULT oder 'unknown' gesetzt, wenn leer.
+            notes: Optionale Notizen zur Genehmigung.
+        """
         if item_id not in self._items:
             return False
+        if not reviewer:
+            reviewer = os.getenv("REVIEWER_DEFAULT", "unknown")
         self._items[item_id].status = "approved"
         self._items[item_id].reviewed_at = datetime.now().isoformat()
         self._items[item_id].reviewed_by = reviewer
@@ -145,10 +154,19 @@ class ReviewQueue:
         logger.info(f"Review-Item {item_id[:12]} genehmigt von {reviewer}")
         return True
 
-    def reject(self, item_id: str, reviewer: str = "admin", reason: str = "") -> bool:
-        """Lehnt ein Item ab (keine Indexierung)."""
+    def reject(self, item_id: str, reviewer: str = "", reason: str = "") -> bool:
+        """Lehnt ein Item ab (keine Indexierung).
+
+        Args:
+            item_id: ID des abzulehnenden Items.
+            reviewer: Name/Kennung des Reviewers. Wird aus Umgebungsvariable
+                      REVIEWER_DEFAULT oder 'unknown' gesetzt, wenn leer.
+            reason: Grund für die Ablehnung.
+        """
         if item_id not in self._items:
             return False
+        if not reviewer:
+            reviewer = os.getenv("REVIEWER_DEFAULT", "unknown")
         self._items[item_id].status = "rejected"
         self._items[item_id].reviewed_at = datetime.now().isoformat()
         self._items[item_id].reviewed_by = reviewer

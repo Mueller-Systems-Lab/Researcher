@@ -9,9 +9,12 @@
 # Siehe .env.example für alle verfügbaren Optionen.
 # =============================================================================
 
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Projekt-Root ermitteln
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
@@ -94,9 +97,12 @@ def suggest_env():
     env_path = PROJECT_ROOT / ".env"
     example_path = PROJECT_ROOT / ".env.example"
     if not env_path.exists():
-        print("  ⚠  .env nicht gefunden.")
-        print(f"  →  Kopiere {example_path} nach {env_path}")
-        print("  →  Passe die Werte in .env an deine Umgebung an.")
+        logger.warning(
+            ".env nicht gefunden. Kopiere %s nach %s "
+            "und passe Werte an deine Umgebung an.",
+            example_path,
+            env_path,
+        )
 
 
 def is_deterministic() -> bool:
@@ -138,21 +144,22 @@ def apply_deterministic_config():
 
 def print_config():
     """Gibt die aktuelle Konfiguration aus (ohne Secrets)."""
-    print("=" * 60)
-    print("  Researcher — Konfiguration")
-    print("=" * 60)
-    print(f"  FAST_LLM:        {os.getenv('FAST_LLM', 'nicht gesetzt')}")
-    print(f"  SMART_LLM:       {os.getenv('SMART_LLM', 'nicht gesetzt')}")
-    print(f"  STRATEGIC_LLM:   {os.getenv('STRATEGIC_LLM', 'nicht gesetzt')}")
-    print(f"  OLLAMA_BASE_URL: {os.getenv('OLLAMA_BASE_URL', 'nicht gesetzt')}")
-    print(f"  EMBEDDING:       {os.getenv('EMBEDDING', 'nicht gesetzt')}")
-    print(f"  RETRIEVER:       {os.getenv('RETRIEVER', 'nicht gesetzt')}")
-    print(f"  SEARX_URL:       {os.getenv('SEARX_URL', 'nicht gesetzt')}")
-    print(
-        f"  CHROMA_DB:       {os.getenv('CHROMA_PERSIST_DIRECTORY', 'nicht gesetzt')}"
+    logger.info("=" * 60)
+    logger.info("  Researcher — Konfiguration")
+    logger.info("=" * 60)
+    logger.info("  FAST_LLM:        %s", os.getenv("FAST_LLM", "nicht gesetzt"))
+    logger.info("  SMART_LLM:       %s", os.getenv("SMART_LLM", "nicht gesetzt"))
+    logger.info("  STRATEGIC_LLM:   %s", os.getenv("STRATEGIC_LLM", "nicht gesetzt"))
+    logger.info("  OLLAMA_BASE_URL: %s", os.getenv("OLLAMA_BASE_URL", "nicht gesetzt"))
+    logger.info("  EMBEDDING:       %s", os.getenv("EMBEDDING", "nicht gesetzt"))
+    logger.info("  RETRIEVER:       %s", os.getenv("RETRIEVER", "nicht gesetzt"))
+    logger.info("  SEARX_URL:       %s", os.getenv("SEARX_URL", "nicht gesetzt"))
+    logger.info(
+        "  CHROMA_DB:       %s",
+        os.getenv("CHROMA_PERSIST_DIRECTORY", "nicht gesetzt"),
     )
-    print(f"  DETERMINISTIC:   {os.getenv('RESEARCH_DETERMINISTIC', 'false')}")
+    logger.info("  DETERMINISTIC:   %s", os.getenv("RESEARCH_DETERMINISTIC", "false"))
     if is_deterministic():
-        print("  TEMPERATURE:     0 (fixiert)")
-        print("  LLM_SEED:        42 (fixiert)")
-    print("=" * 60)
+        logger.info("  TEMPERATURE:     0 (fixiert)")
+        logger.info("  LLM_SEED:        42 (fixiert)")
+    logger.info("=" * 60)

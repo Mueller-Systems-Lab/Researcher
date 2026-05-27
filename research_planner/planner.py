@@ -13,6 +13,7 @@ import logging
 import re
 import time
 
+from config.services import LLAMA_SERVER_URL, OLLAMA_CHAT_MODEL
 from research_planner.models import (
     ResearchNode,
     ResearchPlan,
@@ -118,23 +119,35 @@ def _split_query(query: str) -> list[str]:
 
 def _llm_plan(
     query: str,
-    base_url: str = "http://127.0.0.1:8080",
-    model: str = "qwen3.5-uncensored-no-thinking",
+    base_url: str = "",
+    model: str = "",
     timeout: float = 30.0,
 ) -> ResearchPlan | None:
     """Try to generate a richer plan using a local LLM via OpenAI-compatible API.
 
-    Returns None on any failure — caller falls back to deterministic planner.
+    Uses LLAMA_SERVER_URL and OLLAMA_CHAT_MODEL from centralized config
+    as defaults. Returns None on any failure — caller falls back to
+    deterministic planner.
     """
+    if not base_url:
+        base_url = LLAMA_SERVER_URL
+    if not model:
+        model = OLLAMA_CHAT_MODEL
     try:
         import requests
     except ImportError:
-        logger.debug("requests not available for LLM planner")
+        logger.warning("LLM planner: requests not available — cannot call %s", base_url)
         return None
 
     prompt = _build_llm_prompt(query)
 
     try:
+        logger.info(
+            "LLM planner calling %s with model %s (timeout=%ss)",
+            base_url,
+            model,
+            timeout,
+        )
         resp = requests.post(
             f"{base_url.rstrip('/')}/v1/chat/completions",
             json={
@@ -156,8 +169,18 @@ def _llm_plan(
             timeout=timeout,
         )
         resp.raise_for_status()
+    except ImportError:
+        return None
+    except requests.exceptions.Timeout:
+        logger.warning("LLM planner request timed out (%ss) for %s", timeout, base_url)
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.warning(
+            "LLM planner connection refused at %s — is llama-server running?", base_url
+        )
+        return None
     except Exception as exc:
-        logger.warning("LLM planner request failed: %s", exc)
+        logger.warning("LLM planner request failed: %s (%s)", type(exc).__name__, exc)
         return None
 
     try:
@@ -258,8 +281,8 @@ def generate_plan(
     assumptions: list[str] | None = None,
     constraints: list[str] | None = None,
     use_llm: bool = False,
-    llm_base_url: str = "http://127.0.0.1:8080",
-    llm_model: str = "qwen3.5-uncensored-no-thinking",
+    llm_base_url: str = "",
+    llm_model: str = "",
     llm_timeout: float = 30.0,
 ) -> ResearchPlan:
     """Generate a validated ResearchPlan from a user query.

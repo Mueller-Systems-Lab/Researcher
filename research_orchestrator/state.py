@@ -53,12 +53,8 @@ class RunState:
     run_id: str
     plan_id: str
     status: RunStatus = RunStatus.CREATED
-    created_at: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
-    updated_at: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     started_at: str | None = None
     completed_at: str | None = None
     node_states: dict[str, NodeState] = field(default_factory=dict)
@@ -66,6 +62,13 @@ class RunState:
     topo_order: list[str] = field(default_factory=list)
     node_deps: dict[str, list[str]] = field(default_factory=dict)
     max_parallel: int = 1
+
+    # ── Plan metadata for context building (populated by create_run) ──
+    query: str = ""  # Original user query
+    language: str = "unknown"
+    node_questions: dict[str, str] = field(default_factory=dict)  # node_id → question
+    node_rationales: dict[str, str] = field(default_factory=dict)  # node_id → rationale
+    node_expected_sources: dict[str, list[str]] = field(default_factory=dict)
 
     def touch(self) -> None:
         self.updated_at = datetime.now(UTC).isoformat()

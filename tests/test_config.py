@@ -196,8 +196,8 @@ def test_ensure_local_first_detected():
 # ---------------------------------------------------------------------------
 
 
-def test_suggest_env_no_env_file(capsys):
-    """Test: Keine .env → Hinweis wird ausgegeben."""
+def test_suggest_env_no_env_file(caplog):
+    """Test: Keine .env → Hinweis wird als Log ausgegeben."""
     from config.config import PROJECT_ROOT, suggest_env
 
     # Sichern, falls .env existiert
@@ -208,9 +208,11 @@ def test_suggest_env_no_env_file(capsys):
         if env_exists:
             os.rename(str(env_path), str(env_path) + ".backup_test")
 
-        suggest_env()
-        captured = capsys.readouterr()
-        assert ".env nicht gefunden" in captured.out
+        with caplog.at_level("WARNING"):
+            suggest_env()
+            assert any(
+                ".env nicht gefunden" in record.message for record in caplog.records
+            ), "WARNING-Log über fehlende .env erwartet"
     finally:
         if env_exists:
             os.rename(str(env_path) + ".backup_test", str(env_path))
@@ -237,19 +239,20 @@ def test_is_deterministic_enabled():
         assert is_deterministic() is True
 
 
-def test_print_config_basic(capsys):
-    """Test: print_config gibt Basis-Konfiguration aus (keine Secrets)."""
+def test_print_config_basic(caplog):
+    """Test: print_config gibt Basis-Konfiguration als Log aus (keine Secrets)."""
     from config.config import print_config
 
     with patch.dict(os.environ, {}, clear=True):
-        print_config()
-        captured = capsys.readouterr()
-        assert "Researcher — Konfiguration" in captured.out
-        assert "FAST_LLM:" in captured.out
-        assert "nicht gesetzt" in captured.out
+        with caplog.at_level("INFO"):
+            print_config()
+            messages = [r.message for r in caplog.records]
+            assert any("Researcher — Konfiguration" in m for m in messages)
+            assert any("FAST_LLM:" in m for m in messages)
+            assert any("nicht gesetzt" in m for m in messages)
 
 
-def test_print_config_deterministic(capsys):
+def test_print_config_deterministic(caplog):
     """Test: print_config im deterministischen Modus."""
     from config.config import print_config
 
@@ -261,7 +264,8 @@ def test_print_config_deterministic(capsys):
         },
         clear=True,
     ):
-        print_config()
-        captured = capsys.readouterr()
-        assert "TEMPERATURE:     0" in captured.out
-        assert "LLM_SEED:        42" in captured.out
+        with caplog.at_level("INFO"):
+            print_config()
+            messages = [r.message for r in caplog.records]
+            assert any("TEMPERATURE:     0" in m for m in messages)
+            assert any("LLM_SEED:        42" in m for m in messages)
