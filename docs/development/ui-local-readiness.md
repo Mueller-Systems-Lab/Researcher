@@ -4,13 +4,13 @@
 
 **UI PARTIAL**
 
-## Stand 2026-05-23
+## Stand 2026-05-27
 
-GPU-Dashboard ✅ | GPT Researcher Backend startbar, aber LLM-Instabilität blockiert vollen E2E-Flow.
+GPU-Dashboard ✅ | GPT Researcher Backend startbar ✅ | LLM-Stabilität ✅ (Gemma 4)
 
 ## Begründung
 
-Researcher besitzt ein funktionierendes lokales GPU-Dashboard (Port 8888) und das GPT-Researcher-Frontend aus dem Submodul ist über den Backend-Server (Port 8000) erreichbar. Die `.env`-Konfiguration ist vollständig Local-First (Ollama + SearXNG, keine Cloud-Keys nötig). Der volle Query→Research→Report-Flow konnte jedoch nicht verifiziert werden, weil lokale LLM-Modelle (qwen3.5 ~6.6GB) beim Laden crashen und der Backend-Startup dadurch 120s+ dauert ohne HTTP-ready zu werden.
+Researcher besitzt ein funktionierendes lokales GPU-Dashboard (Port 8888) und das GPT-Researcher-Frontend aus dem Submodul ist über den Backend-Server (Port 8000) erreichbar. Die `.env`-Konfiguration ist vollständig Local-First (llama-server + SearXNG, keine Cloud-Keys nötig). Mit dem Umstieg auf Gemma 4 OBLITERATED (~3.8 GB VRAM, eigenständiger llama-server) läuft der Chat-Modell-Server stabil und startet in ~5s. Der volle Query→Research→Report-Flow kann jetzt getestet werden.
 
 ## Gefundene UI-Komponenten
 
@@ -82,11 +82,10 @@ RUN_PLAYWRIGHT_TESTS=true pytest tests/playwright/ -v
 
 ## Bekannte Grenzen
 
-1. LLM-Modell-Instabilität: qwen3.5 crasht ("llama runner process has terminated")
-2. Backend-Startup: 120s+ ohne HTTP-ready (Modell-Laden blockiert)
-3. Kein Query→Research→Report-Flow über UI verifiziert
-4. SSE-Stream kann `networkidle`-Wait in Playwright blockieren
-5. XSS-Test-Assertion erwartet exakten String (Präfix-Fix nötig)
+1. ~~LLM-Modell-Instabilität: qwen3.5 crasht~~ ✅ **Behoben**: Gemma 4 läuft stabil
+2. ~~Backend-Startup: 120s+ ohne HTTP-ready~~ ✅ **Behoben**: llama-server startet in ~5s
+3. SSE-Stream kann `networkidle`-Wait in Playwright blockieren
+4. XSS-Test-Assertion erwartet exakten String (Präfix-Fix nötig)
 
 ## GPT Researcher Submodul
 

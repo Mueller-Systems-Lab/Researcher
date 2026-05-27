@@ -8,13 +8,16 @@ Optimierung aller Komponenten, die GPU-Speicher belegen.
 ## VRAM-Budget
 
 | Komponente | Verbrauch (geschätzt) |
-|---|---|
-| Qwen3.5-9B Q4_K_M | ~4.8 GB |
-| KV-Cache (num_ctx=4096) | ~1.0 GB |
-| Overhead/Puffer | ~1.0 GB |
-| **Gesamt LLM** | **~6.8 GB** |
+|---|---|---|
+| Gemma 4 E4B OBLITERATED Q4_K_M | ~3.3 GB |
+| KV-Cache (num_ctx=8192) | ~0.5 GB |
+| Overhead/Puffer | ~0.5 GB |
+| **Gesamt LLM** | **~3.8 GB** |
 | Verfügbar | 8.0 GB |
-| **Reserve** | **~1.2 GB** |
+| **Reserve** | **~4.2 GB** |
+
+> **Historisch:** Qwen3.5-9B benötigte ~6.8 GB (4.8 GB Gewichte + 1.0 GB KV-Cache + 1.0 GB Puffer).
+> Gemma 4 spart ~3 GB VRAM und ermöglicht größere Kontexte oder paralleles GPU-Dashboard.
 
 **Wichtig:** Embeddings laufen auf CPU, nicht GPU! nomic-embed-text ist mit 137M Parametern
 klein genug für CPU-Betrieb und belegt keinen GPU-VRAM.
@@ -44,8 +47,8 @@ EMBEDDING=ollama:nomic-embed-text:latest
 ### llama-server (direkter Start)
 
 ```bash
-./serve_qwen3.5_uncensored.sh
-# Enthält: --n-gpu-layers 999, -np 1, -c 4096, --flash-attn on
+./serve_gemma4_obliterated_researcher.sh
+# Enthält: --n-gpu-layers 999, -np 1, -c 8192, --flash-attn off (Pascal!), -ctk f32 -ctv f32
 ```
 
 ## Monitoring
@@ -85,4 +88,4 @@ EMBEDDING=ollama:nomic-embed-text:latest
 4. SearXNG und andere CPU-Dienste starten
 5. GPT Researcher starten
 
-Nur **ein** Modellserver gleichzeitig (Qwen ODER Gemma, nicht beide).
+Nur **ein** Modellserver gleichzeitig. Aktuell: Gemma 4 via llama-server (Port 8081, ~3.8 GB).

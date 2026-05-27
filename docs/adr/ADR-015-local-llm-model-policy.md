@@ -1,8 +1,9 @@
 # ADR-015: Local LLM Model Policy
 
-**Status:** Proposed  
+**Status:** Superseded (Chat) / Active (Embedding)  
 **Date:** 2026-05-20  
 **Deciders:** Architecture Review Agent  
+**Superseded by:** [ADR-016](ADR-016-gemma4-chat-model.md) für Chat/Summary  
 **Context:** Lokale Modellrichtlinie für Chat/Summary und Embeddings; Issue #62 für Namensabgleich
 
 ---

@@ -82,10 +82,10 @@ SearXNG (lokale Websuche)     Darknet-Crawler + Whoosh
   |---------------------------|
                |
                v
-   Ollama (Qwen3.5 + Embeddings)
-              |
-              v
-           ChromaDB
+    llama-server (Gemma 4 Chat)    Ollama (nomic-embed-text, CPU)
+               |                               |
+               v                               v
+         Report-Generierung               ChromaDB
 ```
 
 ## Voraussetzungen
@@ -98,7 +98,8 @@ SearXNG (lokale Websuche)     Darknet-Crawler + Whoosh
 | Betriebssystem | Linux (getestet) |
 | Python | >= 3.11 |
 | Container | Docker für SearXNG |
-| LLM | Ollama für Textgenerierung und Embeddings |
+| LLM Chat | llama-server (Gemma 4 OBLITERATED, Port 8081, ~3.8 GB VRAM) |
+| LLM Embedding | Ollama + nomic-embed-text (Port 11434, CPU-seitig) |
 | Darknet-Zugriff | Tor für den Crawler |
 
 ## Setup
@@ -126,25 +127,21 @@ cp .env.example .env
 
 Danach `.env` an die lokale Umgebung anpassen. Die vollständige Referenz steht weiter unten.
 
-Die aktiven Modellvariablen sind in `.env.example` dokumentiert: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL` und optional `ALLOW_OLLAMA_MODEL_FALLBACK`.
+Die aktiven Modellvariablen sind in `.env.example` dokumentiert. Chat: `gemma4-obliterated` via llama-server (Port 8081). Embedding: `nomic-embed-text:latest` via Ollama (Port 11434, CPU).
 
-### 4) Ollama installieren und starten
-
-```bash
-ollama serve
-```
-
-### 5) Qwen3.5-Modell bereitstellen
+### 4) Gemma 4 Chat-Modell starten (via llama-server)
 
 ```bash
-ollama create qwen3.5-9b-uncensored-hauhaucs-aggressive -f Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive
+./serve_gemma4_obliterated_researcher.sh
 ```
 
-Alternative mit llama.cpp:
+Der Server läuft auf `127.0.0.1:8081` mit Alias `gemma4-obliterated`.
+VRAM: ~3.8 GB. Precision Trap: `-ctk f32 -ctv f32` zwingend auf Pascal (GTX 1070).
 
-```bash
-./serve_qwen3.5_uncensored.sh
-```
+> **Hinweis:** Chat läuft via llama-server (eigenständig), **nicht** via Ollama.
+> qwen3.5 ist deprecated — siehe `docs/adr/ADR-016-gemma4-chat-model.md`.
+
+### 5) Embedding-Modell laden (Ollama, CPU-seitig)
 
 ### 6) Embedding-Modell laden
 
@@ -181,10 +178,10 @@ http://localhost:8000
 ### Terminal-Layout für den Normalbetrieb
 
 ```text
-Terminal 1: ollama serve
-Terminal 2: docker compose -f searxng/docker-compose.yml up -d
-Terminal 3: ./research-serve.sh qwen
-Terminal 4: ./scripts/start-researcher.sh    ← GPT Researcher + Dashboard
+Terminal 1: ./serve_gemma4_obliterated_researcher.sh   ← Chat-Modell (Port 8081)
+Terminal 2: ollama serve                                ← Embedding (Port 11434, CPU)
+Terminal 3: docker compose -f searxng/docker-compose.yml up -d
+Terminal 4: ./scripts/start-researcher.sh                ← GPT Researcher + Dashboard
 ```
 
 **GPU-Dashboard:** Öffne `http://localhost:8000/dashboard` im Browser, um
@@ -211,22 +208,24 @@ Das Skript verwaltet die lokalen Modellserver für die 8-GB-VRAM-Workstation. Es
 ./research-serve.sh restart-gemma
 ```
 
-### serve_qwen3.5_uncensored.sh
+### serve_gemma4_obliterated_researcher.sh
 
-Direkter Start des Qwen3.5-Servers via llama.cpp:
+Start des Gemma 4 Chat-Modells via llama-server (eigenständig, kein Ollama):
 
 ```bash
-./serve_qwen3.5_uncensored.sh
+./serve_gemma4_obliterated_researcher.sh
 ```
 
-Der Server lauscht lokal auf `127.0.0.1:8086`.
+Der Server lauscht lokal auf `127.0.0.1:8081`. Alias: `gemma4-obliterated`.
+
+> **Historisch:** `serve_qwen3.5_uncensored.sh` (qwen3.5, Port 8086) ist deprecated.
 
 ### Wichtige Kontrollbefehle
 
 ```bash
 ollama list
 curl http://localhost:8080/search?q=test&format=json
-curl http://127.0.0.1:8086/v1/models
+curl http://127.0.0.1:8081/v1/models
 ./research-serve.sh status
 ```
 
@@ -243,12 +242,12 @@ GPU-Dashboard läuft lokal unter `http://127.0.0.1:8888`. Details: [UI Local Rea
 
 | Variable | Beschreibung |
 |---|---|
-| `LLM_PROVIDER` | Provider für die Textgenerierung; aktuell `ollama`. |
-| `OLLAMA_BASE_URL` | Basis-URL des lokalen Ollama-Servers. |
-| `OLLAMA_CHAT_MODEL` | Aktives Chat-/Summary-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
-| `OLLAMA_EMBEDDING_MODEL` | Aktives Embedding-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
+| `LLM_PROVIDER` | Provider für die Textgenerierung; aktuell `openai` (llama-server). |
+| `OPENAI_BASE_URL` | Basis-URL des llama-Servers (z. B. `http://127.0.0.1:8081/v1`). |
+| `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` | GPT-Researcher-Modellvariablen; aktuell `openai:gemma4-obliterated`. |
+| `OLLAMA_CHAT_MODEL` | Chat-Modell für den Ollama-Fallback-Pfad; siehe `docs/llm/model-selection-policy.md`. |
+| `OLLAMA_EMBEDDING_MODEL` | Embedding-Modell in Ollama; siehe `docs/llm/model-selection-policy.md`. |
 | `ALLOW_OLLAMA_MODEL_FALLBACK` | Erlaubt einen Chat-Modell-Fallback, falls das konfigurierte Modell fehlt; Embedding-Modelle werden nie als Chat-Fallback genutzt. |
-| `LLM_MODEL` | Modellname in Ollama, z. B. `qwen3.5-9b-uncensored-hauhaucs-aggressive:latest`. |
 | `RETRIEVER` | Retriever-Modus; `custom` aktiviert den CompositeRetriever. |
 | `SEARX_URL` | Basis-URL des lokalen SearXNG-Dienstes. |
 | `SEARX_MAX_RESULTS` | Maximale Trefferzahl pro SearXNG-Abfrage. |
@@ -272,9 +271,10 @@ GPU-Dashboard läuft lokal unter `http://127.0.0.1:8888`. Details: [UI Local Rea
 | `README.md` | Einstieg, Setup und Betriebsanleitung. |
 | `requirements.txt` | Python-Abhängigkeiten. |
 | `.env.example` | Vorlage für die lokale Konfiguration. |
-| `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive` | Ollama-Modelldefinition. |
+| `serve_gemma4_obliterated_researcher.sh` | Start des Gemma 4 Chat-Modells via llama-server. |
+| `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive` | Historische Ollama-Modelldefinition (qwen3.5, deprecated). |
 | `research-serve.sh` | Umschalten und Verwalten der lokalen Modellserver. |
-| `serve_qwen3.5_uncensored.sh` | Direkter Qwen3.5-Start via llama.cpp. |
+| `serve_qwen3.5_uncensored.sh` | Historischer Qwen3.5-Start via llama.cpp (deprecated). |
 | `docs/architecture.md` | Architektur- und Laufzeitdokumentation. |
 | `docs/troubleshooting.md` | Fehlerdiagnosen und Lösungen. |
 | `docs/changelog/iteration-1.md` | Änderungsprotokoll der ersten Iteration. |

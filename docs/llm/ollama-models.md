@@ -18,9 +18,34 @@ date: 2026-05-20
 - Wichtige Umgebungsvariablen im Projekt: `OLLAMA_HOST`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_CONTEXT_LENGTH`, `OLLAMA_KEEP_ALIVE`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_FLASH_ATTENTION`, `OLLAMA_KV_CACHE_TYPE`. Quelle: https://github.com/ollama/ollama/blob/main/docs/api.md
 - Modelfiles nutzen u. a. `FROM`, `PARAMETER`, `TEMPLATE`, `SYSTEM` und können aus GGUF-Dateien gebaut werden. Quelle: https://raw.githubusercontent.com/ollama/ollama/main/docs/modelfile.mdx
 
-## Chat/Summary Model: Qwen3.5 Uncensored No-Thinking
+## Chat/Summary Model: Gemma 4 E4B OBLITERATED (aktuell)
 
-- Exakter lokaler Modellname: `qwen3.5-uncensored-no-thinking:latest`
+- Exakter Modellname: `gemma4-obliterated` (Alias im llama-server)
+- Backend: Eigenständiger `llama-server` (Port 8081), **kein Ollama**
+- VRAM: ~3.8 GB (passt zusammen mit GPU-Dashboard auf GTX 1070)
+- Start: `./serve_gemma4_obliterated_researcher.sh`
+- Precision Trap: `-ctk f32 -ctv f32` zwingend auf Pascal (GTX 1070)
+- Basismodell: Google Gemma 4 E4B (Community-Uncensored-Fork)
+- GGUF-Pfad: `/home/xxammaxx/Schreibtisch/gemma4/llama.cpp/models/gemma-4-E4B-it-OBLITERATED-Q4_K_M.gguf`
+
+| Merkmal | Wert |
+|---|---|
+| Backend | llama-server (eigenständig) |
+| Port | 8081 |
+| VRAM | ~3.8 GB |
+| Kontextlänge | 8192 Tokens |
+| Reasoning | Deaktivierbar via `--reasoning off` |
+| Stabilität | ✅ Deutlich stabiler als qwen3.5-Vorgänger |
+
+- Eignung für Research-Summaries: gut, faktenbasiert, Deutsch-kompatibel
+- Stabilität: kein "llama runner process has terminated"-Absturz mehr
+- Keine Ollama-Abhängigkeit: Chat läuft als eigenständiger Prozess
+
+## Historisch (deprecated): Qwen3.5 Uncensored No-Thinking
+
+> qwen3.5 wurde durch Gemma 4 OBLITERATED ersetzt. Diese Sektion dient als Referenz.
+
+- Ex-lokaler Modellname: `qwen3.5-uncensored-no-thinking:latest`
 - Öffentlich belegbarer Ursprung: `Qwen/Qwen3.5-9B` bzw. `qwen3.5:9b`
 - Ursprung des lokalen Uncensored-Forks: `HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive`
 
@@ -28,16 +53,11 @@ date: 2026-05-20
 |---|---|---|
 | Parameter | 9B | https://huggingface.co/Qwen/Qwen3.5-9B |
 | Native Kontextlänge | 262,144 Tokens | https://huggingface.co/Qwen/Qwen3.5-9B |
-| Erweiterbar via YaRN | bis ca. 1,010,000 Tokens | https://huggingface.co/Qwen/Qwen3.5-9B |
-| Lizenz | Apache 2.0 | https://huggingface.co/Qwen/Qwen3.5-9B |
 | Ollama-Größe | 6.6 GB | https://ollama.com/library/qwen3.5 |
-| Ollama-Kontext | 256K | https://ollama.com/library/qwen3.5 |
-| Non-Thinking Default | über API-Parameter deaktivierbar | https://huggingface.co/Qwen/Qwen3.5-9B, https://github.com/ollama/ollama/blob/main/docs/api.md |
+| Lizenz | Apache 2.0 | https://huggingface.co/Qwen/Qwen3.5-9B |
 
-- Eignung für Research-Summaries: gut für faktengebundene Zusammenfassungen, wenn der Prompt auf Quellen, Genauigkeit und knappe Ausgabe ausgerichtet ist. Quelle: https://huggingface.co/Qwen/Qwen3.5-9B
-- Prompting-Empfehlung für Reports: systematisch, Deutsch, Quellen nennen lassen, `temperature` niedrig halten. Qwen empfiehlt im Non-Thinking-Modus `temperature=0.7`, `top_p=0.8`, `top_k=20`, `presence_penalty=1.5`. Quelle: https://huggingface.co/Qwen/Qwen3.5-9B
-- Thinking/No-Thinking Modus: Qwen3.5 denkt standardmäßig; direkte Antworten werden über `think: false` bzw. `chat_template_kwargs: {"enable_thinking": False}` erzielt. Quelle: https://huggingface.co/Qwen/Qwen3.5-9B, https://github.com/ollama/ollama/blob/main/docs/api.md
-- Risiken unzensierter Modelle: reduzierte Refusal-/Safety-Grenzen, unklare Provenienz der Community-Forks, mögliche Compliance-Risiken. Quelle: https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+- Crashte gelegentlich mit "llama runner process has terminated"
+- Ersetzt durch Gemma 4 obliterated (stabiler, weniger VRAM)
 
 ## Embedding Model: nomic-embed-text
 

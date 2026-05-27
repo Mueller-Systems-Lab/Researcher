@@ -7,8 +7,8 @@ Beide schreiben die Antwort in ein separates Feld, nicht in `message.content`.
 
 | Modell | Server | Endpoint | Antwort-Feld | Deaktivierbar? |
 |--------|--------|----------|-------------|----------------|
-| Qwen3.5 Uncensored | Ollama :11434 | `/api/chat` | `message.thinking` | ✅ `"think": false` |
-| Gemma4 Obliterated | llama.cpp :8085 | `/v1/chat/completions` | `message.reasoning_content` | ✅ `--reasoning off` |
+| **Gemma4 Obliterated** (aktiv) | llama-server :8081 | `/v1/chat/completions` | `message.reasoning_content` | ✅ `--reasoning off` |
+| Qwen3.5 Uncensored (deprecated) | Ollama :11434 | `/api/chat` | `message.thinking` | ✅ `"think": false` |
 
 ## 1. Ollama Thinking-Modus
 
@@ -37,8 +37,10 @@ answer = msg.get("content") or msg.get("thinking") or ""
 ## 2. llama.cpp Reasoning-Modus
 
 ### Problem
-Gemma4 wird mit `--jinja` gestartet, was den Reasoning-Modus aktiviert.
+Gemma 4 wird mit `--jinja` gestartet, was den Reasoning-Modus aktiviert.
 Der `deepseek`-Format extrahiert Gedanken nach `reasoning_content`.
+
+Gemma 4 läuft auf Port **8081** (nicht 8085, wie in älteren Doku-Versionen).
 
 ### Solution A: Reasoning serverseitig deaktivieren
 ```bash

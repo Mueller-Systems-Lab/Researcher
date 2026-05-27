@@ -43,6 +43,9 @@ LLAMA_SERVER_URL: str = os.getenv(
 OLLAMA_EMBEDDING_MODEL: str = os.getenv(
     "OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest"
 )
+# Fallback: Offizielles Ollama-Qwen3.5-Basismodell für den Ollama-Chat-Pfad.
+# Das primäre Chat-Modell ist gemma4-obliterated via llama-server (OPENAI_BASE_URL).
+# OLLAMA_CHAT_MODEL wird von config/ollama_models.py und research_planner genutzt.
 OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:9b")
 
 # ── Storage Paths ───────────────────────────────────────────────────────────

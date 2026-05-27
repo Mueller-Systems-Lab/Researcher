@@ -41,11 +41,11 @@
 | Attribut | Wert |
 |---|---|
 | **Verantwortung** | Textgenerierung, Report-Erstellung |
-| **Technologie** | Ollama Server, Qwen3.5-9B-Uncensored-HauhauCS-Aggressive GGUF |
-| **Schnittstelle** | REST API `localhost:11434` |
-| **Abhängigkeiten** | Keine (externer Dienst) |
+| **Technologie** | llama-server (eigenständig), Gemma 4 E4B OBLITERATED GGUF |
+| **Schnittstelle** | OpenAI-kompatible REST API `localhost:8081/v1` |
+| **Abhängigkeiten** | Keine (externer Dienst, eigenständiger Prozess) |
 | **Kritikalität** | 🔴 Systemkritisch – ohne LLM keine Reports |
-| **Dateien** | `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive`, Ollama-Konfiguration |
+| **Dateien** | `serve_gemma4_obliterated_researcher.sh`, llama-server-Konfiguration |
 
 ### Search_Composite
 | Attribut | Wert |

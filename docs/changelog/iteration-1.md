@@ -69,12 +69,14 @@
 
 ## Implementierte Features / Komponenten
 
-- Lokales LLM-Setup mit Ollama und Qwen3.5-9B-Uncensored-HauhauCS-Aggressive
+- Lokales LLM-Setup mit Ollama und Qwen3.5-9B-Uncensored-HauhauCS-Aggressive **(deprecated, ersetzt durch Gemma 4 OBLITERATED)**
 - Lokales Embedding-Setup mit `nomic-embed-text`
 - Lokale Websuche über SearXNG
 - Modellserver-Verwaltung per `research-serve.sh`
-- Direktstart des Qwen3.5-Servers per `serve_qwen3.5_uncensored.sh`
+- Direktstart des Qwen3.5-Servers per `serve_qwen3.5_uncensored.sh` **(deprecated)**
 - Architektur- und Betriebsdokumentation für das komplette lokale Research-System
+
+> **Aktuelles Chat-Modell (seit v0.1.0-local-alpha):** Gemma 4 E4B OBLITERATED via llama-server (Port 8081, ~3.8 GB VRAM). Siehe `docs/adr/ADR-016-gemma4-chat-model.md`.
 
 ## Offene Punkte / Bekannte Einschränkungen
 

@@ -51,8 +51,10 @@ class OllamaModelConfig:
     allow_model_fallback: bool = False
 
     # Defaults aus .env.example / docs/llm/model-inventory.md
+    # Chat: Primär via llama-server (gemma4-obliterated, Port 8081).
+    # OLLAMA_CHAT_MODEL ist der Fallback für den Ollama-Chat-Pfad.
     _DEFAULT_BASE_URL: ClassVar[str] = "http://localhost:11434"
-    _DEFAULT_CHAT_MODEL: ClassVar[str] = "qwen3.5-uncensored-no-thinking:latest"
+    _DEFAULT_CHAT_MODEL: ClassVar[str] = "qwen3.5:9b"
     _DEFAULT_EMBEDDING_MODEL: ClassVar[str] = "nomic-embed-text:latest"
 
 

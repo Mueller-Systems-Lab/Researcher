@@ -44,7 +44,7 @@ print("✅ ChatOllama → UncensoredChatOllama (thinking→content)")
 print("\n1️⃣ LLM-Test...")
 from langchain_ollama import ChatOllama  # noqa: E402
 
-_llm_model = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5-uncensored-no-thinking:latest")
+_llm_model = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:9b")
 _llm_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 llm = ChatOllama(

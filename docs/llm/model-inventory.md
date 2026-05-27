@@ -34,7 +34,7 @@ qwen3.5-Ära beendet (deprecated, durch Gemma 4 obliterated ersetzt).
 
 | Modell / Variable | Rolle | Fundstelle | Aktueller Default | Bemerkung |
 |---|---|---|---|---|
-| `OLLAMA_CHAT_MODEL` | Chat/Summary | `.env.example:110`, `scripts/runtime_smoke.py:55`, `scripts/research_happy_path.py:31` | `qwen3.5-uncensored-no-thinking:latest` | Lokaler Modelfile-Name; Ursprung: `Qwen/Qwen3.5-9B` / `qwen3.5:9b` |
+| `OLLAMA_CHAT_MODEL` | Chat/Summary (Ollama-Fallback) | `.env.example`, `scripts/runtime_smoke.py`, `scripts/research_happy_path.py`, `config/ollama_models.py` | `qwen3.5:9b` | Offizielles Ollama-Basismodell. Primäres Chat-Modell ist `gemma4-obliterated` via llama-server. |
 | `OLLAMA_EMBEDDING_MODEL` | Embeddings | `.env.example`, `gpt_researcher/gpt_researcher/config/config.py:119` | `nomic-embed-text:latest` | Standard-Ollama-Embedding-Modell |
 | `FAST_LLM` | Fast LLM (Deprecated-Rolle) | `.env.example:16` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | Historischer/alternativer Name; mappt auf HauhauCS-Fork |
 | `SMART_LLM` | Smart LLM (Deprecated-Rolle) | `.env.example:17` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | Historischer/alternativer Name |
@@ -47,7 +47,8 @@ qwen3.5-Ära beendet (deprecated, durch Gemma 4 obliterated ersetzt).
 
 | Rolle | Variable | Default | Zweck |
 |---|---|---|---|
-| Chat / Text-Generierung / Summary | `OLLAMA_CHAT_MODEL` | `qwen3.5-uncensored-no-thinking:latest` | Generierung von Research-Summaries, Chat-Responses |
+| Chat / Text-Generierung / Summary | `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` (primär, via llama-server) | `openai:gemma4-obliterated` | Generierung von Research-Summaries, Chat-Responses via llama-server (Port 8081) |
+| Chat / Text-Generierung / Summary (Ollama-Fallback) | `OLLAMA_CHAT_MODEL` | `qwen3.5:9b` | Fallback für den Ollama-Chat-Pfad |
 | Embeddings / Vektorsuche | `OLLAMA_EMBEDDING_MODEL` / `EMBEDDING` | `nomic-embed-text:latest` | Vektorisierung von Dokumenten für ChromaDB |
 | GPT-Researcher Fast LLM | `FAST_LLM` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | GPT-Researcher-intern (Deprecated-Format) |
 | GPT-Researcher Smart LLM | `SMART_LLM` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | GPT-Researcher-intern (Deprecated-Format) |
