@@ -1,15 +1,21 @@
 # =============================================================================
-# Researcher — Ollama Model Configuration (ADR-015)
+# Researcher — Ollama Model Configuration (ADR-015, ADR-016)
 # =============================================================================
 # Zentrales Modul für Ollama-Modellkonfiguration und Modellauflösung.
 # Trennt strikt Chat-/Summary- und Embedding-Modellrollen.
 #
+# WICHTIG (ADR-016): Primäres Chat-Modell ist Gemma 4 OBLITERATED via
+# llama-server (Port 8081, alias gemma4-obliterated).
+# OLLAMA_CHAT_MODEL ist NUR der Fallback-Pfad, wenn INFERENCE_BACKEND=ollama
+# gesetzt ist. Siehe .env.example: FAST_LLM=openai:gemma4-obliterated.
+#
 # Regeln (aus docs/llm/model-selection-policy.md):
-#   - OLLAMA_CHAT_MODEL: Textgenerierung, Summary, Report-Generierung
-#   - OLLAMA_EMBEDDING_MODEL: Embeddings, Vektorsuche (CPU-seitig)
+#   - OLLAMA_CHAT_MODEL: Textgenerierung, Summary, Report-Generierung (Ollama-Fallback)
+#   - OLLAMA_EMBEDDING_MODEL: Embeddings, Vektorsuche (CPU-seitig, via Ollama)
 #   - Embedding-Modelle (nomic-embed-text, etc.) dürfen NIE als Chatmodell dienen
 #   - Fallback nur wenn ALLOW_OLLAMA_MODEL_FALLBACK=true
 #   - Keine Cloud-Provider
+#   - Standard-OLLAMA_CHAT_MODEL 'qwen3.5:9b' ist deprecated (ADR-016)
 #
 # Nutzung:
 #   from config.ollama_models import load_ollama_model_config, resolve_chat_model
@@ -50,11 +56,17 @@ class OllamaModelConfig:
     embedding_model: str
     allow_model_fallback: bool = False
 
-    # Defaults aus .env.example / docs/llm/model-inventory.md
-    # Chat: Primär via llama-server (gemma4-obliterated, Port 8081).
-    # OLLAMA_CHAT_MODEL ist der Fallback für den Ollama-Chat-Pfad.
+    # Defaults aus .env.example / docs/llm/model-inventory.md / ADR-016
+    # PRIMARY Chat-Modell: Gemma 4 OBLITERATED via llama-server
+    #   FAST_LLM=openai:gemma4-obliterated (siehe .env.example)
+    #   Port 8081, alias gemma4-obliterated
+    # OLLAMA_CHAT_MODEL ist NUR der Fallback für den Ollama-Chat-Pfad,
+    #       wenn INFERENCE_BACKEND=ollama gesetzt ist.
+    # DEFAULT 'qwen3.5:9b': deprecated seit ADR-016. qwen3.5 ist auf GTX 1070
+    #       hardware-blockiert (Pascal FP16-Precision-Trap).
+    #       Siehe docs/adr/ADR-016-gemma4-chat-model.md
     _DEFAULT_BASE_URL: ClassVar[str] = "http://localhost:11434"
-    _DEFAULT_CHAT_MODEL: ClassVar[str] = "qwen3.5:9b"
+    _DEFAULT_CHAT_MODEL: ClassVar[str] = "qwen3.5:9b"  # DEPRECATED (ADR-016)
     _DEFAULT_EMBEDDING_MODEL: ClassVar[str] = "nomic-embed-text:latest"
 
 
@@ -213,6 +225,7 @@ def validate_model_roles(config: OllamaModelConfig) -> list[str]:
     - OLLAMA_CHAT_MODEL ist nicht leer.
     - OLLAMA_EMBEDDING_MODEL ist nicht leer.
     - OLLAMA_CHAT_MODEL ist kein bekanntes Embedding-Modell.
+    - OLLAMA_CHAT_MODEL verwendet nicht den deprecated qwen3.5-Default.
 
     Args:
         config: Die zu validierende OllamaModelConfig.
@@ -229,6 +242,15 @@ def validate_model_roles(config: OllamaModelConfig) -> list[str]:
             f"OLLAMA_CHAT_MODEL='{config.chat_model}' ist ein "
             f"Embedding-Modell und kann keine Texte generieren. "
             f"Setze OLLAMA_CHAT_MODEL auf ein Chat-/Summary-Modell."
+        )
+    elif config.chat_model == "qwen3.5:9b":
+        errors.append(
+            "OLLAMA_CHAT_MODEL='qwen3.5:9b' ist DEPRECATED (ADR-016). "
+            "qwen3.5 ist auf GTX 1070 hardware-blockiert "
+            "(Pascal FP16-Precision-Trap). Primäres Chat-Modell ist "
+            "Gemma 4 via llama-server (FAST_LLM=openai:gemma4-obliterated). "
+            "Setze OLLAMA_CHAT_MODEL auf ein alternatives Chat-Modell "
+            "oder ignoriere die Warnung bei INFERENCE_BACKEND=ollama."
         )
 
     if not config.embedding_model:

@@ -162,8 +162,50 @@ def check_tor() -> bool:
         return False
 
 
+def _check_gemma4_precision_trap() -> tuple[bool, str]:
+    """Prüft, ob der laufende llama-server die Precision-Trap-Flags setzt.
+
+    (ADR-016) Auf Pascal-GPUs (GTX 1070) muss der KV-Cache in FP32 laufen,
+    sonst produziert Gemma 4 garbled Output. Erforderliche Flags:
+      -ctk f32 -ctv f32
+
+    Prüft über den Process-Name die Kommandozeilen-Argumente.
+    Wenn der Server nicht läuft oder die Flags fehlen, wird gewarnt.
+
+    Returns:
+        (ok, message) — ok=True wenn Flags gesetzt oder Server nicht läuft.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            if "llama-server" in line and "gemma4" in line.lower():
+                if "-ctk f32" in line and "-ctv f32" in line:
+                    return (True, "Precision-Trap-Flags gefunden (-ctk f32 -ctv f32)")
+                else:
+                    return (
+                        False,
+                        "WARNUNG: Gemma 4 ohne Precision-Trap-Flags! "
+                        "Fehlen -ctk f32 -ctv f32 → garbled Output auf Pascal-GPUs. "
+                        "Siehe ADR-016 und serve_gemma4_obliterated_researcher.sh",
+                    )
+        # Kein Gemma-4-Prozess gefunden → kein Precision-Trap-Risiko
+        return (True, "Kein Gemma-4-Prozess aktiv (keine Prüfung nötig)")
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return (True, "Precision-Trap-Check nicht ausführbar (ps nicht verfügbar)")
+
+
 def check_llama_server() -> bool:
-    """Prüft, ob llama-server (OpenAI-kompatibler Chat-Endpoint) erreichbar ist."""
+    """Prüft, ob llama-server (OpenAI-kompatibler Chat-Endpoint) erreichbar ist.
+
+    Führt zusätzlich die Precision-Trap-Validierung durch (ADR-016).
+    """
     model_url = f"{LLAMA_SERVER_URL}/models"
     chat_url = f"{LLAMA_SERVER_URL}/chat/completions"
 
@@ -190,6 +232,13 @@ def check_llama_server() -> bool:
             if models:
                 print(f"     Verfügbar: {', '.join(models[:3])}")
             return False
+
+        # Schritt 1b: Precision-Trap-Validierung (ADR-016)
+        pt_ok, pt_msg = _check_gemma4_precision_trap()
+        if pt_ok:
+            print(f"  {_status(True)} {pt_msg}")
+        else:
+            print(f"  {_status(False)} {pt_msg}")
 
         # Schritt 2: Kurzen Chat-Test (optional, kein Fail wenn fehlschlägt)
         try:

@@ -281,3 +281,79 @@ def test_validate_roles_embedding_as_chat():
     errors = validate_model_roles(config)
     assert len(errors) > 0
     assert any("Embedding" in e for e in errors)
+
+
+# ── ADR-016: Deprecation + Gemma 4 ────────────────────────────────────────────
+
+
+def test_validate_roles_deprecated_qwen_default():
+    """Test: qwen3.5:9b Default löst ADR-016-Deprecation-Warnung aus.
+
+    OLLAMA_CHAT_MODEL='qwen3.5:9b' ist seit ADR-016 deprecated.
+    Primäres Chat-Modell ist Gemma 4 OBLITERATED via llama-server.
+    """
+    from config.ollama_models import OllamaModelConfig, validate_model_roles
+
+    config = OllamaModelConfig(
+        base_url="http://localhost:11434",
+        chat_model="qwen3.5:9b",  # deprecated default
+        embedding_model="nomic-embed-text:latest",
+    )
+    errors = validate_model_roles(config)
+    assert len(errors) > 0
+    assert any("DEPRECATED" in e for e in errors)
+    assert any("ADR-016" in e for e in errors)
+
+
+def test_validate_roles_gemma4_chat_model_ok():
+    """Test: Gemma 4 (gemma4-obliterated) als Chat-Modell → keine Fehler.
+
+    Gemma 4 ist das primäre Chat-Modell (ADR-016), via llama-server.
+    """
+    from config.ollama_models import OllamaModelConfig, validate_model_roles
+
+    config = OllamaModelConfig(
+        base_url="http://localhost:11434",
+        chat_model="gemma4-obliterated",
+        embedding_model="nomic-embed-text:latest",
+    )
+    errors = validate_model_roles(config)
+    assert errors == []
+
+
+def test_is_embedding_gemma4():
+    """Test: gemma4-obliterated ist KEIN Embedding-Modell."""
+    from config.ollama_models import is_embedding_model_name
+
+    assert is_embedding_model_name("gemma4-obliterated") is False
+    assert is_embedding_model_name("gemma4:latest") is False
+
+
+def test_validate_roles_qwen35_variant_ok():
+    """Test: qwen3.5-Varianten (nicht der Default) sind OK und nicht deprecated.
+
+    'qwen3.5-uncensored-no-thinking' ist nicht 'qwen3.5:9b' → kein Deprecation-Fehler.
+    """
+    from config.ollama_models import OllamaModelConfig, validate_model_roles
+
+    config = OllamaModelConfig(
+        base_url="http://localhost:11434",
+        chat_model="qwen3.5-uncensored-no-thinking:latest",
+        embedding_model="nomic-embed-text:latest",
+    )
+    errors = validate_model_roles(config)
+    assert errors == []
+
+
+# ── Precision Trap Validation (ADR-016) ────────────────────────────────────────
+
+
+def test_check_gemma4_precision_trap_no_process():
+    """Test: _check_gemma4_precision_trap ohne laufenden llama-server."""
+    # Import innerhalb des Tests, da die Funktion subprocess verwendet
+    from scripts.runtime_smoke import _check_gemma4_precision_trap
+
+    ok, msg = _check_gemma4_precision_trap()
+    # Ohne laufenden Server: sollte True + passende Meldung zurückgeben
+    assert ok is True
+    assert "Kein Gemma-4-Prozess aktiv" in msg or "nicht ausführbar" in msg

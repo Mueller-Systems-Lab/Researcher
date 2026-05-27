@@ -43,10 +43,12 @@ LLAMA_SERVER_URL: str = os.getenv(
 OLLAMA_EMBEDDING_MODEL: str = os.getenv(
     "OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest"
 )
-# Fallback: Offizielles Ollama-Qwen3.5-Basismodell für den Ollama-Chat-Pfad.
-# Das primäre Chat-Modell ist gemma4-obliterated via llama-server (OPENAI_BASE_URL).
-# OLLAMA_CHAT_MODEL wird von config/ollama_models.py und research_planner genutzt.
-OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:9b")
+# DEPRECATED (ADR-016): qwen3.5 is hardware-blocked on GTX 1070 (Pascal FP16).
+# PRIMARY Chat-Modell: Gemma 4 OBLITERATED via llama-server
+#   FAST_LLM=openai:gemma4-obliterated (OPENAI_BASE_URL, Port 8081)
+# OLLAMA_CHAT_MODEL ist NUR der Fallback, wenn INFERENCE_BACKEND=ollama gesetzt ist.
+# Siehe docs/adr/ADR-016-gemma4-chat-model.md
+OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:9b")  # DEPRECATED
 
 # ── Storage Paths ───────────────────────────────────────────────────────────
 CHROMA_PERSIST_DIRECTORY: str = os.getenv("CHROMA_PERSIST_DIRECTORY", "./chroma_db")
