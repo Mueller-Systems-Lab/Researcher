@@ -34,8 +34,11 @@ darknet_index/
 .DS_Store
 Thumbs.db
 
-# Docker
-searxng/
+# Docker (Volumes, Daten) — nur das Root-Verzeichnis, nicht docs/searxng/
+# settings.yml: individuell anpassen (secret_key, Engines)
+# Vorlage: docs/searxng/settings.example.yml
+# Eigenen Key generieren: openssl rand -base64 32
+/searxng/
 
 # Ollama
 .ollama/

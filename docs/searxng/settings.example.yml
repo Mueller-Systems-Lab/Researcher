@@ -1,0 +1,33 @@
+# SearXNG settings.yml — Lokale Research-Umgebung
+# ==============================================================================
+# 1. Kopiere diese Datei nach searxng/settings.yml
+# 2. Ersetze 'CHANGE_ME' durch einen eigenen Secret Key:
+#    openssl rand -base64 32
+# 3. Optional: Engines anpassen (keep_only-Liste)
+# ==============================================================================
+
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - wikipedia
+      - wikidata
+
+server:
+  bind_address: "0.0.0.0"  # Sicherheit durch Docker-Port-Binding (127.0.0.1)
+  port: 8080
+  base_url: "http://localhost:8080/"
+  secret_key: "CHANGE_ME"  # openssl rand -base64 32
+  limiter: false  # Kein Rate-Limiting für lokalen Betrieb
+
+search:
+  safe_search: 0     # Keine Filter für Research-Zwecke
+  formats:
+    - html
+    - json          # JSON-API für GPT Researcher
+
+ui:
+  static_use_hash: true
+
+# Keine zusätzlichen Plugins aktiviert
+plugins: {}
