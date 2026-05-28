@@ -11,6 +11,7 @@ server:
   bind_address: "0.0.0.0"  # Sicherheit durch Docker-Port-Binding (127.0.0.1)
   port: 8080
   base_url: "http://localhost:8080/"
+  secret_key: "62OOXOZCuYGDnDYgSCjCUx5Hy2L5yJPYOLWfDhGWris="
   limiter: false  # Kein Rate-Limiting für lokalen Betrieb (kein Valkey nötig)
 
 search:
