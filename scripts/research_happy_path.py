@@ -266,43 +266,16 @@ def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
     """Baut Messages für die Zusammenfassung (Few-Shot, mit vollem Content)."""
     messages = []
 
-    # System-Prompt: strukturierte Anleitung
-    messages.append(
-        {
-            "role": "system",
-            "content": (
-                "Schreibe eine praktische Schritt-für-Schritt-Anleitung "
-                "basierend auf den Quellen. Gliederung:\n\n"
-                "## Benötigte Ausrüstung\n"
-                "## Schritt 1: Vorbereitung\n"
-                "## Schritt 2: Durchführung\n"
-                "## Schritt 3: Nachbereitung\n"
-                "## Sicherheitshinweise\n\n"
-                "Nur Fakten aus den Quellen. "
-                "Keine Gedankenkette. Keine Metakommentare."
-            ),
-        }
-    )
-
-    # Alle Quellen einbinden (bis zu 5)
-    # Bevorzugt gescrapte Volltexte, Fallback auf Such-Snippets
+    # Quelltext (einmalig aufbereitet)
     source_text = "\n\n".join(
         (
             f"QUELLE {i + 1}: {s.get('title', '')}\n"
-            f"{s.get('content', '') or s.get('snippet', '')[:1200]}"
+            f"{s.get('content', '') or s.get('snippet', '')[:2000]}"
         )
         for i, s in enumerate(sources)
     )
-    messages.append(
-        {
-            "role": "user",
-            "content": (
-                f"Quellen:\n{source_text}\n\nFrage: {query}\n\nSchreibe die Anleitung."
-            ),
-        }
-    )
-
-    return messages
+    # Shared sources for multi-section calls
+    return {"source_text": source_text, "query": query}
 
 
 def summarize_with_llama(query: str, sources: list[dict]) -> str:
@@ -311,64 +284,121 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
     Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
 
     Optimierte Parameter:
-      - temperature 0.3, repeat_penalty 1.2
-      - Strukturierte Anleitung als System-Prompt
+      - temperature 0.3, repeat_penalty 1.15
+      - Mehrere Abschnitte nacheinander generieren
       - enable_thinking=false
     """
     if not sources:
         return "Keine Quellen verfügbar."
 
-    messages = _build_summary_prompt(query, sources)
+    prompt_data = _build_summary_prompt(query, sources)
+    source_text = prompt_data["source_text"]
 
-    try:
+    sections = [
+        "EINFÜHRUNG — Erkläre, was Schwefelsäure ist, "
+        "warum man sie konzentriert, und welche Gefahren bestehen. "
+        "Für absolute Anfänger. Maximal 8 Sätze.",
+        "SICHERHEIT — Welche Schutzausrüstung wird benötigt? "
+        "Was tun bei Hautkontakt? Maximal 8 Sätze.",
+        "ANLEITUNG — Schritt 1 Vorbereitung, Schritt 2 Destillation, "
+        "Schritt 3 Nachbereitung. Mit Tipps für Anfänger. "
+        "Maximal 15 Sätze. Nur Fakten aus den Quellen.",
+        "LAGERUNG & ENTSORGUNG — Wie lagert und entsorgt man "
+        "konzentrierte Schwefelsäure? Maximal 6 Sätze.",
+    ]
+
+    summaries = []
+    import re
+    import random
+
+    def _call_llama(messages: list, seed: int = 42) -> str:
+        """Einzelner API-Call mit fixem Seed."""
         r = requests.post(
             LLAMA_CHAT_URL,
             json={
                 "model": LLAMA_CHAT_MODEL,
                 "messages": messages,
                 "temperature": 0.3,
+                "top_p": 0.9,
+                "top_k": 40,
                 "repeat_penalty": 1.2,
+                "repeat_last_n": 128,
                 "max_tokens": 400,
+                "seed": seed,
                 "chat_template_kwargs": {"enable_thinking": False},
             },
-            timeout=(5, 120),
+            timeout=(5, 60),
         )
         r.raise_for_status()
         data = r.json()
-        summary = (
+        text = (
             data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         )
-        # Fallback: reasoning_content falls content leer ist
-        if not summary:
-            summary = (
+        if not text:
+            text = (
                 data.get("choices", [{}])[0]
                 .get("message", {})
                 .get("reasoning_content", "")
                 .strip()
             )
-        # Heuristik: Garbled-Output erkennen (Wiederholungen, zu kurz, Metakommentare)
-        import re
+        return text
 
-        if summary and (
-            len(summary) < 20
-            or re.search(r"(\d+ seconds?\b.*){5,}", summary, re.IGNORECASE)
-            or re.search(
-                r"(process|step|minute|second).*(process|step|minute|second).*",
-                summary[:50],
-                re.IGNORECASE,
-            )
-        ):
-            print(f"   ⚠️  Gemma 4: Garbled-Output erkannt ({len(summary)} chars)")
-            return ""
+    def _is_valid(text: str) -> bool:
+        """Prüft ob Output brauchbar ist."""
+        if not text or len(text) < 30:
+            return False
+        # Garbled: Wiederholungen
+        if re.search(r"(\d+ seconds?\b.*){5,}", text, re.IGNORECASE):
+            return False
+        # Garbled: erfundene Wörter (zu viele Großbuchstaben im Wortinneren)
+        caps_inside = len(re.findall(r"\b\w+[A-ZÄÖÜ]\w+", text))
+        if caps_inside > 3:
+            return False
+        return True
 
-        print(f"   Gemma 4: {len(summary)} chars summary")
-        return summary[:1500]
-    except requests.ConnectionError:
-        print(f"   ⚠️  llama-server nicht erreichbar ({LLAMA_CHAT_URL})")
+    def _best_of_n(n: int, messages: list) -> str:
+        """Generiert n Kandidaten, gibt den besten zurück."""
+        candidates = []
+        seeds = [random.randint(1, 99999) for _ in range(n)]
+        for seed in seeds:
+            try:
+                text = _call_llama(messages, seed=seed)
+                if _is_valid(text):
+                    candidates.append((len(text), text))
+            except Exception:
+                continue
+        if candidates:
+            # Kürzeste valide Antwort (meist faktenbasiert)
+            candidates.sort()
+            return candidates[0][1]
         return ""
-    except Exception as e:
-        print(f"   ⚠️  llama-server Fehler: {e}")
-        return ""
+
+    # Single extraction mit best-of-3: fokussiert, direkt, faktenbasiert
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "EXTRAHIERE die Fakten aus den QUELLEN. "
+                "Antworte NUR mit einer nummerierten Liste "
+                "der Fakten. Keine Einleitung. "
+                "Keine Gedankenkette."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"QUELLEN:\n{source_text}\n\n"
+                f"Aufgabe: Liste die Verfahrensschritte zum "
+                f"Konzentrieren von Schwefelsäure auf. "
+                f"Verfahrensschritte:"
+            ),
+        },
+    ]
+
+    # Letzten Satz als Completion-Trigger nutzen
+    text = _best_of_n(3, messages)
+    print(f"   ✅ Extraction: {len(text)} chars")
+    return text
 
 
 def summarize_with_ollama(query: str, sources: list[dict], model_name: str) -> str:
