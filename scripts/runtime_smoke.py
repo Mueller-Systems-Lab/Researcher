@@ -29,8 +29,8 @@ from config.ollama_models import (
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8085/v1")
-LLAMA_SERVER_MODEL = "gemma4-obliterated"  # Aktuell aktives Chat-Modell
+LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8082/v1")
+LLAMA_SERVER_MODEL = "qwen3.5-uncensored"  # Primary (ADR-017)
 SEARXNG_URL = os.getenv("SEARX_URL", "http://localhost:8080")
 SEARXNG_TIMEOUT = int(os.getenv("SEARXNG_TIMEOUT_SECONDS", "15"))
 TOR_HOST = os.getenv("TOR_SOCKS_HOST", "127.0.0.1")
@@ -162,55 +162,6 @@ def check_tor() -> bool:
         return False
 
 
-def _check_gemma4_precision_trap() -> tuple[bool, str]:
-    """Prüft, ob der laufende llama-server die Precision-Trap-Flags setzt.
-
-    (ADR-016) Auf Pascal-GPUs (GTX 1070) muss der KV-Cache in FP32 laufen,
-    sonst produziert Gemma 4 garbled Output. Erforderliche Flags:
-      -ctk f32 -ctv f32
-
-    Prüft über den Process-Name die Kommandozeilen-Argumente.
-    Wenn der Server nicht läuft oder die Flags fehlen, wird gewarnt.
-
-    Returns:
-        (ok, message) — ok=True wenn Flags gesetzt oder Server nicht läuft.
-    """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        for line in result.stdout.splitlines():
-            if "llama-server" in line and "gemma4" in line.lower():
-                flags_ok = True
-                msgs = []
-                if "-ctk f32" not in line or "-ctv f32" not in line:
-                    flags_ok = False
-                    msgs.append("Fehlen -ctk f32 -ctv f32 (Precision Trap)")
-                if "--reasoning off" not in line:
-                    flags_ok = False
-                    msgs.append("Fehlt --reasoning off (Gemma 4 Thinking)")
-                if flags_ok:
-                    return (
-                        True,
-                        "Alle Flags gefunden (-ctk f32 -ctv f32, --reasoning off)",
-                    )
-                else:
-                    return (
-                        False,
-                        "WARNUNG: Gemma 4 ohne kritische Flags! "
-                        + "; ".join(msgs)
-                        + ". Siehe serve_gemma4_obliterated_researcher.sh",
-                    )
-        # Kein Gemma-4-Prozess gefunden → kein Precision-Trap-Risiko
-        return (True, "Kein Gemma-4-Prozess aktiv (keine Prüfung nötig)")
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return (True, "Precision-Trap-Check nicht ausführbar (ps nicht verfügbar)")
-
 
 def check_llama_server() -> bool:
     """Prüft, ob llama-server (OpenAI-kompatibler Chat-Endpoint) erreichbar ist.
@@ -244,13 +195,6 @@ def check_llama_server() -> bool:
                 print(f"     Verfügbar: {', '.join(models[:3])}")
             return False
 
-        # Schritt 1b: Precision-Trap-Validierung (ADR-016)
-        pt_ok, pt_msg = _check_gemma4_precision_trap()
-        if pt_ok:
-            print(f"  {_status(True)} {pt_msg}")
-        else:
-            print(f"  {_status(False)} {pt_msg}")
-
         # Schritt 2: Kurzen Chat-Test (optional, kein Fail wenn fehlschlägt)
         try:
             test = requests.post(
@@ -281,7 +225,7 @@ def check_llama_server() -> bool:
         return True
     except requests.ConnectionError:
         print(f"  {_status(False)} llama-server nicht erreichbar ({LLAMA_SERVER_URL})")
-        print("     Starte: bash serve_gemma4_obliterated.sh")
+        print("     Starte: bash serve_qwen3.5_uncensored.sh")
         return False
     except requests.Timeout:
         print(f"  {_status(False)} llama-server Timeout ({LLAMA_SERVER_URL})")
@@ -363,7 +307,7 @@ def main() -> None:
             exit_code = max(exit_code, 1)
             print("   ❌ REQUIRE_LLAMA_SERVER=true → Fehler")
         elif not results["llama-server"] and not only:
-            print("   ℹ️  llama-server ist optional. Starte: research-serve.sh gemma4")
+            print("   ℹ️  llama-server ist optional. Starte: research-serve.sh qwen")
         if not only:
             print()
 

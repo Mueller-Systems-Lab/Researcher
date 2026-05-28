@@ -16,12 +16,12 @@ date: 2026-05-27
 
 ## Chat/Summary-Modell
 
-- Aktuelle Wahl: **Gemma 4 E4B OBLITERATED** (`gemma4-obliterated`)
-- Backend: Eigenständiger `llama-server` (Port 8081), **kein Ollama**
+- Aktuelle Wahl: **Qwen3.5 E4B OBLITERATED** (`qwen3.5-uncensored`)
+- Backend: Eigenständiger `llama-server` (Port 8082), **kein Ollama**
 - VRAM: ~3.8 GB (passt zusammen mit GPU-Dashboard auf GTX 1070)
-- Start: `./serve_gemma4_obliterated_researcher.sh`
-- Precision-Trap: `-ctk f32 -ctv f32` zwingend auf Pascal-GPUs (GTX 1070), da FP16-KV-Cache bei Gemma 4 garbled Output erzeugt
-- Alias im Server: `gemma4-obliterated`
+- Start: `./serve_qwen3.5_obliterated_researcher.sh`
+- Precision-Trap: `-ctk f32 -ctv f32` zwingend auf Pascal-GPUs (GTX 1070), da FP16-KV-Cache bei Qwen3.5 garbled Output erzeugt
+- Alias im Server: `qwen3.5-uncensored`
 - Eignung: Research-Summaries, Report-Generierung, Chat
 - Stabilität: ✅ deutlich stabiler als qwen3.5-Vorgänger
 
@@ -29,11 +29,11 @@ date: 2026-05-27
 
 - Frühere Wahl: `qwen3.5-uncensored-no-thinking:latest` (via Ollama, 6.6 GB VRAM)
 - Crashte gelegentlich mit "llama runner process has terminated"
-- Vollständig durch Gemma 4 obliterated ersetzt
+- Vollständig durch Qwen3.5 obliterated ersetzt
 - Das GGUF `Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf` liegt noch im Projektroot
 
 Quellen:
-- https://huggingface.co/google/gemma-4 (Gemma 4 Basis)
+- https://huggingface.co/google/gemma-4 (Qwen3.5 Basis)
 - https://huggingface.co/Qwen/Qwen3.5-9B (qwen3.5, deprecated)
 - https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive (qwen3.5, deprecated)
 

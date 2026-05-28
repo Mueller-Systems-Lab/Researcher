@@ -7,14 +7,14 @@ date: 2026-05-27
 
 ## Stand
 
-2026-05-27 — Aktuelle Co-Primary-Chat-Modelle: **Gemma 4 E4B OBLITERATED** und **Qwen3.5-9B-Uncensored-HauhauCS-Aggressive** via llama-server.  
+2026-05-27 — Aktuelle Co-Primary-Chat-Modelle: **Qwen3.5 E4B OBLITERATED** und **Qwen3.5-9B-Uncensored-HauhauCS-Aggressive** via llama-server.  
 Der alte Ollama-qwen3.5-Pfad ist deprecated; der HauhauCS-Fork läuft parallel als llama.cpp-Server.
 
 ## Aktuelle Modelle (2026-05)
 
 | Modell | Rolle | Backend | Port | VRAM | Start |
 |--------|-------|---------|------|------|-------|
-| **gemma4-obliterated** | Chat / Summary / Report | llama-server (eigenständig) | 8081 | ~3.8 GB | `./serve_gemma4_obliterated_researcher.sh` |
+| **qwen3.5-uncensored** | Chat / Summary / Report | llama-server (eigenständig) | 8081 | ~3.8 GB | `./serve_qwen3.5_obliterated_researcher.sh` |
 | **qwen3.5-uncensored** | Chat / Extraction / Scraping | llama-server (eigenständig) | 8082 | ~5.3 GB | `./serve_qwen3.5_uncensored.sh` |
 | **nomic-embed-text:latest** | Embedding | Ollama | 11434 | 274 MB (CPU-seitig) | `ollama run nomic-embed-text` |
 
@@ -27,7 +27,7 @@ Der alte Ollama-qwen3.5-Pfad ist deprecated; der HauhauCS-Fork läuft parallel a
 ## Internet-Recherche: Bestätigungen und Korrekturen
 
 - `nomic-embed-text:latest` ist ein reines Embedding-Modell und kann **keinen Text generieren**. Quellen: https://ollama.com/library/nomic-embed-text, https://huggingface.co/nomic-ai/nomic-embed-text-v1.5
-- **Gemma 4 E4B OBLITERATED** ist ein Community-Uncensored-Fork von Googles Gemma 4 (E4B = Expert-4B). Läuft via llama.cpp/llama-server, nicht via Ollama. Quelle: Projekt-eigene GGUF-Datei in `/home/xxammaxx/Schreibtisch/gemma4/llama.cpp/models/`.
+- **Qwen3.5 E4B OBLITERATED** ist ein Community-Uncensored-Fork von Googles Qwen3.5 (E4B = Expert-4B). Läuft via llama.cpp/llama-server, nicht via Ollama. Quelle: Projekt-eigene GGUF-Datei in `/home/xxammaxx/Schreibtisch/qwen3.5/llama.cpp/models/`.
 - **qwen3.5-Ära (deprecated)**: Historischer Ollama-Chat-Pfad. `qwen3.5-uncensored-no-thinking:latest` war ein lokaler Modelfile-Name im Projekt, Basis `Qwen/Qwen3.5-9B`. Der HauhauCS-Fork läuft heute zusätzlich als llama-server-Co-Primary.
 
 ## Hardware-Kontext (verifiziert im Projekt)
@@ -41,7 +41,7 @@ Der alte Ollama-qwen3.5-Pfad ist deprecated; der HauhauCS-Fork läuft parallel a
 
 | Modell / Variable | Rolle | Fundstelle | Aktueller Default | Bemerkung |
 |---|---|---|---|---|
-| `OLLAMA_CHAT_MODEL` | Chat/Summary (Ollama-Fallback) | `.env.example`, `scripts/runtime_smoke.py`, `scripts/research_happy_path.py`, `config/ollama_models.py` | `qwen3.5:9b` | Offizielles Ollama-Basismodell. Primäres Chat-Modell ist `gemma4-obliterated` via llama-server. |
+| `OLLAMA_CHAT_MODEL` | Chat/Summary (Ollama-Fallback) | `.env.example`, `scripts/runtime_smoke.py`, `scripts/research_happy_path.py`, `config/ollama_models.py` | `qwen3.5:9b` | Offizielles Ollama-Basismodell. Primäres Chat-Modell ist `qwen3.5-uncensored` via llama-server. |
 | `OLLAMA_EMBEDDING_MODEL` | Embeddings | `.env.example`, `gpt_researcher/gpt_researcher/config/config.py:119` | `nomic-embed-text:latest` | Standard-Ollama-Embedding-Modell |
 | `FAST_LLM` | Fast LLM (Deprecated-Rolle) | `.env.example:16` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | Historischer/alternativer Name; mappt auf HauhauCS-Fork |
 | `SMART_LLM` | Smart LLM (Deprecated-Rolle) | `.env.example:17` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | Historischer/alternativer Name |
@@ -54,7 +54,7 @@ Der alte Ollama-qwen3.5-Pfad ist deprecated; der HauhauCS-Fork läuft parallel a
 
 | Rolle | Variable | Default | Zweck |
 |---|---|---|---|
-| Chat / Text-Generierung / Summary | `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` (primär, via llama-server) | `openai:gemma4-obliterated` | Generierung von Research-Summaries, Chat-Responses via llama-server (Port 8081) |
+| Chat / Text-Generierung / Summary | `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` (primär, via llama-server) | `openai:qwen3.5-uncensored` | Generierung von Research-Summaries, Chat-Responses via llama-server (Port 8082) |
 | Chat / Text-Generierung / Summary (Ollama-Fallback) | `OLLAMA_CHAT_MODEL` | `qwen3.5:9b` | Fallback für den Ollama-Chat-Pfad |
 | Embeddings / Vektorsuche | `OLLAMA_EMBEDDING_MODEL` / `EMBEDDING` | `nomic-embed-text:latest` | Vektorisierung von Dokumenten für ChromaDB |
 | GPT-Researcher Fast LLM | `FAST_LLM` | `ollama:qwen3.5-9b-uncensored-hauhaucs-aggressive:latest` | GPT-Researcher-intern (Deprecated-Format) |
@@ -109,7 +109,7 @@ Risiko: geringere Safety/Refusal-Mechanismen, unklare Provenienz, mögliche rech
 ## Hardware-Hinweise
 
 - `nomic-embed-text` bleibt auf CPU und ist für die GTX 1070 unkritisch. Quelle: `vectordb/embedding.py`, https://ollama.com/library/nomic-embed-text
-- Gemma 4 und Qwen3.5 sind als Co-Primary-Modelle auf getrennten Ports dokumentiert; je nach VRAM-Budget bleibt Einzelbetrieb optional sinnvoll. Quelle: `README.md`, `tests/test_vram.py`
+- Qwen3.5 und Qwen3.5 sind als Co-Primary-Modelle auf getrennten Ports dokumentiert; je nach VRAM-Budget bleibt Einzelbetrieb optional sinnvoll. Quelle: `README.md`, `tests/test_vram.py`
 - Das Modelfile nutzt `num_ctx 4096` und `repeat_penalty 1.1`; in der Laufzeitkonfiguration ist `temperature 0.7` gesetzt. Quelle: `Modelfile.qwen3.5-9b-uncensored-hauhaucs-aggressive`
 - Der Projekt-Spawn nutzt bei Bedarf reduzierte Kontexte, um VRAM zu sparen. Quelle: `README.md`, `serve_qwen3.5_uncensored.sh`
 

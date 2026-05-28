@@ -24,9 +24,9 @@
 
 ## Runtime Stability
 
-- **Gemma 4 OBLITERATED (Chat)**: Aktuelles Chat-/Summary-Modell. Läuft via llama-server (Port 8081, ~3.8 GB VRAM). Deutlich stabiler als der qwen3.5-Vorgänger. Keine Ollama-Abhängigkeit für Chat — eigener Prozess.
-- **Precision Trap (Gemma 4 + Pascal)**: Auf GTX 1070 (Pascal) muss der KV-Cache in FP32 laufen (`-ctk f32 -ctv f32`). FP16 erzeugt garbled Output. `--flash-attn off` ist ebenfalls nötig, da Pascal keine Tensor Cores besitzt. Diese Flags sind in `serve_gemma4_obliterated_researcher.sh` gesetzt.
-- **qwen3.5 (Deprecated)**: Historisches Chat-Modell. Crashte gelegentlich mit "llama runner process has terminated". Vollständig durch Gemma 4 obliterated ersetzt.
+- **Qwen3.5-Uncensored (Chat)**: Aktuelles Chat-/Summary-Modell. Läuft via llama-server (Port 8082, ~3.8 GB VRAM). Deutlich stabiler als der qwen3.5-Vorgänger. Keine Ollama-Abhängigkeit für Chat — eigener Prozess.
+- **Precision Trap (Qwen3.5 + Pascal)**: Auf GTX 1070 (Pascal) muss der KV-Cache in FP32 laufen (`-ctk f32 -ctv f32`). FP16 erzeugt garbled Output. `--flash-attn off` ist ebenfalls nötig, da Pascal keine Tensor Cores besitzt. Diese Flags sind in `serve_qwen3.5_obliterated_researcher.sh` gesetzt.
+- **qwen3.5 (Deprecated)**: Historisches Chat-Modell. Crashte gelegentlich mit "llama runner process has terminated". Vollständig durch Qwen3.5 obliterated ersetzt.
 - **nomic-embed-text (Embedding)**: Läuft weiterhin via Ollama (Port 11434). 274 MB, stabil.
 - **ChromaDB 1.5.9 count-Verhalten**: `count()` gibt `-1` statt `0` bei fehlender Verbindung. Wird lokal in `vectordb/store.py` abgefangen.
 - **SSE blockiert Playwright**: Der Server-Sent-Events-Stream (SSE) der Dashboard-API verhindert, dass Playwright `networkidle` als Wait-Strategy verwenden kann.

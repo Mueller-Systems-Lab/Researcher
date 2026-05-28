@@ -2,7 +2,7 @@
 
 ## Local UI Status: **UI PARTIAL**
 
-GPT Researcher Submodul ist vorhanden und grundsätzlich startbar. Der volle Query→Research→Report-Flow konnte wegen historischer LLM-Ladezeiten (qwen3.5-Ära) noch nicht vollständig verifiziert werden. Mit dem Umstieg auf Gemma 4 OBLITERATED (eigener llama-server, ~3.8 GB VRAM) ist die Runtime deutlich stabiler.
+GPT Researcher Submodul ist vorhanden und grundsätzlich startbar. Der volle Query→Research→Report-Flow konnte wegen historischer LLM-Ladezeiten (qwen3.5-Ära) noch nicht vollständig verifiziert werden. Mit dem Umstieg auf Qwen3.5-Uncensored (eigener llama-server, ~3.8 GB VRAM) ist die Runtime deutlich stabiler.
 
 ## Startbefehle
 
@@ -12,13 +12,13 @@ python3 -m dashboard.server
 # http://127.0.0.1:8888
 ```
 
-### Gemma 4 OBLITERATED Chat-Server (Port 8081)
+### Qwen3.5-Uncensored Chat-Server (Port 8082)
 Das Chat-/Summary-Modell. Läuft eigenständig via llama.cpp, **unabhängig von Ollama**.
 
 ```bash
-./serve_gemma4_obliterated_researcher.sh
+./serve_qwen3.5_obliterated_researcher.sh
 # http://127.0.0.1:8081
-# Alias im Server: gemma4-obliterated
+# Alias im Server: qwen3.5-uncensored
 # VRAM: ~3.8 GB von 8 GB
 ```
 
@@ -52,14 +52,14 @@ NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0
 
 | Dienst | Port | Status | Zweck |
 |--------|------|--------|-------|
-| llama-server (Gemma 4) | 8081 | ✅ | Chat/Summary (llama.cpp, eigenständig) |
+| llama-server (Qwen3.5) | 8081 | ✅ | Chat/Summary (llama.cpp, eigenständig) |
 | llama-server (Qwen3.5) | 8082 | ✅ | Chat/Extraction (≈45 tok/s, llama.cpp, eigenständig) |
 | Ollama | 11434 | ✅ | Nur noch für Embedding (nomic-embed-text) |
 | SearXNG (Suche) | 8080 | ✅ | Metasuchmaschine |
 | Tor (Proxy) | 9050 | ✅ | Darknet-Zugriff (optional) |
 | ChromaDB | — | ✅ | Vektordatenbank |
 
-Gemma 4 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgabe wird das passende Modell gestartet.
+Qwen3.5 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgabe wird das passende Modell gestartet.
 
 ## Modelle
 
@@ -68,8 +68,8 @@ Gemma 4 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgab
 ollama list | grep nomic-embed-text
 
 # Chat (via llama-server, unabhängig von Ollama):
-# Läuft als eigener Prozess: ./serve_gemma4_obliterated_researcher.sh
-# Port 8081, Alias: gemma4-obliterated
+# Läuft als eigener Prozess: ./serve_qwen3.5_obliterated_researcher.sh
+# Port 8082, Alias: qwen3.5-uncensored
 
 # Extraction/Chat (via llama-server, unabhängig von Ollama):
 # Läuft als eigener Prozess: ./serve_qwen3.5_uncensored.sh
@@ -78,19 +78,19 @@ ollama list | grep nomic-embed-text
 
 | Modell | Typ | Backend | Größe | Status |
 |--------|-----|---------|-------|--------|
-| gemma4-obliterated | Chat/Summary | llama-server (Port 8081) | ~3.8 GB VRAM | ✅ Stabil |
+| qwen3.5-uncensored | Chat/Summary | llama-server (Port 8082) | ~3.8 GB VRAM | ✅ Stabil |
 | qwen3.5-uncensored | Chat/Extraction | llama-server (Port 8082) | ~5.3 GB VRAM | ✅ Co-Primary |
 | nomic-embed-text | Embedding | Ollama (Port 11434) | 274 MB | ✅ Stabil |
 
 ### Historisch (ersetzt)
-| qwen3.5-uncensored-no-thinking | Chat (deprecated) | Ollama | 6.6 GB | ❌ Instabil — ersetzt durch Gemma 4 |
+| qwen3.5-uncensored-no-thinking | Chat (deprecated) | Ollama | 6.6 GB | ❌ Instabil — ersetzt durch Qwen3.5 |
 
 ## Known Issues
 
 1. **SSE blockiert Playwright**: `networkidle`-Wait hängt wegen SSE-Stream
-2. **Gemma 4 Precision Trap**: `-ctk f32 -ctv f32` zwingend erforderlich auf Pascal (GTX 1070), da FP16-KV-Cache bei Gemma 4 zu garbled Output führt
+2. **Qwen3.5 Precision Trap**: `-ctk f32 -ctv f32` zwingend erforderlich auf Pascal (GTX 1070), da FP16-KV-Cache bei Qwen3.5 zu garbled Output führt
 3. **ChromaDB 1.5.9 count()**: Gibt `-1` statt `0` bei fehlender Verbindung (lokal in `vectordb/store.py` abgefangen)
-4. **Keine Ollama-Abhängigkeit für Chat**: Gemma 4 läuft eigenständig via llama.cpp — Ollama wird nur noch für nomic-embed-text benötigt
+4. **Keine Ollama-Abhängigkeit für Chat**: Qwen3.5 läuft eigenständig via llama.cpp — Ollama wird nur noch für nomic-embed-text benötigt
 
 ## UI Smoke Test
 

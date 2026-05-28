@@ -36,16 +36,15 @@ MCP_HOST: str = os.getenv("MCP_HOST", "127.0.0.1")
 # ── Llama Server (OpenAI-compatible) ────────────────────────────────────────
 LLAMA_SERVER_URL: str = os.getenv(
     "OPENAI_BASE_URL",
-    os.getenv("LLAMA_SERVER_URL", "http://127.0.0.1:8081/v1"),
+    os.getenv("LLAMA_SERVER_URL", "http://127.0.0.1:8082/v1"),
 )
 
 # ── Embedding ───────────────────────────────────────────────────────────────
 OLLAMA_EMBEDDING_MODEL: str = os.getenv(
     "OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest"
 )
-# DEPRECATED (ADR-016): qwen3.5 is hardware-blocked on GTX 1070 (Pascal FP16).
-# PRIMARY Chat-Modell: Gemma 4 OBLITERATED via llama-server
-#   FAST_LLM=openai:gemma4-obliterated (OPENAI_BASE_URL, Port 8081)
+# PRIMARY Chat-Modell: Qwen3.5-Uncensored-HauhauCS via llama-server
+#   FAST_LLM=openai:qwen3.5-uncensored (OPENAI_BASE_URL, Port 8082)
 # OLLAMA_CHAT_MODEL ist NUR der Fallback, wenn INFERENCE_BACKEND=ollama gesetzt ist.
 # Siehe docs/adr/ADR-016-gemma4-chat-model.md
 OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:9b")  # DEPRECATED

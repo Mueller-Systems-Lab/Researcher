@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Minimaler Research-Happy-Path: SearXNG → Gemma 4 (llama-server) → Report.
+"""Minimaler Research-Happy-Path: SearXNG → Qwen3.5 (llama-server) → Report.
 
 Nutzung:
     python3 scripts/research_happy_path.py                    # Standard
     python3 scripts/research_happy_path.py --strict           # Alle Dienste Pflicht
     python3 scripts/research_happy_path.py --query "Frage"    # Eigene Query
 
-Primärer Chat-Pfad: Gemma 4 via llama-server (OPENAIS_BASE_URL, Port 8081).
+Primärer Chat-Pfad: Qwen3.5 via llama-server (OPENAIS_BASE_URL, Port 8082).
 Fallback: Ollama (OLLAMA_CHAT_MODEL) wenn llama-server nicht verfügbar.
 
 Voraussetzungen (Standard):
@@ -44,10 +44,10 @@ OLLAMA_URL = _ollama_config.base_url
 OLLAMA_CHAT_MODEL = _ollama_config.chat_model
 REQUEST_TIMEOUT = (5, 30)
 
-# llama-server (Gemma 4) — primärer Chat-Pfad (ADR-016)
-LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8081/v1")
+# llama-server (Qwen3.5) — primärer Chat-Pfad (ADR-016)
+LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8082/v1")
 LLAMA_CHAT_URL = f"{LLAMA_SERVER_URL.rstrip('/')}/chat/completions"
-LLAMA_CHAT_MODEL = os.getenv("LLM_CHAT_MODEL", "gemma4-obliterated")
+LLAMA_CHAT_MODEL = os.getenv("LLM_CHAT_MODEL", "qwen3.5-uncensored")
 
 # Harmlose Default-Query
 DEFAULT_QUERY = "What is a search engine?"
@@ -279,7 +279,7 @@ def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
 
 
 def summarize_with_llama(query: str, sources: list[dict]) -> str:
-    """Erzeugt eine Zusammenfassung via llama-server (Gemma 4, ADR-016).
+    """Erzeugt eine Zusammenfassung via llama-server (Qwen3.5, ADR-016).
 
     Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
 
@@ -582,8 +582,8 @@ def main() -> None:
         print(f"   → {scraped_count} Quellen gescrapt, {len(sources)} gesamt")
     print()
 
-    # 4. Summary — primär via llama-server (Gemma 4), Fallback Ollama
-    print("🧠 Summarizing (Gemma 4 via llama-server)...")
+    # 4. Summary — primär via llama-server (Qwen3.5), Fallback Ollama
+    print("🧠 Summarizing (Qwen3.5 via llama-server)...")
     summary = summarize_with_llama(args.query, sources)
     model_name = LLAMA_CHAT_MODEL
     model_status = "ok" if summary else "missing"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Serve Qwen3.5-9B-Uncensored-HauhauCS-Aggressive via llama.cpp
-# Port: 8082 (gemma4 uses 8081)
+# Port: 8082 (Primary Chat-Modell, ADR-017)
 # Beide Modelle parallel für Recherche/Learning nutzbar
 
 MODEL_PATH="/home/xxammaxx/Schreibtisch/Researcher/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"

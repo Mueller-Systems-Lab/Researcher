@@ -46,14 +46,14 @@ jobs:
         run: |
           PYTHONPATH=. python3 scripts/runtime_smoke.py
         env:
-          OPENAI_BASE_URL: http://127.0.0.1:8081/v1
+          OPENAI_BASE_URL: http://127.0.0.1:8082/v1
 
       - name: Research Happy Path
         if: ${{ !inputs.playwright_only }}
         run: |
           PYTHONPATH=. python3 scripts/research_happy_path.py --strict
         env:
-          OPENAI_BASE_URL: http://127.0.0.1:8081/v1
+          OPENAI_BASE_URL: http://127.0.0.1:8082/v1
           SEARXNG_TIMEOUT_SECONDS: 30
 
       - name: Playwright Viewport Tests

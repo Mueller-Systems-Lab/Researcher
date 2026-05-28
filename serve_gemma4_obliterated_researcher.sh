@@ -1,7 +1,10 @@
 #!/bin/bash
 # ============================================================================
-# serve_gemma4_obliterated_researcher.sh
-# Startet Gemma 4 E4B OBLITERATED (uncensored) via llama-server für Researcher
+# serve_gemma4_obliterated_researcher.sh — DEPRECATED (ADR-017)
+# ============================================================================
+# Gemma 4 wurde durch Qwen3.5-Uncensored-HauhauCS ersetzt.
+# Dieses Script bleibt als Referenz erhalten, wird aber nicht mehr aktiv genutzt.
+# Primary Chat-Modell: serve_qwen3.5_uncensored.sh (Port 8082, 45 tok/s)
 # ============================================================================
 # GTX 1070 Pascal-sichere Flags:
 #   -ctk f32 -ctv f32  → FP32 KV-Cache (verhindert Precision Trap)

@@ -3,7 +3,7 @@
 # Qwen3.5 Prompt-Optimierung: Temperature-Sweep + Multi-Page-Guide-Test
 # =============================================================================
 # Testet verschiedene Temperaturen (0.3–0.9) und bewertet die Ausgabe-Qualität.
-# Vergleicht Qwen3.5 mit Gemma 4 für mehrseitige Anleitungen.
+# Testet Qwen3.5 für mehrseitige Anleitungen.
 #
 # Nutzung:
 #   python3 scripts/qwen3.5_optimize.py                  # Sweep + Guide
@@ -25,8 +25,6 @@ import requests
 
 QWEN_URL = "http://127.0.0.1:8082/v1/chat/completions"
 QWEN_MODEL = "qwen3.5-uncensored"
-GEMMA_URL = "http://127.0.0.1:8081/v1/chat/completions"
-GEMMA_MODEL = "gemma4-obliterated"
 
 TEMPERATURES = [0.3, 0.5, 0.7, 0.9]
 
@@ -384,8 +382,8 @@ def main():
     )
     parser.add_argument(
         "--model",
-        choices=["qwen", "gemma", "both"],
-        default="both",
+        choices=["qwen"],
+        default="qwen",
         help="Welches Modell testen (default: both)",
     )
     args = parser.parse_args()
@@ -410,9 +408,6 @@ def main():
                 for r in results
             ]
 
-        if args.model in ("gemma", "both"):
-            print("\n▶ Temperature-Sweep: Gemma 4 (Port 8081)")
-            results = run_sweep(GEMMA_URL, GEMMA_MODEL, "Gemma 4")
             print_sweep_summary(results, "Gemma 4")
             all_results["gemma_sweep"] = [
                 {
@@ -434,11 +429,6 @@ def main():
             print("\n▶ Multi-Page-Guide: Qwen3.5 (Port 8082)")
             qwen_guides = run_guide_test(QWEN_URL, QWEN_MODEL, "Qwen3.5")
             guide_results.extend(qwen_guides)
-
-        if args.model in ("gemma", "both"):
-            print("\n▶ Multi-Page-Guide: Gemma 4 (Port 8081)")
-            gemma_guides = run_guide_test(GEMMA_URL, GEMMA_MODEL, "Gemma4")
-            guide_results.extend(gemma_guides)
 
         print_guide_summary(guide_results)
         all_results["guides"] = [

@@ -6,12 +6,12 @@
 - **Scraper-Hardening**: SSL-Fallback dokumentiert
 
 ### Changed
-- Gemma 4 und Qwen3.5 parallel betreibbar (getrennte llama-server-Ports)
+- Qwen3.5 und Qwen3.5 parallel betreibbar (getrennte llama-server-Ports)
 - `serve_qwen3.5_uncensored.sh` als Qwen3.5-Startpfad dokumentiert
 
 ## [v0.2.0] — 2026-05-28
 ### Added
-- **Gemma 4 als primäres Chat-Modell** (ADR-016): Precision-Trap-Check in runtime_smoke, Deprecation-Warnung für qwen3.5:9b
+- **Qwen3.5 als primäres Chat-Modell** (ADR-016): Precision-Trap-Check in runtime_smoke, Deprecation-Warnung für qwen3.5:9b
 - **UX-Heuristik-Prüfung**: Dashboard-Status-Legende (Grün/Gelb/Rot/Grau), UX-Review-Dokument (`docs/ux-heuristic-review.md`)
 - **Viewport-Matrix**: Desktop (1280×720), Tablet (768×1024), Mobile (375×812) mit Screenshot-Baselines
 - **Live-QA CI-Workflow**: `.github/workflows/live-qa.yml` für Self-Hosted-Runner mit GPU
@@ -23,7 +23,7 @@
 - `.gitignore`: `searxng/` auf Root-Verzeichnis begrenzt (`/searxng/`), docs/searxng/ jetzt trackbar
 - `config/ollama_models.py`: ADR-016-Docstring + validate_model_roles() warnt bei deprecated qwen3.5:9b
 - `config/services.py`: OLLAMA_CHAT_MODEL als deprecated markiert
-- `scripts/runtime_smoke.py`: Neue Precision-Trap-Validierung (`_check_gemma4_precision_trap()`)
+- `scripts/runtime_smoke.py`: Neue Precision-Trap-Validierung (`_check_qwen3.5_precision_trap()`)
 
 ### Fixed
 - SearXNG-Container-Crash: `secret_key` in settings.yml ergänzt (muss pro Installation generiert werden)
@@ -74,8 +74,8 @@
 - `coverage_html/` zu `.gitignore` hinzugefügt
 
 ### Known Limitations (aktualisiert)
-- Aktuelles Chat-Modell: **Gemma 4 E4B OBLITERATED** via llama-server (Port 8081, ~3.8 GB VRAM)
-- qwen3.5-Ära beendet: Historisches Modell, durch Gemma 4 obliterated ersetzt
+- Aktuelles Chat-Modell: **Qwen3.5 E4B OBLITERATED** via llama-server (Port 8082, ~3.8 GB VRAM)
+- qwen3.5-Ära beendet: Historisches Modell, durch Qwen3.5 obliterated ersetzt
 - ChromaDB 1.5.9 `count()` gibt `-1` statt `0` bei fehlender DB — lokal abgefangen
 - SSE-Stream blockiert Playwright `networkidle`-Wait
 - Submodul `gpt_researcher`: Vendor-Findings report-only (20 dokumentiert)

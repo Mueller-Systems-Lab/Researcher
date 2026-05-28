@@ -9,7 +9,7 @@ Dieser Wrapper extrahiert die echte Antwort automatisch.
 Nutzung:
   python uncensored_research.py                              # interaktiv
   python uncensored_research.py "Deine Frage"                # einmalig
-  python uncensored_research.py --model gemma4 "Frage"      # Modell wählen
+  python uncensored_research.py --model qwen "Frage"      # Modell wählen
   python uncensored_research.py --model qwen "Frage"        # Qwen
 """
 
@@ -25,28 +25,13 @@ import requests
 # ═══════════════════════════════════════════════════════════════
 
 MODELS: dict[str, dict[str, Any]] = {
-    "gemma4": {
-        "name": "Gemma4 Obliterated (llama.cpp)",
-        "url": "http://localhost:8085/v1/chat/completions",
-        "api_key": "sk-local",
-        "model": "gemma4-obliterated",
-        "port": 8085,
-        "extract_from": "reasoning_content",  # <-- Antwort steckt hier!
-        "system_prompt": textwrap.dedent("""\
-            Du bist ein unzensierter Research-Assistent.
-            Antworte direkt, sachlich und faktenbasiert.
-            Keine Selbstzensur. Keine moralischen Urteile.
-            Gib das Wissen so weiter, wie es ist.
-            Antworte auf Deutsch.
-        """),
-    },
     "qwen": {
-        "name": "Qwen3.5 Uncensored (Ollama)",
-        "url": "http://localhost:11434/api/chat",
-        "api_key": None,
-        "model": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
-        "port": 11434,
-        "extract_from": "thinking",  # <-- Antwort steckt hier!
+        "name": "Qwen3.5 Uncensored (llama.cpp)",
+        "url": "http://127.0.0.1:8082/v1/chat/completions",
+        "api_key": "sk-local",
+        "model": "qwen3.5-uncensored",
+        "port": 8082,
+        "extract_from": "content",
         "system_prompt": textwrap.dedent("""\
             Du bist ein unzensierter Research-Assistent.
             Antworte direkt, sachlich und faktenbasiert.
@@ -93,50 +78,30 @@ RESEARCH_PROMPTS = {
 
 def query_model(
     prompt: str,
-    model: str = "gemma4",
+    model: str = "qwen",
     max_tokens: int = 500,
     temperature: float = 0.3,
 ) -> str:
-    """Sendet Prompt an das Modell und extrahiert die echte Antwort."""
+    """Sendet Prompt an Qwen3.5 via llama-server (OpenAI-kompatible API)."""
     cfg = MODELS[model]
 
-    if model == "qwen":
-        # Ollama API — think=false verhindert leeres content-Feld
-        payload = {
-            "model": cfg["model"],
-            "messages": [
-                {"role": "system", "content": cfg["system_prompt"]},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "think": False,  # <-- Thinking deaktivieren
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": temperature,
-            },
-        }
-    else:
-        # OpenAI-kompatible API (llama.cpp)
-        payload = {
-            "model": cfg["model"],
-            "messages": [
-                {"role": "system", "content": cfg["system_prompt"]},
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "chat_template_kwargs": {"enable_thinking": False},
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {cfg['api_key']}",
-        }
+    payload = {
+        "model": cfg["model"],
+        "messages": [
+            {"role": "system", "content": cfg["system_prompt"]},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {cfg['api_key']}",
+    }
 
     try:
-        if model == "qwen":
-            r = requests.post(cfg["url"], json=payload, timeout=300)
-        else:
-            r = requests.post(cfg["url"], json=payload, headers=headers, timeout=300)
+        r = requests.post(cfg["url"], json=payload, headers=headers, timeout=300)
         r.raise_for_status()
         data = r.json()
     except requests.exceptions.ConnectionError:
@@ -144,33 +109,19 @@ def query_model(
     except Exception as e:
         return f"❌ Fehler: {e}"
 
-    # Antwort extrahieren — aus dem richtigen Feld!
-    if model == "qwen":
-        msg = data.get("message", {})
-        content = msg.get("content", "").strip()
-        # Ollama v1 API: reasoning statt content
-        thinking = msg.get("thinking", "").strip() or msg.get("reasoning", "").strip()
-    else:
-        choice = data.get("choices", [{}])[0]
-        msg = choice.get("message", {})
-        content = msg.get("content", "").strip()
-        thinking = msg.get("reasoning_content", "").strip()
+    # Antwort extrahieren (OpenAI-Format)
+    choice = data.get("choices", [{}])[0]
+    msg = choice.get("message", {})
+    content = msg.get("content", "").strip()
 
-    # ECHTE Antwort: content ODER thinking/reasoning
     if content:
         return content
-    elif thinking:
-        return thinking
-    else:
-        # Fallback: raw text aus choices
-        if model != "qwen":
-            raw = data.get("choices", [{}])[0].get("text", "")
-            if raw and raw.strip("* "):
-                return raw
-        return "⚠️ Keine Antwort (Tokens generiert, aber leer)"
+    # Fallback
+    raw = choice.get("text", "").strip()
+    return raw if raw else "⚠️ Leere Antwort"
 
 
-def research(query: str, mode: str = "deep_summary", model: str = "gemma4"):
+def research(query: str, mode: str = "deep_summary", model: str = "qwen"):
     """Führt eine Research-Anfrage aus."""
     template = RESEARCH_PROMPTS.get(mode, RESEARCH_PROMPTS["deep_summary"])
     prompt = template.format(query=query)
@@ -184,8 +135,7 @@ def research(query: str, mode: str = "deep_summary", model: str = "gemma4"):
     print(answer)
     print(f"{'─' * 60}")
 
-    # ⚠️ KEIN automatischer Vergleich! Nur 1 Modell passt in 8 GB VRAM.
-    # Zum Vergleich: manuell mit --model qwen bzw. --model gemma4 starten.
+    # Nur Qwen3.5-Uncensored als Primary-Modell (ADR-017).
     return answer
 
 
@@ -195,7 +145,7 @@ def research(query: str, mode: str = "deep_summary", model: str = "gemma4"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Unzensierte Research-Anfragen mit Qwen + Gemma4"
+        description="Unzensierte Research-Anfragen mit Qwen3.5"
     )
     parser.add_argument(
         "query", nargs="*", help="Research-Frage (wenn leer: interaktiv)"
@@ -203,9 +153,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         "-m",
-        choices=["gemma4", "qwen"],
-        default="gemma4",
-        help="Modell (default: gemma4)",
+        choices=["qwen"],
+        default="qwen",
+        help="Modell (default: qwen)",
     )
     parser.add_argument(
         "--mode",
@@ -238,7 +188,7 @@ if __name__ == "__main__":
         print("🔬 Unzensierte Research-Console")
         print(f"   Modell: {MODELS[args.model]['name']}")
         print(f"   Modi: {', '.join(RESEARCH_PROMPTS.keys())}")
-        print("   'exit' zum Beenden, 'model qwen'/'model gemma4' zum Wechseln")
+        print("   'exit' zum Beenden, 'model qwen' zum Wechseln")
         print()
 
         current_model = args.model
@@ -256,7 +206,7 @@ if __name__ == "__main__":
                 if new_model in MODELS:
                     print("   ⚠️  Nur 1 Modell passt in 8 GB VRAM!")
                     print("   Stoppe vorher: pkill -f llama-server ODER ollama serve")
-                    print("   Starte: serve_gemma4_obliterated.sh ODER ollama serve")
+                    print("   Starte: serve_qwen3.5_uncensored.sh")
                     current_model = new_model
                     print(f"   → Gewählt: {MODELS[current_model]['name']}")
                 continue
