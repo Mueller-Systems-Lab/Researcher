@@ -186,14 +186,25 @@ def _check_gemma4_precision_trap() -> tuple[bool, str]:
         )
         for line in result.stdout.splitlines():
             if "llama-server" in line and "gemma4" in line.lower():
-                if "-ctk f32" in line and "-ctv f32" in line:
-                    return (True, "Precision-Trap-Flags gefunden (-ctk f32 -ctv f32)")
+                flags_ok = True
+                msgs = []
+                if "-ctk f32" not in line or "-ctv f32" not in line:
+                    flags_ok = False
+                    msgs.append("Fehlen -ctk f32 -ctv f32 (Precision Trap)")
+                if "--reasoning off" not in line:
+                    flags_ok = False
+                    msgs.append("Fehlt --reasoning off (Gemma 4 Thinking)")
+                if flags_ok:
+                    return (
+                        True,
+                        "Alle Flags gefunden (-ctk f32 -ctv f32, --reasoning off)",
+                    )
                 else:
                     return (
                         False,
-                        "WARNUNG: Gemma 4 ohne Precision-Trap-Flags! "
-                        "Fehlen -ctk f32 -ctv f32 → garbled Output auf Pascal-GPUs. "
-                        "Siehe ADR-016 und serve_gemma4_obliterated_researcher.sh",
+                        "WARNUNG: Gemma 4 ohne kritische Flags! "
+                        + "; ".join(msgs)
+                        + ". Siehe serve_gemma4_obliterated_researcher.sh",
                     )
         # Kein Gemma-4-Prozess gefunden → kein Precision-Trap-Risiko
         return (True, "Kein Gemma-4-Prozess aktiv (keine Prüfung nötig)")

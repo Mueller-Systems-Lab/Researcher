@@ -9,6 +9,8 @@
 #   --n-gpu-layers 999  → Alle 42 Layers auf GPU
 #   -np 1               → Single Sequence (VRAM sparen)
 #   --threads 8         → Ryzen 7 5700G physische Kerne
+#   --reasoning off     → Gemma-4-Thinking deaktivieren (sonst reasoning_content statt content)
+#   + API: chat_template_kwargs={"enable_thinking":false} als Fallback
 # ============================================================================
 
 MODEL_PATH="/home/xxammaxx/Schreibtisch/gemma4/llama.cpp/models/gemma-4-E4B-it-OBLITERATED-Q4_K_M.gguf"
@@ -36,4 +38,5 @@ exec $SERVER_PATH \
   --host 127.0.0.1 \
   --port 8081 \
   -c 8192 \
+  --reasoning off \
   "$@"

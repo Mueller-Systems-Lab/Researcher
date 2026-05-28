@@ -172,6 +172,11 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
     """Erzeugt eine Zusammenfassung via llama-server (Gemma 4, ADR-016).
 
     Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
+
+    Optimierte Parameter aus OBLITERATUS Model-Card-Sweep:
+      - temperature 0.7, top_p 0.9, top_k 40
+      - repeat_penalty 1.1 (20% Repetition-Loops lt. Model-Card)
+      + reasoning via llama-server Flag --reasoning off deaktiviert
     """
     if not sources:
         return "Keine Quellen verfügbar."
@@ -186,16 +191,18 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
                 "messages": [
                     {
                         "role": "system",
-                        "content": (
-                            "Antworte direkt und sachlich auf Deutsch. "
-                            "Keine Gedankenkette, keine Aufzählung, "
-                            "keine Metakommentare."
-                        ),
+                        "content": "Antworte direkt auf Deutsch. Keine Gedankenkette.",
                     },
                     {"role": "user", "content": prompt},
                 ],
-                "max_tokens": 250,
-                "temperature": 0.1,
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "top_k": 40,
+                "repeat_penalty": 1.1,
+                "repeat_last_n": 128,
+                "min_p": 0.05,
+                "max_tokens": 256,
+                "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=(5, 120),
         )
