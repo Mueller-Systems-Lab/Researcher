@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Minimaler Research-Happy-Path: SearXNG → Ollama → Report.
+"""Minimaler Research-Happy-Path: SearXNG → Gemma 4 (llama-server) → Report.
 
 Nutzung:
-    python3 scripts/research_happy_path.py           # Standard
-    python3 scripts/research_happy_path.py --strict  # Alle Dienste Pflicht
-    python3 scripts/research_happy_path.py --query "What is local search?"
+    python3 scripts/research_happy_path.py                    # Standard
+    python3 scripts/research_happy_path.py --strict           # Alle Dienste Pflicht
+    python3 scripts/research_happy_path.py --query "Frage"    # Eigene Query
+
+Primärer Chat-Pfad: Gemma 4 via llama-server (OPENAIS_BASE_URL, Port 8081).
+Fallback: Ollama (OLLAMA_CHAT_MODEL) wenn llama-server nicht verfügbar.
 
 Voraussetzungen (Standard):
     - SearXNG läuft (optional, wird geprüft)
-    - Ollama läuft (optional, wird geprüft)
+    - llama-server oder Ollama (optional, wird geprüft)
     - Keine Cloud-Provider aktiv
 
 Exit-Codes:
@@ -40,6 +43,11 @@ _ollama_config = load_ollama_model_config()
 OLLAMA_URL = _ollama_config.base_url
 OLLAMA_CHAT_MODEL = _ollama_config.chat_model
 REQUEST_TIMEOUT = (5, 30)
+
+# llama-server (Gemma 4) — primärer Chat-Pfad (ADR-016)
+LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8081/v1")
+LLAMA_CHAT_URL = f"{LLAMA_SERVER_URL.rstrip('/')}/chat/completions"
+LLAMA_CHAT_MODEL = os.getenv("LLM_CHAT_MODEL", "gemma4-obliterated")
 
 # Harmlose Default-Query
 DEFAULT_QUERY = "What is a search engine?"
@@ -145,22 +153,98 @@ def search_searxng(query: str) -> list[dict]:
         return []
 
 
+def _build_summary_prompt(query: str, sources: list[dict]) -> str:
+    """Baut einen Prompt für die Zusammenfassung der Suchergebnisse."""
+    if not sources:
+        return "Keine Quellen verfügbar."
+    source_text = "\n".join(
+        f"- {s.get('title', '')}: {s.get('content', '')[:250]}"
+        for i, s in enumerate(sources)
+    )
+    return (
+        f"Basierend auf diesen Quellen:\n{source_text}\n\n"
+        f"Antworte auf die Frage: {query}\n\n"
+        f"3-5 Sätze, sachlich, keine Gedankenkette."
+    )
+
+
+def summarize_with_llama(query: str, sources: list[dict]) -> str:
+    """Erzeugt eine Zusammenfassung via llama-server (Gemma 4, ADR-016).
+
+    Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
+    """
+    if not sources:
+        return "Keine Quellen verfügbar."
+
+    prompt = _build_summary_prompt(query, sources)
+
+    try:
+        r = requests.post(
+            LLAMA_CHAT_URL,
+            json={
+                "model": LLAMA_CHAT_MODEL,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Antworte direkt und sachlich auf Deutsch. "
+                            "Keine Gedankenkette, keine Aufzählung, "
+                            "keine Metakommentare."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 250,
+                "temperature": 0.1,
+            },
+            timeout=(5, 120),
+        )
+        r.raise_for_status()
+        data = r.json()
+        summary = (
+            data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        )
+        # Fallback: reasoning_content falls content leer ist
+        if not summary:
+            summary = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("reasoning_content", "")
+                .strip()
+            )
+        # Heuristik: Garbled-Output erkennen (Wiederholungen, zu kurz, Metakommentare)
+        import re
+
+        if summary and (
+            len(summary) < 20
+            or re.search(r"(\d+ seconds?\b.*){5,}", summary, re.IGNORECASE)
+            or re.search(
+                r"(process|step|minute|second).*(process|step|minute|second).*",
+                summary[:50],
+                re.IGNORECASE,
+            )
+        ):
+            print(f"   ⚠️  Gemma 4: Garbled-Output erkannt ({len(summary)} chars)")
+            return ""
+
+        print(f"   Gemma 4: {len(summary)} chars summary")
+        return summary[:1500]
+    except requests.ConnectionError:
+        print(f"   ⚠️  llama-server nicht erreichbar ({LLAMA_CHAT_URL})")
+        return ""
+    except Exception as e:
+        print(f"   ⚠️  llama-server Fehler: {e}")
+        return ""
+
+
 def summarize_with_ollama(query: str, sources: list[dict], model_name: str) -> str:
-    """Erzeugt eine kurze Zusammenfassung via Ollama."""
+    """Erzeugt eine kurze Zusammenfassung via Ollama (Fallback)."""
     if not sources:
         return "Keine Quellen verfügbar."
     if not model_name:
         return "[No chat model available — no summary generated]"
 
-    # Baue Prompt
-    source_text = "\n\n".join(
-        f"Source {i + 1}: {s.get('title', '')}\n{s.get('content', '')[:300]}"
-        for i, s in enumerate(sources)
-    )
-    prompt = (
-        f"Summarize the following search results about '{query}' "
-        f"in 3-5 sentences. Be factual and concise.\n\n{source_text}"
-    )
+    prompt = _build_summary_prompt(query, sources)
 
     try:
         r = requests.post(
@@ -181,7 +265,7 @@ def summarize_with_ollama(query: str, sources: list[dict], model_name: str) -> s
 
         summary = re.sub(r"<think>.*?</think>", "", summary, flags=re.DOTALL).strip()
         print(f"   Ollama: {len(summary)} chars summary")
-        return summary[:1000]  # Truncate to 1000 chars
+        return summary[:1000]
     except requests.ConnectionError:
         print(f"   ⚠️  Ollama nicht erreichbar ({OLLAMA_URL})")
         return "[Ollama not available — no summary generated]"
@@ -226,9 +310,9 @@ def write_report(
         f.write(f"| Cloud Providers Active | {str(cloud_active).lower()} |\n")
         f.write(f"| SearXNG URL | {SEARXNG_URL} |\n")
         f.write(f"| SearXNG Result Count | {len(sources)} |\n")
-        f.write(f"| Ollama Chat Model Requested | `{OLLAMA_CHAT_MODEL}` |\n")
+        f.write(f"| Primary Chat Model | `{LLAMA_CHAT_MODEL}` (llama-server) |\n")
         f.write(f"| Ollama Chat Model Used | `{model_used or 'none'}` |\n")
-        f.write(f"| Ollama Embedding Model | `{embed_model}` |\n")
+        f.write(f"| Embedding Model | `{embed_model}` |\n")
         f.write(
             f"| Model Fallback Used | {str(model_status == 'fallback').lower()} |\n"
         )
@@ -320,19 +404,25 @@ def main() -> None:
         print("   ⚠️  Keine SearXNG-Ergebnisse — Report ohne Quellen")
     print()
 
-    # 4. Ollama Summary
-    print("🦙 Summarizing...")
-    model_name, model_status = resolve_chat_model_local()
-    summary = summarize_with_ollama(args.query, sources, model_name)
+    # 4. Summary — primär via llama-server (Gemma 4), Fallback Ollama
+    print("🧠 Summarizing (Gemma 4 via llama-server)...")
+    summary = summarize_with_llama(args.query, sources)
+    model_name = LLAMA_CHAT_MODEL
+    model_status = "ok" if summary else "missing"
+
+    if not summary:
+        # Fallback: Ollama
+        print("   ⚠️  llama-server nicht verfügbar — versuche Ollama...")
+        ollama_model, model_status = resolve_chat_model_local()
+        summary = summarize_with_ollama(args.query, sources, ollama_model)
+        if ollama_model:
+            model_name = ollama_model
+
     if model_status == "missing" and args.strict:
         print("❌ Strict-Mode: Chat-Modell muss verfügbar sein")
         sys.exit(1)
-    elif model_status == "missing":
+    elif not summary:
         print("   ⚠️  Kein Chat-Modell — Report ohne Summary")
-    elif model_status == "fallback":
-        print(
-            "   ⚠️  Fallback-Modell verwendet (setze ALLOW_OLLAMA_MODEL_FALLBACK=true)"
-        )
     print()
 
     # 5. Write Report
@@ -342,7 +432,7 @@ def main() -> None:
         sources,
         summary,
         args.output,
-        model_requested=OLLAMA_CHAT_MODEL,
+        model_requested=LLAMA_CHAT_MODEL,
         model_used=model_name,
         model_status=model_status,
         degraded=(model_status == "missing" or model_status == "fallback"),
