@@ -136,6 +136,7 @@ def check_generation(
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 50,
                 "temperature": 0.0,
+                "chat_template_kwargs": {"enable_thinking": False},
             }
         ).encode("utf-8")
 

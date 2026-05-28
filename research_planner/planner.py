@@ -164,6 +164,7 @@ def _llm_plan(
                 ],
                 "temperature": 0.3,
                 "max_tokens": 1024,
+                "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=timeout,
         )

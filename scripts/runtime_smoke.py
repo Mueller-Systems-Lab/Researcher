@@ -260,6 +260,7 @@ def check_llama_server() -> bool:
                     "messages": [{"role": "user", "content": "OK"}],
                     "max_tokens": 4,
                     "temperature": 0.01,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 },
                 timeout=(5, 15),
             )
