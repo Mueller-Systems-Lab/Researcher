@@ -284,9 +284,13 @@ def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
         }
     )
 
-    # Aktuelle Quellen
+    # Alle Quellen einbinden (bis zu 5)
+    # Bevorzugt gescrapte Volltexte, Fallback auf Such-Snippets
     source_text = "\n\n".join(
-        f"QUELLE {i + 1}: {s.get('title', '')}\n{s.get('content', '')[:1500]}"
+        (
+            f"QUELLE {i + 1}: {s.get('title', '')}\n"
+            f"{s.get('content', '') or s.get('snippet', '')[:1200]}"
+        )
         for i, s in enumerate(sources)
     )
     messages.append(
@@ -533,23 +537,19 @@ def main() -> None:
     elif not sources:
         print("   ⚠️  Keine SearXNG-Ergebnisse — Report ohne Quellen")
     else:
-        # Top-Quellen scrapen + Relevanz prüfen
-        print("   📄 Scrape + Filter Top-Quellen...")
-        relevant_sources = []
-        for src in sources[:4]:
+        # Alle Quellen scrapen (max 5)
+        print("   📄 Scrape alle Quellen...")
+        scraped_count = 0
+        for src in sources[:5]:
             url = src.get("url", "")
             if not url:
                 continue
             full_text = scrape_url(url)
             if full_text:
                 src["content"] = full_text
-                if _is_relevant(full_text, args.query):
-                    relevant_sources.append(src)
-                    print(f"   ✅ {url[:55]}... ({len(full_text)} chars)")
-                else:
-                    print(f"   ⏭️  Nicht relevant: {url[:55]}...")
-        sources[:] = relevant_sources[:3]
-        print(f"   → {len(sources)} relevante Quellen")
+                scraped_count += 1
+                print(f"   ✅ {url[:55]}... ({len(full_text)} chars)")
+        print(f"   → {scraped_count} Quellen gescrapt, {len(sources)} gesamt")
     print()
 
     # 4. Summary — primär via llama-server (Gemma 4), Fallback Ollama
