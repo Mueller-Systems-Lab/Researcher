@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- **Qwen3.5-Uncensored-HauhauCS als Co-Primary-Modell** via llama-server (Port 8082)
+- **Scraper-Hardening**: SSL-Fallback dokumentiert
+
+### Changed
+- Gemma 4 und Qwen3.5 parallel betreibbar (getrennte llama-server-Ports)
+- `serve_qwen3.5_uncensored.sh` als Qwen3.5-Startpfad dokumentiert
+
 ## [v0.2.0] — 2026-05-28
 ### Added
 - **Gemma 4 als primäres Chat-Modell** (ADR-016): Precision-Trap-Check in runtime_smoke, Deprecation-Warnung für qwen3.5:9b

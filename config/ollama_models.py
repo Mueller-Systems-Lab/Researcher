@@ -4,8 +4,9 @@
 # Zentrales Modul für Ollama-Modellkonfiguration und Modellauflösung.
 # Trennt strikt Chat-/Summary- und Embedding-Modellrollen.
 #
-# WICHTIG (ADR-016): Primäres Chat-Modell ist Gemma 4 OBLITERATED via
-# llama-server (Port 8081, alias gemma4-obliterated).
+# WICHTIG (ADR-016, ADR-017): Co-Primary Chat-Modelle via llama-server:
+# - Gemma 4 OBLITERATED (Port 8081, alias gemma4-obliterated, ~3.8 GB VRAM)
+# - Qwen3.5-Uncensored-HauhauCS (Port 8082, alias qwen3.5-uncensored, 45 tok/s)
 # OLLAMA_CHAT_MODEL ist NUR der Fallback-Pfad, wenn INFERENCE_BACKEND=ollama
 # gesetzt ist. Siehe .env.example: FAST_LLM=openai:gemma4-obliterated.
 #
@@ -56,15 +57,17 @@ class OllamaModelConfig:
     embedding_model: str
     allow_model_fallback: bool = False
 
-    # Defaults aus .env.example / docs/llm/model-inventory.md / ADR-016
-    # PRIMARY Chat-Modell: Gemma 4 OBLITERATED via llama-server
+    # Defaults aus .env.example / docs/llm/model-inventory.md / ADR-016 / ADR-017
+    # Co-Primary Chat-Modelle via llama-server:
+    #   - Gemma 4 OBLITERATED: Port 8081, alias gemma4-obliterated (~3.8 GB)
+    #   - Qwen3.5-Uncensored-HauhauCS: Port 8082, alias qwen3.5-uncensored (45 tok/s)
     #   FAST_LLM=openai:gemma4-obliterated (siehe .env.example)
-    #   Port 8081, alias gemma4-obliterated
     # OLLAMA_CHAT_MODEL ist NUR der Fallback für den Ollama-Chat-Pfad,
     #       wenn INFERENCE_BACKEND=ollama gesetzt ist.
-    # DEFAULT 'qwen3.5:9b': deprecated seit ADR-016. qwen3.5 ist auf GTX 1070
-    #       hardware-blockiert (Pascal FP16-Precision-Trap).
-    #       Siehe docs/adr/ADR-016-gemma4-chat-model.md
+    # DEFAULT 'qwen3.5:9b': deprecated seit ADR-016 (Ollama-qwen3.5-Pfad).
+    #       Der neue Qwen3.5-Uncensored-HauhauCS via llama.cpp (Port 8082) ist
+    #       davon NICHT betroffen — siehe ADR-017.
+    #       Siehe docs/adr/ADR-017-qwen3.5-co-primary-model.md
     _DEFAULT_BASE_URL: ClassVar[str] = "http://localhost:11434"
     _DEFAULT_CHAT_MODEL: ClassVar[str] = "qwen3.5:9b"  # DEPRECATED (ADR-016)
     _DEFAULT_EMBEDDING_MODEL: ClassVar[str] = "nomic-embed-text:latest"
@@ -246,9 +249,12 @@ def validate_model_roles(config: OllamaModelConfig) -> list[str]:
     elif config.chat_model == "qwen3.5:9b":
         errors.append(
             "OLLAMA_CHAT_MODEL='qwen3.5:9b' ist DEPRECATED (ADR-016). "
-            "qwen3.5 ist auf GTX 1070 hardware-blockiert "
-            "(Pascal FP16-Precision-Trap). Primäres Chat-Modell ist "
-            "Gemma 4 via llama-server (FAST_LLM=openai:gemma4-obliterated). "
+            "Der alte Ollama-qwen3.5-Pfad ist auf GTX 1070 hardware-blockiert "
+            "(Pascal FP16-Precision-Trap, Ollama-CGO-Bug). "
+            "Der neue Qwen3.5-Uncensored-HauhauCS via llama.cpp (Port 8082, "
+            "45 tok/s) ist davon NICHT betroffen — siehe ADR-017. "
+            "Co-Primary Chat-Modelle sind Gemma 4 und Qwen3.5-Uncensored "
+            "(FAST_LLM=openai:gemma4-obliterated). "
             "Setze OLLAMA_CHAT_MODEL auf ein alternatives Chat-Modell "
             "oder ignoriere die Warnung bei INFERENCE_BACKEND=ollama."
         )

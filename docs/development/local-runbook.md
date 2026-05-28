@@ -22,6 +22,16 @@ Das Chat-/Summary-Modell. Läuft eigenständig via llama.cpp, **unabhängig von 
 # VRAM: ~3.8 GB von 8 GB
 ```
 
+### Qwen3.5 Uncensored Chat-/Extraction-Server (Port 8082)
+Das Co-Primary-Modell für schnelle Extraktion (45 tok/s) und strukturierte Ausgaben. Läuft ebenfalls eigenständig via llama.cpp.
+
+```bash
+./serve_qwen3.5_uncensored.sh
+# http://127.0.0.1:8082
+# Alias im Server: qwen3.5-uncensored
+# Fokus: Chat/Extraction, Scraping
+```
+
 ### GPT Researcher Backend (Port 8000)
 ```bash
 python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 --app-dir gpt_researcher
@@ -43,10 +53,13 @@ NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0
 | Dienst | Port | Status | Zweck |
 |--------|------|--------|-------|
 | llama-server (Gemma 4) | 8081 | ✅ | Chat/Summary (llama.cpp, eigenständig) |
+| llama-server (Qwen3.5) | 8082 | ✅ | Chat/Extraction (≈45 tok/s, llama.cpp, eigenständig) |
 | Ollama | 11434 | ✅ | Nur noch für Embedding (nomic-embed-text) |
 | SearXNG (Suche) | 8080 | ✅ | Metasuchmaschine |
 | Tor (Proxy) | 9050 | ✅ | Darknet-Zugriff (optional) |
 | ChromaDB | — | ✅ | Vektordatenbank |
+
+Gemma 4 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgabe wird das passende Modell gestartet.
 
 ## Modelle
 
@@ -57,11 +70,16 @@ ollama list | grep nomic-embed-text
 # Chat (via llama-server, unabhängig von Ollama):
 # Läuft als eigener Prozess: ./serve_gemma4_obliterated_researcher.sh
 # Port 8081, Alias: gemma4-obliterated
+
+# Extraction/Chat (via llama-server, unabhängig von Ollama):
+# Läuft als eigener Prozess: ./serve_qwen3.5_uncensored.sh
+# Port 8082, Alias: qwen3.5-uncensored
 ```
 
 | Modell | Typ | Backend | Größe | Status |
 |--------|-----|---------|-------|--------|
 | gemma4-obliterated | Chat/Summary | llama-server (Port 8081) | ~3.8 GB VRAM | ✅ Stabil |
+| qwen3.5-uncensored | Chat/Extraction | llama-server (Port 8082) | ~5.3 GB VRAM | ✅ Co-Primary |
 | nomic-embed-text | Embedding | Ollama (Port 11434) | 274 MB | ✅ Stabil |
 
 ### Historisch (ersetzt)
