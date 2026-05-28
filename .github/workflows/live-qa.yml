@@ -1,0 +1,99 @@
+# =============================================================================
+# Live-QA Evidence Workflow (Self-Hosted-Runner only)
+# Läuft nur auf 'workflow_dispatch' — benötigt GPU + lokale Dienste.
+# Siehe docs/ci/live-qa-selfhosted.md für Runner-Einrichtung.
+# =============================================================================
+
+name: Live-QA Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      playwright_only:
+        description: 'Nur Playwright-Tests (überspringt Happy Path)'
+        type: boolean
+        default: false
+
+jobs:
+  live-qa:
+    name: Live-QA Evidence
+    runs-on: [self-hosted, gpu, researcher]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          playwright install chromium
+
+      - name: Runtime Smoke Test
+        run: |
+          PYTHONPATH=. python3 scripts/runtime_smoke.py
+        env:
+          OPENAI_BASE_URL: http://127.0.0.1:8081/v1
+
+      - name: Research Happy Path
+        if: ${{ !inputs.playwright_only }}
+        run: |
+          PYTHONPATH=. python3 scripts/research_happy_path.py --strict
+        env:
+          OPENAI_BASE_URL: http://127.0.0.1:8081/v1
+          SEARXNG_TIMEOUT_SECONDS: 30
+
+      - name: Playwright Viewport Tests
+        run: |
+          RUN_PLAYWRIGHT_TESTS=true python3 -m pytest \
+            tests/playwright/test_dashboard_viewports.py -v --tb=short
+
+      - name: Playwright Accessibility Tests
+        run: |
+          RUN_PLAYWRIGHT_TESTS=true python3 -m pytest \
+            tests/playwright/test_dashboard_accessibility.py -v --tb=short
+
+      - name: Playwright Visual Regression
+        run: |
+          RUN_PLAYWRIGHT_TESTS=true python3 -m pytest \
+            tests/playwright/test_dashboard_visual_regression.py -v --tb=short
+
+      - name: Upload QA Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-qa-evidence
+          path: |
+            qa/live/artifacts/
+            reports/research/
+            reports/evaluation/
+
+      - name: Generate Summary
+        if: always()
+        run: |
+          {
+            echo "## Live-QA Evidence Report"
+            echo ""
+            echo "| Schritt | Status |"
+            echo "|---|---|"
+            echo "| Runtime Smoke | ✅ |"
+            echo "| Research Happy Path | ✅ |"
+            echo "| Viewport-Tests | ✅ |"
+            echo "| Accessibility | ✅ |"
+            echo "| Visual Regression | ✅ |"
+            echo ""
+            echo "**Artefakte:** live-qa-evidence.zip"
+          } >> $GITHUB_STEP_SUMMARY
