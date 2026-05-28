@@ -210,16 +210,29 @@ class WebFetchTool(MCPToolBase):
             error=f"HTTP-Fehler {status_code}: {message} — {url}",
         ).to_dict()
 
-    def _validate_redirect_chain(self, response) -> str | None:
-        """Validiert SSRF-Schutz für alle Redirects in der Response-Kette.
+    def _validate_redirect_chain(self, response, original_url: str) -> str | None:
+        """Validiert SSRF-Schutz für alle Redirects und das finale Ziel.
+
+        Args:
+            response: requests.Response nach dem Fetch.
+            original_url: Die ursprünglich angeforderte URL.
 
         Returns:
-            Fehlerstring wenn eine Redirect-URL blockiert wird, sonst None.
+            Fehlerstring wenn eine Redirect-URL oder das finale Ziel
+            blockiert wird, sonst None.
         """
         for redirect_resp in response.history:
             ssrf_error = self._validate_url_target(redirect_resp.url)
             if ssrf_error:
                 return f"SSRF blockiert nach Redirect: {ssrf_error}"
+
+        # Auch das finale Ziel validieren, wenn es vom Original abweicht
+        final_url = response.url
+        if final_url != original_url and isinstance(final_url, str):
+            ssrf_error = self._validate_url_target(final_url)
+            if ssrf_error:
+                return f"SSRF blockiert: Final-URL {final_url} ist nicht erlaubt"
+
         return None
 
     def _check_js_only(self, response, url: str) -> dict | None:
@@ -340,7 +353,7 @@ class WebFetchTool(MCPToolBase):
             response = self._fetch_with_resilience(url)
 
             # SSRF-Redirect-Revalidation
-            ssrf_error = self._validate_redirect_chain(response)
+            ssrf_error = self._validate_redirect_chain(response, url)
             if ssrf_error:
                 return MCPToolResult(False, error=ssrf_error).to_dict()
 
@@ -363,7 +376,7 @@ class WebFetchTool(MCPToolBase):
                 response.raise_for_status()
                 logger.info("SSL-Fallback erfolgreich für %s", url)
 
-                ssrf_error = self._validate_redirect_chain(response)
+                ssrf_error = self._validate_redirect_chain(response, url)
                 if ssrf_error:
                     return MCPToolResult(False, error=ssrf_error).to_dict()
 
