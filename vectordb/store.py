@@ -13,8 +13,15 @@
 
 import logging
 import os
+import sqlite3
+import threading
+import time
 
 logger = logging.getLogger(__name__)
+
+# Retry-Parameter für "database is locked"-Fehler (ADR-016 Resilience-Pattern)
+_MAX_RETRIES = 3
+_BASE_BACKOFF_SECONDS = 0.1  # 0.1s → 0.2s → 0.4s
 
 
 class VectorStore:
@@ -38,6 +45,7 @@ class VectorStore:
         )
         self._collection = None
         self._client = None
+        self._lock = threading.RLock()
         self.last_error: str | None = None
 
     @property
@@ -46,43 +54,79 @@ class VectorStore:
         return self._get_collection() is not None
 
     def _get_client(self):
-        """Lazy-Initialisierung des ChromaDB-Clients."""
+        """Lazy-Initialisierung des ChromaDB-Clients (thread-safe)."""
         if self._client is None:
-            try:
-                import chromadb
+            with self._lock:
+                if self._client is not None:
+                    return self._client
+                try:
+                    import chromadb
 
-                self._client = chromadb.PersistentClient(path=self.persist_directory)
-                logger.info(f"ChromaDB verbunden: {self.persist_directory}")
-            except ImportError:
-                self.last_error = "chromadb nicht installiert"
-                logger.warning(
-                    "chromadb nicht installiert. Installiere: pip install chromadb"
-                )
-                return None
-            except Exception as e:
-                self.last_error = f"ChromaDB nicht verfügbar: {e}"
-                logger.warning(
-                    f"ChromaDB nicht verfügbar: {e}. Betrieb ohne Vektorspeicherung."
-                )
-                return None
+                    self._client = chromadb.PersistentClient(
+                        path=self.persist_directory
+                    )
+                    logger.info(f"ChromaDB verbunden: {self.persist_directory}")
+                except ImportError:
+                    self.last_error = "chromadb nicht installiert"
+                    logger.warning(
+                        "chromadb nicht installiert. Installiere: pip install chromadb"
+                    )
+                    return None
+                except Exception as e:
+                    self.last_error = f"ChromaDB nicht verfügbar: {e}"
+                    logger.warning(
+                        f"ChromaDB nicht verfügbar: {e}. "
+                        "Betrieb ohne Vektorspeicherung."
+                    )
+                    return None
         return self._client
 
     def _get_collection(self):
-        """Lazy-Initialisierung der ChromaDB-Collection."""
+        """Lazy-Initialisierung der ChromaDB-Collection (thread-safe)."""
         if self._collection is None:
-            client = self._get_client()
-            if client is None:
-                return None
-            try:
-                self._collection = client.get_or_create_collection(
-                    name=self.collection_name
-                )
-                logger.info(f"Collection '{self.collection_name}' bereit")
-            except Exception as e:
-                self.last_error = f"Collection-Fehler: {e}"
-                logger.warning(f"Collection-Fehler: {e}")
-                return None
+            with self._lock:
+                if self._collection is not None:
+                    return self._collection
+                client = self._get_client()
+                if client is None:
+                    return None
+                try:
+                    self._collection = client.get_or_create_collection(
+                        name=self.collection_name
+                    )
+                    logger.info(f"Collection '{self.collection_name}' bereit")
+                except Exception as e:
+                    self.last_error = f"Collection-Fehler: {e}"
+                    logger.warning(f"Collection-Fehler: {e}")
+                    return None
         return self._collection
+
+    def _execute_with_retry(self, operation: str, fn, *args, **kwargs):
+        """Führt fn(*args, **kwargs) mit Retry bei 'database is locked' aus.
+
+        Exponentielles Backoff: 0.1s → 0.2s → 0.4s.
+        Gibt das fn-Ergebnis zurück oder raised den letzten Fehler.
+        """
+        last_error = None
+        for attempt in range(1, _MAX_RETRIES + 1):
+            try:
+                return fn(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if "database is locked" not in str(e):
+                    raise
+                last_error = e
+                if attempt < _MAX_RETRIES:
+                    backoff = _BASE_BACKOFF_SECONDS * (2 ** (attempt - 1))
+                    logger.warning(
+                        "ChromaDB %s: database locked (attempt %d/%d), backoff %.2fs",
+                        operation,
+                        attempt,
+                        _MAX_RETRIES,
+                        backoff,
+                    )
+                    time.sleep(backoff)
+        if last_error:
+            raise last_error
 
     def add(
         self,
@@ -91,7 +135,7 @@ class VectorStore:
         metadatas: list[dict] | None = None,
         ids: list[str] | None = None,
     ) -> bool:
-        """Fügt Dokumente mit Embeddings hinzu.
+        """Fügt Dokumente mit Embeddings hinzu (thread-safe mit Retry).
 
         Args:
             documents: Liste von Textdokumenten.
@@ -107,18 +151,28 @@ class VectorStore:
             logger.warning("ChromaDB nicht verfügbar — Dokument nicht gespeichert")
             return False
 
-        try:
-            import uuid
+        import uuid
 
-            doc_ids = ids or [str(uuid.uuid4()) for _ in documents]
-            collection.add(
-                documents=documents,
-                embeddings=embeddings,
-                metadatas=metadatas or [{}] * len(documents),
-                ids=doc_ids,
-            )
+        doc_ids = ids or [str(uuid.uuid4()) for _ in documents]
+        meta = metadatas or [{}] * len(documents)
+
+        try:
+            with self._lock:
+                self._execute_with_retry(
+                    "add",
+                    collection.add,
+                    documents=documents,
+                    embeddings=embeddings,
+                    metadatas=meta,
+                    ids=doc_ids,
+                )
             logger.debug(f"{len(documents)} Dokumente zu ChromaDB hinzugefügt")
             return True
+        except sqlite3.OperationalError as e:
+            logger.warning(
+                f"ChromaDB-Add nach {_MAX_RETRIES} Retries fehlgeschlagen: {e}"
+            )
+            return False
         except Exception as e:
             logger.warning(f"Fehler beim ChromaDB-Add: {e}")
             return False
@@ -136,7 +190,7 @@ class VectorStore:
         return self.add(
             documents=[document],
             embeddings=[embedding],
-            metadatas=[metadata or {}],
+            metadatas=[metadata if metadata is not None else {"_source": "unknown"}],
             ids=[doc_id or str(uuid.uuid4())],
         )
 
@@ -176,11 +230,10 @@ class VectorStore:
             kwargs["where"] = where_filter
 
         try:
-            results = collection.query(**kwargs)
+            with self._lock:
+                results = self._execute_with_retry("query", collection.query, **kwargs)
             output = []
             if results.get("documents"):
-                # ChromaDB gibt pro Query-Embedding eine Ergebnisliste zurück.
-                # Da wir nur EIN Embedding senden, greifen wir auf Index [0] zu.
                 for i in range(len(results["documents"][0])):
                     output.append(
                         {
@@ -199,6 +252,10 @@ class VectorStore:
                         }
                     )
             return output
+        except sqlite3.OperationalError as e:
+            self.last_error = f"ChromaDB-Query nach Retries fehlgeschlagen: {e}"
+            logger.error(f"ChromaDB-Query: database locked nach {_MAX_RETRIES} Retries")
+            return []
         except Exception as e:
             self.last_error = f"ChromaDB-Query-Fehler: {e}"
             logger.error(f"Fehler bei ChromaDB-Query: {e}", exc_info=True)
@@ -206,31 +263,30 @@ class VectorStore:
 
     @property
     def count(self) -> int:
-        """Anzahl der Dokumente in der Collection.
+        """Anzahl der Dokumente in der Collection (thread-safe).
 
         Returns:
-            Anzahl der Dokumente, oder 0 wenn ChromaDB nicht verfügbar
-            (prüfe `available`-Property für Status).
+            Anzahl der Dokumente, oder 0 wenn ChromaDB nicht verfügbar.
         """
         collection = self._get_collection()
         if collection is None:
-            self.last_error = "ChromaDB nicht verfügbar — count=0"
-            logger.warning(f"ChromaDB-Count: nicht verfügbar ({self.last_error})")
             return 0
         try:
-            return collection.count()
+            with self._lock:
+                return collection.count()
         except Exception as e:
             self.last_error = f"ChromaDB-Count-Fehler: {e}"
             logger.error(f"Fehler bei ChromaDB-Count: {e}", exc_info=True)
             return 0
 
     def delete_collection(self):
-        """Löscht die gesamte Collection."""
+        """Löscht die gesamte Collection (thread-safe)."""
         client = self._get_client()
         if client is None:
             return
         try:
-            client.delete_collection(self.collection_name)
+            with self._lock:
+                client.delete_collection(self.collection_name)
             self._collection = None
             logger.info(f"Collection '{self.collection_name}' gelöscht")
         except Exception as e:
