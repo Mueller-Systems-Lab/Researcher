@@ -1,4 +1,4 @@
-# Known Limitations — v0.1.0-local-alpha
+# Known Limitations — v0.2.0
 
 ---
 

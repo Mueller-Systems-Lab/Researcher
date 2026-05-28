@@ -1,5 +1,35 @@
 # Changelog
 
+## [v0.2.0] — 2026-05-28
+### Added
+- **Gemma 4 als primäres Chat-Modell** (ADR-016): Precision-Trap-Check in runtime_smoke, Deprecation-Warnung für qwen3.5:9b
+- **UX-Heuristik-Prüfung**: Dashboard-Status-Legende (Grün/Gelb/Rot/Grau), UX-Review-Dokument (`docs/ux-heuristic-review.md`)
+- **Viewport-Matrix**: Desktop (1280×720), Tablet (768×1024), Mobile (375×812) mit Screenshot-Baselines
+- **Live-QA CI-Workflow**: `.github/workflows/live-qa.yml` für Self-Hosted-Runner mit GPU
+- **Positron-tested Badge** im README
+- **SearXNG-Config-Template**: `docs/searxng/settings.example.yml` mit secret_key-Dokumentation
+
+### Changed
+- pyproject.toml: 0.1.0 → **0.2.0**
+- `.gitignore`: `searxng/` auf Root-Verzeichnis begrenzt (`/searxng/`), docs/searxng/ jetzt trackbar
+- `config/ollama_models.py`: ADR-016-Docstring + validate_model_roles() warnt bei deprecated qwen3.5:9b
+- `config/services.py`: OLLAMA_CHAT_MODEL als deprecated markiert
+- `scripts/runtime_smoke.py`: Neue Precision-Trap-Validierung (`_check_gemma4_precision_trap()`)
+
+### Fixed
+- SearXNG-Container-Crash: `secret_key` in settings.yml ergänzt (muss pro Installation generiert werden)
+- `.gitignore`-Pattern: `searxng/` matchte auch `docs/searxng/` (jetzt `/searxng/`)
+
+### Documentation
+- `docs/ux-heuristic-review.md` — 10 Nielsen-Norman-Heuristiken geprüft
+- `docs/ci/live-qa-selfhosted.md` — Self-Hosted-Runner-Einrichtung
+- `docs/searxng/settings.example.yml` — Config-Vorlage
+- README: Positron-Badge ergänzt
+
+### Quality Gates
+- `make quality`: **721 passed**, 12 skipped, 3 xfailed (unverändert stabil)
+- E2E-Tests: ⚠️ 6 failed (Submodul `gpt_researcher`-Adapter-Kompatibilität)
+
 ## [v0.1.0-local-alpha] — 2026-05-27
 
 ### Added
