@@ -3,6 +3,7 @@
 [![CI](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml/badge.svg)](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml)
 [![Coverage](https://img.shields.io/badge/coverage-78%25-green)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
+[![Positron-tested](https://img.shields.io/badge/positron-tested-7B2FF5?logo=github)]()
 
 > **Current Status:** [v0.1.0-local-alpha](docs/release/v0.1.0-local-alpha.md)  
 > **Release:** [Changelog](CHANGELOG.md) · [Release Notes](docs/release/v0.1.0-local-alpha.md) · [Known Limitations](docs/release/known-limitations.md)
