@@ -17,8 +17,8 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-@patch("search.composite.requests.get")
-def test_composite_full_pipeline(mock_get):
+@patch("search.composite.create_session")
+def test_composite_full_pipeline(mock_create):
     """Integration: Komplette Composite-Pipeline mit beiden Backends."""
     from darknet_search.index import WhooshIndex
     from search.composite import CompositeRetriever
@@ -44,7 +44,9 @@ def test_composite_full_pipeline(mock_get):
         ]
     }
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     # Darknet-Index mit Daten
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -99,8 +101,8 @@ def test_composite_full_pipeline(mock_get):
                 del os.environ["DARKNET_ENABLED"]
 
 
-@patch("search.composite.requests.get")
-def test_composite_mixed_sources(mock_get):
+@patch("search.composite.create_session")
+def test_composite_mixed_sources(mock_create):
     """Integration: Gemischte Quellen und korrekte Sortierung."""
     from datetime import datetime
 
@@ -120,7 +122,9 @@ def test_composite_mixed_sources(mock_get):
         ]
     }
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     with tempfile.TemporaryDirectory() as tmpdir:
         idx = WhooshIndex(tmpdir)

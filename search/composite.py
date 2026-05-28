@@ -23,6 +23,7 @@ from urllib.parse import urljoin
 import requests
 
 from darknet_search.retriever import DarknetRetriever
+from scrapers.http_session import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class CompositeRetriever:
                 "categories": "general",
                 "pageno": 1,
             }
-            response = requests.get(search_url, params=params, timeout=15)
+            response = create_session().get(search_url, params=params, timeout=15)
             response.raise_for_status()
             data = response.json()
 

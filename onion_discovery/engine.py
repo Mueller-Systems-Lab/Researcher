@@ -36,6 +36,7 @@ from onion_discovery.human_review import ReviewQueue
 from onion_discovery.link_extractor import LinkExtractor
 from onion_discovery.policy_gateway import PolicyGateway
 from onion_discovery.seed_queue import SeedQueue
+from scrapers.http_session import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -115,23 +116,8 @@ class DiscoveryPipeline:
             return None
 
     def _create_session(self) -> requests.Session:
-        """Erstellt eine requests.Session mit Tor-Proxy."""
-        session = requests.Session()
-        session.proxies = {
-            "http": self.tor_proxy,
-            "https": self.tor_proxy,
-        }
-        session.headers.update(
-            {
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) "
-                    "Gecko/20100101 Firefox/128.0"
-                ),
-                "Accept": "text/html,application/xhtml+xml",
-            }
-        )
-        session.timeout = 30  # type: ignore[attr-defined]
-        return session
+        """Erstellt eine requests.Session mit Tor-Proxy (via http_session)."""
+        return create_session(proxy=self.tor_proxy)
 
     def enabled(self) -> bool:
         """Prüft, ob Onion Discovery aktiviert ist (ADR-006)."""

@@ -104,8 +104,10 @@ async def test_end_to_end_research_workflow(monkeypatch):
     ]
 
     monkeypatch.setenv("DARKNET_ENABLED", "true")
+    mock_session = MagicMock()
+    mock_session.get.return_value = searx_response
     with (
-        patch("search.composite.requests.get", return_value=searx_response),
+        patch("search.composite.create_session", return_value=mock_session),
         patch("search.composite.DarknetRetriever.search", return_value=darknet_result),
     ):
         retriever = CompositeRetriever(query, searx_url="http://searxng.mock")

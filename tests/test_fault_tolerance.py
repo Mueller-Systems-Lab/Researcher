@@ -12,20 +12,22 @@ import os
 import sys
 import tempfile
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-@patch("search.composite.requests.get")
-def test_fault_searxng_down_darknet_ok(mock_get):
+@patch("search.composite.create_session")
+def test_fault_searxng_down_darknet_ok(mock_create):
     """Fehlertoleranz: SearXNG down, Darknet OK → nur Darknet."""
     from requests.exceptions import ConnectionError
 
     from darknet_search.index import WhooshIndex
     from search.composite import CompositeRetriever
 
-    mock_get.side_effect = ConnectionError("SearXNG not reachable")
+    mock_session = MagicMock()
+    mock_session.get.side_effect = ConnectionError("SearXNG not reachable")
+    mock_create.return_value = mock_session
 
     with tempfile.TemporaryDirectory() as tmpdir:
         idx = WhooshIndex(tmpdir)
@@ -60,14 +62,16 @@ def test_fault_searxng_down_darknet_ok(mock_get):
                 del os.environ["DARKNET_ENABLED"]
 
 
-@patch("search.composite.requests.get")
-def test_fault_both_backends_down(mock_get):
+@patch("search.composite.create_session")
+def test_fault_both_backends_down(mock_create):
     """Fehlertoleranz: Beide Backends down → leere Liste (kein Fehler)."""
     from requests.exceptions import ConnectionError
 
     from search.composite import CompositeRetriever
 
-    mock_get.side_effect = ConnectionError("SearXNG not reachable")
+    mock_session = MagicMock()
+    mock_session.get.side_effect = ConnectionError("SearXNG not reachable")
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever(
         "test",
@@ -110,14 +114,16 @@ def test_fault_embedding_ollama_down():
         svc.embed("test")
 
 
-@patch("search.composite.requests.get")
-def test_fault_searxng_timeout(mock_get):
+@patch("search.composite.create_session")
+def test_fault_searxng_timeout(mock_create):
     """Fehlertoleranz: SearXNG timeout."""
     from requests.exceptions import Timeout
 
     from search.composite import CompositeRetriever
 
-    mock_get.side_effect = Timeout("SearXNG timed out")
+    mock_session = MagicMock()
+    mock_session.get.side_effect = Timeout("SearXNG timed out")
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever(
         "test",

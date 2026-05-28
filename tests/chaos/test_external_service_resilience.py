@@ -72,8 +72,8 @@ class TestOllamaResilience:
 class TestSearXNGResilience:
     """SearXNG-Degradations-Szenarien."""
 
-    @patch("search.composite.requests.get")
-    def test_searxng_rate_limited_429(self, mock_get):
+    @patch("search.composite.create_session")
+    def test_searxng_rate_limited_429(self, mock_create):
         """SearXNG liefert 429 → leere Ergebnisse, kein Fehler."""
         from search.composite import CompositeRetriever
 
@@ -81,7 +81,9 @@ class TestSearXNGResilience:
         response.raise_for_status.side_effect = requests.HTTPError(
             "429 Too Many Requests"
         )
-        mock_get.return_value = response
+        mock_session = MagicMock()
+        mock_session.get.return_value = response
+        mock_create.return_value = mock_session
 
         r = CompositeRetriever("test")
         r.darknet_enabled = False
@@ -91,30 +93,34 @@ class TestSearXNGResilience:
     @pytest.mark.xfail(
         reason="ValueError aus response.json() wird derzeit nicht abgefangen."
     )
-    @patch("search.composite.requests.get")
-    def test_searxng_malformed_html_response(self, mock_get):
+    @patch("search.composite.create_session")
+    def test_searxng_malformed_html_response(self, mock_create):
         """SearXNG liefert HTML statt JSON → parst leere Ergebnisse."""
         from search.composite import CompositeRetriever
 
         response = MagicMock()
         response.raise_for_status.return_value = None
         response.json.side_effect = ValueError("HTML statt JSON")
-        mock_get.return_value = response
+        mock_session = MagicMock()
+        mock_session.get.return_value = response
+        mock_create.return_value = mock_session
 
         r = CompositeRetriever("test")
         r.darknet_enabled = False
 
         assert r.search(max_results=10) == []
 
-    @patch("search.composite.requests.get")
-    def test_searxng_empty_results_field(self, mock_get):
+    @patch("search.composite.create_session")
+    def test_searxng_empty_results_field(self, mock_create):
         """SearXNG JSON ohne 'results'-Key → kein KeyError."""
         from search.composite import CompositeRetriever
 
         response = MagicMock()
         response.raise_for_status.return_value = None
         response.json.return_value = {"query": "test"}
-        mock_get.return_value = response
+        mock_session = MagicMock()
+        mock_session.get.return_value = response
+        mock_create.return_value = mock_session
 
         r = CompositeRetriever("test")
         r.darknet_enabled = False

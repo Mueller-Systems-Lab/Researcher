@@ -235,13 +235,8 @@ def _is_relevant(content: str, query: str) -> bool:
     Verhindert, dass Artikel über andere Themen (z.B. Kontaktverfahren)
     das Modell verwirren.
     """
-    import re
-
     content_lower = content.lower()
     query_lower = query.lower()
-
-    # Extrahiere Schlüsselwörter aus der Query
-    query_words = set(re.findall(r"\w+", query_lower))
 
     # Relevanz-Kernbegriffe (müssen im Content vorkommen)
     core_terms = ["schwefelsäure", "säure"]
@@ -262,9 +257,8 @@ def _is_relevant(content: str, query: str) -> bool:
     return True
 
 
-def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
-    """Baut Messages für die Zusammenfassung (Few-Shot, mit vollem Content)."""
-    messages = []
+def _build_summary_prompt(query: str, sources: list[dict]) -> dict:
+    """Baut den Prompt-Kontext für die Zusammenfassung mit Quelltexten."""
 
     # Quelltext (einmalig aufbereitet)
     source_text = "\n\n".join(
@@ -291,25 +285,11 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
     if not sources:
         return "Keine Quellen verfügbar."
 
+    import random
+    import re
+
     prompt_data = _build_summary_prompt(query, sources)
     source_text = prompt_data["source_text"]
-
-    sections = [
-        "EINFÜHRUNG — Erkläre, was Schwefelsäure ist, "
-        "warum man sie konzentriert, und welche Gefahren bestehen. "
-        "Für absolute Anfänger. Maximal 8 Sätze.",
-        "SICHERHEIT — Welche Schutzausrüstung wird benötigt? "
-        "Was tun bei Hautkontakt? Maximal 8 Sätze.",
-        "ANLEITUNG — Schritt 1 Vorbereitung, Schritt 2 Destillation, "
-        "Schritt 3 Nachbereitung. Mit Tipps für Anfänger. "
-        "Maximal 15 Sätze. Nur Fakten aus den Quellen.",
-        "LAGERUNG & ENTSORGUNG — Wie lagert und entsorgt man "
-        "konzentrierte Schwefelsäure? Maximal 6 Sätze.",
-    ]
-
-    summaries = []
-    import re
-    import random
 
     def _call_llama(messages: list, seed: int = 42) -> str:
         """Einzelner API-Call mit fixem Seed."""

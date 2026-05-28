@@ -1,4 +1,4 @@
-# Known Limitations — v0.2.0
+# Known Limitations — v0.2.1
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## Runtime Stability
 
-- **Qwen3.5-Uncensored (Chat)**: Aktuelles Chat-/Summary-Modell. Läuft via llama-server (Port 8082, ~3.8 GB VRAM). Deutlich stabiler als der qwen3.5-Vorgänger. Keine Ollama-Abhängigkeit für Chat — eigener Prozess.
+- **Qwen3.5-Uncensored-HauhauCS (Chat/Solo)**: Alleiniges Primary-Modell via llama-server (Port 8082, ~3.8 GB VRAM). 45 tok/s. Keine Ollama-Abhängigkeit für Chat — eigener Prozess. Gemma 4 komplett entfernt (#120).
 - **Precision Trap (Qwen3.5 + Pascal)**: Auf GTX 1070 (Pascal) muss der KV-Cache in FP32 laufen (`-ctk f32 -ctv f32`). FP16 erzeugt garbled Output. `--flash-attn off` ist ebenfalls nötig, da Pascal keine Tensor Cores besitzt. Diese Flags sind in `serve_qwen3.5_obliterated_researcher.sh` gesetzt.
 - **qwen3.5 (Deprecated)**: Historisches Chat-Modell. Crashte gelegentlich mit "llama runner process has terminated". Vollständig durch Qwen3.5 obliterated ersetzt.
 - **nomic-embed-text (Embedding)**: Läuft weiterhin via Ollama (Port 11434). 274 MB, stabil.
@@ -66,7 +66,7 @@
 
 ---
 
-## Next Steps (v0.2.0+)
+## Next Steps (v0.2.1+)
 
 1. Broader query evaluation dataset (deutsche Umlaut-Queries eingeführt ✅)
 2. Truth-adjacent evaluation (cross-reference, contradiction detection)

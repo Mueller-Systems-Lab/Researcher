@@ -1,13 +1,35 @@
 # Changelog
 
-## [Unreleased]
+## [v0.2.1] — 2026-05-28
 ### Added
-- **Qwen3.5-Uncensored-HauhauCS als Co-Primary-Modell** via llama-server (Port 8082)
-- **Scraper-Hardening**: SSL-Fallback dokumentiert
+- **Qwen3.5-Uncensored-HauhauCS als alleiniges Primary-Modell** via llama-server (Port 8082, 45 tok/s)
+- **ADR-017** — Qwen3.5-Uncensored-HauhauCS als Co-Primary-Modell (#117)
+- **Scraper-HTTP-Resilience**: SSL-Fallback, 505-Retry, JS-Detection, Retry-Adapter (#118)
+- **scrapers/http_session.py** — Zentrales HTTP-Session-Management mit Retry, User-Agent, Timeouts
+- **Alle 5 Suchquellen** in Research-Happy-Path eingebunden (scraped + Snippet-Fallback)
+- **Relevanzfilter** für gescrapte Inhalte
+- **Viewport-Matrix** auf Aktiv gesetzt: Tablet (768×1024) + Mobile (375×812) (#42)
 
 ### Changed
+- **Gemma 4 komplett entfernt** (#120): Alle Referenzen, Configs, Tests und Scripts bereinigt
 - Qwen3.5 und Qwen3.5 parallel betreibbar (getrennte llama-server-Ports)
 - `serve_qwen3.5_uncensored.sh` als Qwen3.5-Startpfad dokumentiert
+- Qwen3.5 Prompt-Optimierung: enable_thinking-Konsistenz, Temperature-Sweep (#119)
+- **Best-of-3 Extraction** mit proven params (temperature 0.3, repeat_penalty 1.2)
+- Research-Happy-Path scrapt echte Artikel (statt Snippets), Extraction-Format optimiert
+- `.env.example`, `docs/` und Runbooks auf Qwen3.5-Solo aktualisiert
+
+### Fixed
+- **Lint**: 5 dead-code errors in `scripts/research_happy_path.py` (F841 unused variables, I001 unsorted imports) — von Gemma-Entfernung hinterlassene Artefakte
+- **Security B108**: Hardcoded `/tmp/` in `scripts/qwen3.5_optimize.py` → `tempfile.gettempdir()`
+- **scripts/qwen3.5_optimize.py**: Duplicate Gemma 4 Output entfernt (Qwen-Ergebnisse wurden fälschlich als "Gemma 4" ausgegeben)
+- `_build_summary_prompt()` Return-Type von `list[dict]` auf `dict` korrigiert
+
+### Quality Gates
+- `make quality`: **760 passed**, 21 skipped, 3 xfailed (+39 Tests seit v0.2.0)
+- `make security-project`: **0 Medium/High** Findings
+- `make lint`: **0 Errors**
+- `make typecheck`: **0 Errors**
 
 ## [v0.2.0] — 2026-05-28
 ### Added

@@ -25,8 +25,8 @@ def test_composite_retriever_init():
     assert r.searx_url == "http://localhost:8080"
 
 
-@patch("search.composite.requests.get")
-def test_composite_searxng_success(mock_get):
+@patch("search.composite.create_session")
+def test_composite_searxng_success(mock_create):
     """Test: SearXNG liefert Ergebnisse."""
     from search.composite import CompositeRetriever
 
@@ -51,7 +51,9 @@ def test_composite_searxng_success(mock_get):
         ]
     }
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever("test", searx_url="http://localhost:8080")
     results = r.search(max_results=10)
@@ -61,15 +63,17 @@ def test_composite_searxng_success(mock_get):
     assert results[0]["url"] == "http://example.com/1"
 
 
-@patch("search.composite.requests.get")
-def test_composite_searxng_down(mock_get):
+@patch("search.composite.create_session")
+def test_composite_searxng_down(mock_create):
     """Test: SearXNG down — Fallback ohne Fehler."""
     # SearXNG nicht erreichbar
     from requests.exceptions import ConnectionError
 
     from search.composite import CompositeRetriever
 
-    mock_get.side_effect = ConnectionError()
+    mock_session = MagicMock()
+    mock_session.get.side_effect = ConnectionError()
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever(
         "test",
@@ -119,15 +123,17 @@ def test_composite_deduplication_no_duplicates():
     assert len(deduped) == 3
 
 
-@patch("search.composite.requests.get")
-def test_composite_darknet_disabled(mock_get):
+@patch("search.composite.create_session")
+def test_composite_darknet_disabled(mock_create):
     """Test: Darknet deaktiviert (DARKNET_ENABLED=false) — nur SearXNG."""
     from search.composite import CompositeRetriever
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"results": []}
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever(
         "test",
@@ -140,8 +146,8 @@ def test_composite_darknet_disabled(mock_get):
     assert isinstance(results, list)
 
 
-@patch("search.composite.requests.get")
-def test_composite_with_darknet_results(mock_get):
+@patch("search.composite.create_session")
+def test_composite_with_darknet_results(mock_create):
     """Test: Composite mit beiden Backends."""
     from datetime import datetime
 
@@ -152,7 +158,9 @@ def test_composite_with_darknet_results(mock_get):
     mock_response = MagicMock()
     mock_response.json.return_value = {"results": []}
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     # Darknet-Index mit Testdaten befüllen
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -211,8 +219,8 @@ def test_composite_with_darknet_results(mock_get):
                 del os.environ["DARKNET_ENABLED"]
 
 
-@patch("search.composite.requests.get")
-def test_composite_total_limit(mock_get):
+@patch("search.composite.create_session")
+def test_composite_total_limit(mock_create):
     """Test: max_results wird eingehalten."""
     from search.composite import CompositeRetriever
 
@@ -231,7 +239,9 @@ def test_composite_total_limit(mock_get):
         ]
     }
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
 
     r = CompositeRetriever("test", searx_url="http://localhost:8080")
     r.darknet_enabled = False

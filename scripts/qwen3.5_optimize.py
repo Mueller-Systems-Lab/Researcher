@@ -9,7 +9,6 @@
 #   python3 scripts/qwen3.5_optimize.py                  # Sweep + Guide
 #   python3 scripts/qwen3.5_optimize.py --sweep-only     # Nur Temperature-Sweep
 #   python3 scripts/qwen3.5_optimize.py --guide-only     # Nur Multi-Page-Guide
-#   python3 scripts/qwen3.5_optimize.py --model qwen     # Nur Qwen3.5 testen
 # =============================================================================
 
 import argparse
@@ -384,7 +383,7 @@ def main():
         "--model",
         choices=["qwen"],
         default="qwen",
-        help="Welches Modell testen (default: both)",
+        help="Zu testendes Modell (default: qwen)",
     )
     args = parser.parse_args()
 
@@ -392,7 +391,7 @@ def main():
 
     # Temperature-Sweep
     if not args.guide_only:
-        if args.model in ("qwen", "both"):
+        if args.model == "qwen":
             print("\n▶ Temperature-Sweep: Qwen3.5 (Port 8082)")
             results = run_sweep(QWEN_URL, QWEN_MODEL, "Qwen3.5")
             print_sweep_summary(results, "Qwen3.5")
@@ -408,24 +407,11 @@ def main():
                 for r in results
             ]
 
-            print_sweep_summary(results, "Gemma 4")
-            all_results["gemma_sweep"] = [
-                {
-                    "temp": r.temperature,
-                    "query": r.query,
-                    "score": r.quality_score,
-                    "tokens": r.tokens,
-                    "latency_ms": r.latency_ms,
-                    "garbled": r.garbled,
-                }
-                for r in results
-            ]
-
     # Multi-Page-Guide-Test
     if not args.sweep_only:
         guide_results: list[GuideResult] = []
 
-        if args.model in ("qwen", "both"):
+        if args.model == "qwen":
             print("\n▶ Multi-Page-Guide: Qwen3.5 (Port 8082)")
             qwen_guides = run_guide_test(QWEN_URL, QWEN_MODEL, "Qwen3.5")
             guide_results.extend(qwen_guides)
@@ -444,8 +430,12 @@ def main():
         ]
 
     # JSON-Export für Dokumentation
-    print("\n▶ Ergebnisse exportiert nach /tmp/qwen3.5_optimize_results.json")
-    with open("/tmp/qwen3.5_optimize_results.json", "w") as f:
+    import tempfile
+    from pathlib import Path
+
+    out_path = Path(tempfile.gettempdir()) / "qwen3.5_optimize_results.json"
+    print(f"\n▶ Ergebnisse exportiert nach {out_path}")
+    with open(str(out_path), "w") as f:
         json.dump(all_results, f, indent=2, ensure_ascii=False)
 
     return 0

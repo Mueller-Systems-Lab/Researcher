@@ -25,6 +25,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from crawlers.config import config
+from scrapers.http_session import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -62,23 +63,8 @@ class DarknetCrawler:
         self.logged_in = False
 
     def _create_session(self) -> requests.Session:
-        """Erstellt eine requests.Session mit Tor-SOCKS5-Proxy."""
-        session = requests.Session()
-        session.proxies = {
-            "http": self.config.proxy_url,
-            "https": self.config.proxy_url,
-        }
-        session.headers.update(
-            {
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) "
-                    "Gecko/20100101 Firefox/128.0"
-                ),
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
-            }
-        )
-        return session
+        """Erstellt eine requests.Session mit Tor-SOCKS5-Proxy (via http_session)."""
+        return create_session(proxy=self.config.proxy_url)
 
     def _extract_csrf_token(self, html: str) -> str | None:
         """Extrahiert CSRF-Token aus einem Login-Formular."""

@@ -101,12 +101,14 @@ class TestCompositePartialFailure:
     """Partielle Ausfälle: Ein Backend down, anderes liefert."""
 
     @patch("search.composite.DarknetRetriever")
-    @patch("search.composite.requests.get")
-    def test_searxng_500_darknet_ok(self, mock_get, mock_darknet):
+    @patch("search.composite.create_session")
+    def test_searxng_500_darknet_ok(self, mock_create, mock_darknet):
         """SearXNG 500er, Darknet gültig → Graceful Degradation."""
         response = MagicMock()
         response.raise_for_status.side_effect = requests.HTTPError("500 Server Error")
-        mock_get.return_value = response
+        mock_session = MagicMock()
+        mock_session.get.return_value = response
+        mock_create.return_value = mock_session
         mock_darknet.return_value.search.return_value = [
             {"url": "darknet://ok/1", "title": "OK", "source": "Darknet Forum"}
         ]
@@ -157,13 +159,15 @@ class TestCompositeRaceConditions:
 class TestCompositeEdgeCases:
     """Edge Cases: Leere Ergebnisse, Schema-Deduplizierung, Scoring."""
 
-    @patch("search.composite.requests.get")
-    def test_both_empty_results_no_division_by_zero(self, mock_get):
+    @patch("search.composite.create_session")
+    def test_both_empty_results_no_division_by_zero(self, mock_create):
         """Beide Services liefern [] → keine Division by Zero in Scoring."""
         response = MagicMock()
         response.raise_for_status.return_value = None
         response.json.return_value = {"results": []}
-        mock_get.return_value = response
+        mock_session = MagicMock()
+        mock_session.get.return_value = response
+        mock_create.return_value = mock_session
 
         r = CompositeRetriever("test")
         r.darknet_enabled = False

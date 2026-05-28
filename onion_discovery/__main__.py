@@ -78,15 +78,12 @@ def main():
         return
 
     if args.tor_check:
-        import requests
+        from scrapers.http_session import create_session
 
+        session = create_session(proxy="socks5h://127.0.0.1:9050")
         try:
-            r = requests.get(
+            r = session.get(
                 "http://check.torproject.org/api/ip",
-                proxies={
-                    "http": "socks5h://127.0.0.1:9050",
-                    "https": "socks5h://127.0.0.1:9050",
-                },
                 timeout=10,
             )
             print(f"  Tor-Verbindung OK: {r.json()}")
