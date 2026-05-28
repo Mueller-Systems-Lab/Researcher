@@ -173,9 +173,30 @@ def scrape_url(url: str, timeout: int = 15) -> str | None:
         )
         r.raise_for_status()
 
-        # Roh-Bytes mit UTF-8 dekodieren (Encoding-Probleme umgehen)
+        # Encoding aus HTML-Meta oder HTTP-Header ermitteln
         raw = r.content
-        text = raw.decode("utf-8", errors="replace")
+        import re
+
+        # Versuche Meta-Charset zu finden
+        meta_charset = re.search(
+            rb'<meta\s+[^>]*charset=["\']?([^"\'>\s]+)',
+            raw[:2000],
+            re.IGNORECASE,
+        )
+        if meta_charset:
+            enc = meta_charset.group(1).decode("ascii", errors="ignore").lower()
+        else:
+            enc = (r.encoding or "").lower()
+        if enc in ("utf-8", "utf8"):
+            text = raw.decode("utf-8", errors="replace")
+        elif enc:
+            text = raw.decode(enc, errors="replace")
+        else:
+            # Fallback: probiere UTF-8, dann Latin-1
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("latin-1", errors="replace")
 
         # HTML-body extrahieren
         body = re.search(r"<body[^>]*>(.*?)</body>", text, re.DOTALL)
@@ -208,20 +229,57 @@ def scrape_url(url: str, timeout: int = 15) -> str | None:
         return None
 
 
+def _is_relevant(content: str, query: str) -> bool:
+    """Prüft ob gescrapte Inhalt zur Frage passt (relevante Keywords).
+
+    Verhindert, dass Artikel über andere Themen (z.B. Kontaktverfahren)
+    das Modell verwirren.
+    """
+    import re
+
+    content_lower = content.lower()
+    query_lower = query.lower()
+
+    # Extrahiere Schlüsselwörter aus der Query
+    query_words = set(re.findall(r"\w+", query_lower))
+
+    # Relevanz-Kernbegriffe (müssen im Content vorkommen)
+    core_terms = ["schwefelsäure", "säure"]
+    for term in core_terms:
+        if term in query_lower and term not in content_lower:
+            return False
+
+    # Ausschluss: Content handelt von etwas anderem
+    if "kontaktverfahren" in content_lower and "destillation" not in content_lower:
+        return False
+    if "schwefel" in content_lower and "säure" not in content_lower:
+        return False
+
+    # Minimum: Content muss Substanz haben
+    if len(content) < 100:
+        return False
+
+    return True
+
+
 def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
     """Baut Messages für die Zusammenfassung (Few-Shot, mit vollem Content)."""
     messages = []
 
-    # System-Prompt: strikte Instruktion für Faktenextraktion
+    # System-Prompt: strukturierte Anleitung
     messages.append(
         {
             "role": "system",
             "content": (
-                "EXTRAHIERE die Fakten aus den Quellen. "
-                "Antworte NUR mit einer nummerierten Liste "
-                "der Verfahrensschritte oder Fakten. "
-                "Keine Einleitung. Keine Zusammenfassung. "
-                "Keine Gedankenkette. Nur die Fakten."
+                "Schreibe eine praktische Schritt-für-Schritt-Anleitung "
+                "basierend auf den Quellen. Gliederung:\n\n"
+                "## Benötigte Ausrüstung\n"
+                "## Schritt 1: Vorbereitung\n"
+                "## Schritt 2: Durchführung\n"
+                "## Schritt 3: Nachbereitung\n"
+                "## Sicherheitshinweise\n\n"
+                "Nur Fakten aus den Quellen. "
+                "Keine Gedankenkette. Keine Metakommentare."
             ),
         }
     )
@@ -235,7 +293,7 @@ def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
         {
             "role": "user",
             "content": (
-                f"Quellen:\n{source_text}\n\nFrage: {query}\n\nVerfahrensschritte:"
+                f"Quellen:\n{source_text}\n\nFrage: {query}\n\nSchreibe die Anleitung."
             ),
         }
     )
@@ -249,9 +307,9 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
     Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
 
     Optimierte Parameter:
-      - temperature 0.3 (niedrig für deterministische Extraktion)
-      - repeat_penalty 1.2 (Repetition-Loops unterdrücken)
-      - Explizite Instruktion + unvollständiger Satz als Prompt
+      - temperature 0.3, repeat_penalty 1.2
+      - Strukturierte Anleitung als System-Prompt
+      - enable_thinking=false
     """
     if not sources:
         return "Keine Quellen verfügbar."
@@ -266,7 +324,7 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
                 "messages": messages,
                 "temperature": 0.3,
                 "repeat_penalty": 1.2,
-                "max_tokens": 200,
+                "max_tokens": 400,
                 "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=(5, 120),
@@ -475,15 +533,23 @@ def main() -> None:
     elif not sources:
         print("   ⚠️  Keine SearXNG-Ergebnisse — Report ohne Quellen")
     else:
-        # Top-Quellen scrapen für bessere Zusammenfassung
-        print("   📄 Scrape Top-Quellen...")
-        for src in sources[:3]:
+        # Top-Quellen scrapen + Relevanz prüfen
+        print("   📄 Scrape + Filter Top-Quellen...")
+        relevant_sources = []
+        for src in sources[:4]:
             url = src.get("url", "")
-            if url:
-                full_text = scrape_url(url)
-                if full_text and len(full_text) > len(src.get("content", "")):
-                    src["content"] = full_text
-                    print(f"      {url[:60]}... ({len(full_text)} chars)")
+            if not url:
+                continue
+            full_text = scrape_url(url)
+            if full_text:
+                src["content"] = full_text
+                if _is_relevant(full_text, args.query):
+                    relevant_sources.append(src)
+                    print(f"   ✅ {url[:55]}... ({len(full_text)} chars)")
+                else:
+                    print(f"   ⏭️  Nicht relevant: {url[:55]}...")
+        sources[:] = relevant_sources[:3]
+        print(f"   → {len(sources)} relevante Quellen")
     print()
 
     # 4. Summary — primär via llama-server (Gemma 4), Fallback Ollama
