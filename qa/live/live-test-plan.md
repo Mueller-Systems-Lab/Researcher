@@ -17,14 +17,19 @@ Kein Mock: echter `dashboard/server.py`-Server, echter Chromium-Browser, echte H
 | 6 | SSE Event Stream | Desktop 1280x720 | Browser | EventSource verbindet, Daten empfangen |
 | 7 | Visual Regression Screenshot | Desktop 1280x720 | Browser | Pixel-Vergleich mit Baseline < 0.1% Diff |
 
-## Viewport-Matrix (geplant, Issue #42)
+## Viewport-Matrix
 
 | Name | Breite | Höhe | Status |
 |---|---|---|---|
 | Desktop | 1280 | 720 | ✅ Aktiv |
 | Desktop-Large | 1920 | 1080 | ⬜ Geplant |
-| Tablet | 768 | 1024 | ⬜ Geplant |
-| Mobile | 375 | 812 | ⬜ Geplant |
+| Tablet | 768 | 1024 | ✅ Aktiv (Issue #42) |
+| Mobile | 375 | 812 | ✅ Aktiv (Issue #42) |
+
+Viewport-Tests in `tests/playwright/test_dashboard_viewports.py`:
+- `test_dashboard_loads_in_viewport` — Lädt und zeigt Metriken in jedem Viewport
+- `test_dashboard_viewport_screenshot` — Screenshot + Baseline-Visual-Regression
+- `test_dashboard_responsive_layout` — Karten sichtbar, nicht überlappend, Legende sichtbar
 
 ## Fehlerfall-Tests
 
