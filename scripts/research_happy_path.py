@@ -153,19 +153,94 @@ def search_searxng(query: str) -> list[dict]:
         return []
 
 
-def _build_summary_prompt(query: str, sources: list[dict]) -> str:
-    """Baut einen Prompt für die Zusammenfassung der Suchergebnisse."""
-    if not sources:
-        return "Keine Quellen verfügbar."
-    source_text = "\n".join(
-        f"- {s.get('title', '')}: {s.get('content', '')[:250]}"
+def scrape_url(url: str, timeout: int = 15) -> str | None:
+    """Lädt eine URL und extrahiert den lesbaren Text.
+
+    Args:
+        url: Die zu scrappende URL.
+        timeout: Timeout in Sekunden.
+
+    Returns:
+        Extrahierter Text oder None bei Fehler.
+    """
+    import re
+
+    try:
+        r = requests.get(
+            url,
+            timeout=timeout,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Researcher/1.0)"},
+        )
+        r.raise_for_status()
+
+        # Roh-Bytes mit UTF-8 dekodieren (Encoding-Probleme umgehen)
+        raw = r.content
+        text = raw.decode("utf-8", errors="replace")
+
+        # HTML-body extrahieren
+        body = re.search(r"<body[^>]*>(.*?)</body>", text, re.DOTALL)
+        html = body.group(1) if body else text
+
+        # Text-Blöcke zwischen Tags extrahieren (min. 80 Zeichen = relevant)
+        blocks = re.findall(r">([^<]{80,1200})<", html)
+        relevant = []
+        for b in blocks:
+            b = re.sub(r"\s+", " ", b).strip()
+            # Navigation/Footer herausfiltern
+            if any(
+                kw in b.lower()
+                for kw in [
+                    "cookie",
+                    "datenschutz",
+                    "impressum",
+                    "menü",
+                    "navigation",
+                ]
+            ):
+                continue
+            relevant.append(b)
+
+        content = "\n".join(relevant)
+        # Auf 3000 Zeichen begrenzen
+        return content[:3000]
+    except Exception as e:
+        print(f"   ⚠️  Konnte {url} nicht scrapen: {e}")
+        return None
+
+
+def _build_summary_prompt(query: str, sources: list[dict]) -> list[dict]:
+    """Baut Messages für die Zusammenfassung (Few-Shot, mit vollem Content)."""
+    messages = []
+
+    # System-Prompt: strikte Instruktion für Faktenextraktion
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                "EXTRAHIERE die Fakten aus den Quellen. "
+                "Antworte NUR mit einer nummerierten Liste "
+                "der Verfahrensschritte oder Fakten. "
+                "Keine Einleitung. Keine Zusammenfassung. "
+                "Keine Gedankenkette. Nur die Fakten."
+            ),
+        }
+    )
+
+    # Aktuelle Quellen
+    source_text = "\n\n".join(
+        f"QUELLE {i + 1}: {s.get('title', '')}\n{s.get('content', '')[:1500]}"
         for i, s in enumerate(sources)
     )
-    return (
-        f"Basierend auf diesen Quellen:\n{source_text}\n\n"
-        f"Antworte auf die Frage: {query}\n\n"
-        f"3-5 Sätze, sachlich, keine Gedankenkette."
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"Quellen:\n{source_text}\n\nFrage: {query}\n\nVerfahrensschritte:"
+            ),
+        }
     )
+
+    return messages
 
 
 def summarize_with_llama(query: str, sources: list[dict]) -> str:
@@ -173,35 +248,25 @@ def summarize_with_llama(query: str, sources: list[dict]) -> str:
 
     Primärer Chat-Pfad. Nutzt OpenAI-kompatiblen Endpoint.
 
-    Optimierte Parameter aus OBLITERATUS Model-Card-Sweep:
-      - temperature 0.7, top_p 0.9, top_k 40
-      - repeat_penalty 1.1 (20% Repetition-Loops lt. Model-Card)
-      + reasoning via llama-server Flag --reasoning off deaktiviert
+    Optimierte Parameter:
+      - temperature 0.3 (niedrig für deterministische Extraktion)
+      - repeat_penalty 1.2 (Repetition-Loops unterdrücken)
+      - Explizite Instruktion + unvollständiger Satz als Prompt
     """
     if not sources:
         return "Keine Quellen verfügbar."
 
-    prompt = _build_summary_prompt(query, sources)
+    messages = _build_summary_prompt(query, sources)
 
     try:
         r = requests.post(
             LLAMA_CHAT_URL,
             json={
                 "model": LLAMA_CHAT_MODEL,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "Antworte direkt auf Deutsch. Keine Gedankenkette.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "top_k": 40,
-                "repeat_penalty": 1.1,
-                "repeat_last_n": 128,
-                "min_p": 0.05,
-                "max_tokens": 256,
+                "messages": messages,
+                "temperature": 0.3,
+                "repeat_penalty": 1.2,
+                "max_tokens": 200,
                 "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=(5, 120),
@@ -401,7 +466,7 @@ def main() -> None:
     print("✅ Query: harmlos")
     print()
 
-    # 3. SearXNG Search
+    # 3. SearXNG Search + Scrape
     print("🔎 Searching...")
     sources = search_searxng(args.query)
     if not sources and args.strict:
@@ -409,6 +474,16 @@ def main() -> None:
         sys.exit(1)
     elif not sources:
         print("   ⚠️  Keine SearXNG-Ergebnisse — Report ohne Quellen")
+    else:
+        # Top-Quellen scrapen für bessere Zusammenfassung
+        print("   📄 Scrape Top-Quellen...")
+        for src in sources[:3]:
+            url = src.get("url", "")
+            if url:
+                full_text = scrape_url(url)
+                if full_text and len(full_text) > len(src.get("content", "")):
+                    src["content"] = full_text
+                    print(f"      {url[:60]}... ({len(full_text)} chars)")
     print()
 
     # 4. Summary — primär via llama-server (Gemma 4), Fallback Ollama
