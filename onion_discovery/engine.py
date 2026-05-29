@@ -88,7 +88,7 @@ class DiscoveryPipeline:
 
         try:
             if backend_name == "sqlite_fts5":
-                from gpt_researcher.adapters.sqlite_fts5_adapter import (
+                from search.adapters.sqlite_fts5_adapter import (
                     SQLiteFTS5Adapter,
                 )
 
@@ -98,7 +98,7 @@ class DiscoveryPipeline:
                 )
                 return SQLiteFTS5Adapter(db_path)
             else:
-                from gpt_researcher.adapters.whoosh_index_adapter import (
+                from search.adapters.whoosh_index_adapter import (
                     WhooshIndexAdapter,
                 )
 

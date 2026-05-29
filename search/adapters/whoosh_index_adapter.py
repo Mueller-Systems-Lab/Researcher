@@ -1,5 +1,6 @@
 """WhooshIndexAdapter — Whoosh-based search index adapter (Legacy)."""
 
+import hashlib
 import logging
 import os
 from datetime import datetime
@@ -38,7 +39,9 @@ class WhooshIndexAdapter(SearchIndexRepository):
     def index(self, doc: dict) -> bool:
         try:
             writer = AsyncWriter(self._ix)
-            post_id = doc.get("url") or str(hash(str(doc)))
+            post_id = (
+                doc.get("url") or hashlib.sha256(str(doc).encode()).hexdigest()[:32]
+            )
             writer.update_document(
                 post_id=post_id,
                 url=doc.get("url", ""),

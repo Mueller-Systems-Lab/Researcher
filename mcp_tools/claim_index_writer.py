@@ -35,12 +35,12 @@ def write_results_to_index(
         if backend_name == "sqlite_fts5":
             import os as _os
 
-            from gpt_researcher.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
+            from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
             db_path = _os.path.join(index_path, "darknet_index.sqlite3")
             index_backend = SQLiteFTS5Adapter(db_path)
         else:
-            from gpt_researcher.adapters.whoosh_index_adapter import WhooshIndexAdapter
+            from search.adapters.whoosh_index_adapter import WhooshIndexAdapter
 
             index_backend = WhooshIndexAdapter(index_path)
 
