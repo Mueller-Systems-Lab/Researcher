@@ -14,10 +14,11 @@
 import hashlib
 import logging
 import os
+import threading
 from datetime import datetime
 
 from whoosh.fields import DATETIME, ID, TEXT, Schema
-from whoosh.index import create_in, exists_in, open_dir
+from whoosh.index import LockError, create_in, exists_in, open_dir
 from whoosh.qparser import MultifieldParser
 from whoosh.writing import AsyncWriter
 
@@ -42,6 +43,7 @@ class WhooshIndex:
     def __init__(self, index_dir: str = "./darknet_index"):
         self.index_dir = index_dir
         self._ix = None
+        self._lock = threading.RLock()
 
     @property
     def ix(self):
@@ -51,17 +53,18 @@ class WhooshIndex:
         return self._ix
 
     def _open_or_create(self):
-        """Öffnet existierenden Index oder erstellt neuen."""
-        os.makedirs(self.index_dir, exist_ok=True)
-        if exists_in(self.index_dir):
-            logger.info(f"Öffne existierenden Whoosh-Index: {self.index_dir}")
-            self._ix = open_dir(self.index_dir, schema=POST_SCHEMA)
-        else:
-            logger.info(f"Erstelle neuen Whoosh-Index: {self.index_dir}")
-            self._ix = create_in(self.index_dir, POST_SCHEMA)
+        """Öffnet existierenden Index oder erstellt neuen (thread-safe)."""
+        with self._lock:
+            os.makedirs(self.index_dir, exist_ok=True)
+            if exists_in(self.index_dir):
+                logger.info(f"Öffne existierenden Whoosh-Index: {self.index_dir}")
+                self._ix = open_dir(self.index_dir, schema=POST_SCHEMA)
+            else:
+                logger.info(f"Erstelle neuen Whoosh-Index: {self.index_dir}")
+                self._ix = create_in(self.index_dir, POST_SCHEMA)
 
     def add_post(self, post: dict) -> bool:
-        """Fügt einen Post zum Index hinzu.
+        """Fügt einen Post zum Index hinzu (thread-safe).
 
         Args:
             post: Dict mit Keys: url, author, title, timestamp, content, forum_id
@@ -71,31 +74,36 @@ class WhooshIndex:
             True bei Erfolg, False bei Fehler.
         """
         try:
-            writer = AsyncWriter(self.ix)
-            post_id = (
-                post.get("url") or hashlib.sha256(str(post).encode()).hexdigest()[:32]
-            )
+            with self._lock:
+                writer = AsyncWriter(self.ix)
+                post_id = (
+                    post.get("url")
+                    or hashlib.sha256(str(post).encode()).hexdigest()[:32]
+                )
 
-            # Timestamp normalisieren
-            ts = post.get("timestamp")
-            if isinstance(ts, str):
-                try:
-                    ts = datetime.fromisoformat(ts)
-                except ValueError:
-                    ts = datetime.now()
+                # Timestamp normalisieren
+                ts = post.get("timestamp")
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts)
+                    except ValueError:
+                        ts = datetime.now()
 
-            writer.update_document(
-                post_id=post_id,
-                url=post.get("url", ""),
-                author=post.get("author", ""),
-                title=post.get("title", ""),
-                timestamp=ts or datetime.now(),
-                content=post.get("content", ""),
-                forum_id=post.get("forum_id", "unknown"),
-            )
-            writer.commit()
+                writer.update_document(
+                    post_id=post_id,
+                    url=post.get("url", ""),
+                    author=post.get("author", ""),
+                    title=post.get("title", ""),
+                    timestamp=ts or datetime.now(),
+                    content=post.get("content", ""),
+                    forum_id=post.get("forum_id", "unknown"),
+                )
+                writer.commit()
             return True
 
+        except LockError as e:
+            logger.warning(f"Whoosh-Lock-Fehler bei add_post: {e}")
+            return False
         except Exception as e:
             logger.exception(f"Fehler beim Indexieren von Post: {e}")
             return False
@@ -168,12 +176,14 @@ class WhooshIndex:
             return []
 
     def optimize(self):
-        """Optimiert den Index (Komprimierung)."""
+        """Optimiert den Index (thread-safe)."""
         try:
-
-            writer = AsyncWriter(self.ix)
-            writer.commit(optimize=True)
+            with self._lock:
+                writer = AsyncWriter(self.ix)
+                writer.commit(optimize=True)
             logger.info("Index optimiert")
+        except LockError as e:
+            logger.warning(f"Whoosh-Lock-Fehler bei optimize: {e}")
         except Exception as e:
             logger.exception(f"Fehler bei Index-Optimierung: {e}")
 
@@ -188,10 +198,12 @@ class WhooshIndex:
             return 0
 
     def clear(self):
-        """Leert den Index vollständig."""
+        """Leert den Index vollständig (thread-safe)."""
         try:
-
-            self._ix = create_in(self.index_dir, POST_SCHEMA)
+            with self._lock:
+                self._ix = create_in(self.index_dir, POST_SCHEMA)
             logger.info("Index geleert")
+        except LockError as e:
+            logger.warning(f"Whoosh-Lock-Fehler bei clear: {e}")
         except Exception as e:
             logger.exception(f"Fehler beim Leeren des Index: {e}")
