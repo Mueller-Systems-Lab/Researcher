@@ -74,6 +74,17 @@ class TestCreateSession:
         session = create_session(timeout=t)
         assert session.timeout == (5.0, 15.0)
 
+    def test_session_timeout_propagated_to_request(self):
+        """Verifiziere dass session.timeout gesetzt und requests-Version kompatibel."""
+        import requests
+
+        session = create_session()
+        assert session.timeout == DEFAULT_TIMEOUT.to_tuple()
+        assert requests.__version__ >= "2.25", (
+            f"requests {requests.__version__} < 2.25 — "
+            "session.timeout wird nicht automatisch propagiert"
+        )
+
     def test_proxy_configuration(self):
         proxy = "socks5h://127.0.0.1:9050"
         session = create_session(proxy=proxy)

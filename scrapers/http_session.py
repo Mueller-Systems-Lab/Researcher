@@ -115,7 +115,7 @@ def create_session(
         }
     )
 
-    # Timeout
+    # Timeout (propagiert seit requests ≥ 2.25 via session.send())
     t = timeout if timeout is not None else DEFAULT_TIMEOUT
     session.timeout = t.to_tuple()  # type: ignore[attr-defined]
 
