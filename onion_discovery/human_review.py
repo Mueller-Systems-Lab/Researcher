@@ -15,6 +15,7 @@
 import json
 import logging
 import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
@@ -63,15 +64,25 @@ class ReviewQueue:
                 logger.warning(f"Fehler beim Laden der Review-Queue: {e}")
 
     def _save(self):
+        """Speichert die Queue atomar (tempfile + os.replace)."""
         try:
             os.makedirs(os.path.dirname(self.queue_file) or ".", exist_ok=True)
-            with open(self.queue_file, "w") as f:
-                json.dump(
-                    [asdict(item) for item in self._items.values()],
-                    f,
-                    indent=2,
-                    ensure_ascii=False,
-                )
+            content = json.dumps(
+                [asdict(item) for item in self._items.values()],
+                indent=2,
+                ensure_ascii=False,
+            )
+            fd, tmp = tempfile.mkstemp(
+                dir=os.path.dirname(self.queue_file) or ".",
+                suffix=".tmp",
+            )
+            try:
+                with open(fd, "w", encoding="utf-8") as f:
+                    f.write(content)
+                os.replace(tmp, self.queue_file)
+            except Exception:
+                os.unlink(tmp)
+                raise
         except (OSError, TypeError) as e:
             logger.error(f"Fehler beim Speichern der Review-Queue: {e}")
 

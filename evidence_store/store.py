@@ -6,21 +6,33 @@ Storage layout:
     reports/deep_research/evidence/citations.jsonl
 
 No database migration — append-only JSONL files.
+Thread-safe via threading.Lock + atomic writes.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 from evidence_store.models import Citation, EvidenceSegment, EvidenceSource
 
 EVIDENCE_DIR = Path("reports/deep_research/evidence")
 
+_lock = threading.Lock()
+
 
 def _ensure_dir() -> Path:
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     return EVIDENCE_DIR
+
+
+def _safe_append(path: Path, line: str) -> None:
+    """Thread-safe JSONL append."""
+    with _lock:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
 
 
 # ── Sources ──────────────────────────────────────────────────────────────
@@ -42,8 +54,7 @@ def save_source(source: EvidenceSource) -> None:
         "content_hash": source.content_hash,
         "run_id": source.run_id,
     }
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _safe_append(path, json.dumps(record, ensure_ascii=False))
 
 
 def load_sources() -> list[EvidenceSource]:
@@ -107,8 +118,7 @@ def save_segment(segment: EvidenceSegment) -> None:
         "mmr_group": segment.mmr_group,
         "injection_flags": segment.injection_flags,
     }
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _safe_append(path, json.dumps(record, ensure_ascii=False))
 
 
 def load_segments() -> list[EvidenceSegment]:
@@ -160,8 +170,7 @@ def save_citation(citation: Citation) -> None:
         "url": citation.url,
         "retrieved_at": citation.retrieved_at,
     }
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _safe_append(path, json.dumps(record, ensure_ascii=False))
 
 
 def load_citations() -> list[Citation]:
