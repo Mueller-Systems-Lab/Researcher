@@ -90,9 +90,6 @@ class TestSearXNGResilience:
 
         assert r.search(max_results=10) == []
 
-    @pytest.mark.xfail(
-        reason="ValueError aus response.json() wird derzeit nicht abgefangen."
-    )
     @patch("search.composite.create_session")
     def test_searxng_malformed_html_response(self, mock_create):
         """SearXNG liefert HTML statt JSON → parst leere Ergebnisse."""
