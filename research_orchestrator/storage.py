@@ -2,16 +2,34 @@
 
 State:   reports/deep_research/runs/<run_id>/state.json
 Events:  reports/deep_research/runs/<run_id>/events.jsonl
+
+Thread-safe via atomic writes (tempfile + os.replace).
 """
 
 from __future__ import annotations
 
 import json
+import tempfile
+import threading
 from pathlib import Path
 
 from research_orchestrator.state import RunState
 
 RUNS_DIR = Path("reports/deep_research/runs")
+_lock = threading.Lock()
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content atomically via tempfile + os.replace."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with open(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        Path(tmp).replace(path)
+    except Exception:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def _run_dir(run_id: str) -> Path:
@@ -55,9 +73,7 @@ def save_state(state: RunState) -> None:
     }
 
     state_path = run_dir / "state.json"
-    state_path.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    _atomic_write(state_path, json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def load_state(run_id: str) -> RunState | None:
@@ -114,17 +130,22 @@ def load_events(run_id: str) -> list[dict]:
 
 
 def append_events(run_id: str, events: list[dict]) -> None:
-    """Append events to the run's events.jsonl."""
+    """Append events to the run's events.jsonl (thread-safe)."""
     run_dir = _run_dir(run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     from research_orchestrator.events import events_to_jsonl
 
     events_path = run_dir / "events.jsonl"
-    existing = events_path.read_text(encoding="utf-8") if events_path.exists() else ""
     new_lines = events_to_jsonl(events)
-    content = existing + ("\n" if existing else "") + new_lines + "\n"
-    events_path.write_text(content, encoding="utf-8")
+
+    with _lock:
+        existing = (
+            events_path.read_text(encoding="utf-8") if events_path.exists() else ""
+        )
+        content = existing + ("\n" if existing and not existing.endswith("\n") else "")
+        content += new_lines + "\n"
+        _atomic_write(events_path, content)
 
 
 def run_exists(run_id: str) -> bool:

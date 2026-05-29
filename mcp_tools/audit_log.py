@@ -14,6 +14,7 @@
 import json
 import logging
 import os
+import threading
 from datetime import datetime
 
 from mcp_tools.base import MCPToolBase, MCPToolResult
@@ -84,6 +85,7 @@ class AuditLog(MCPToolBase):
 
     def __init__(self, log_file: str | None = None):
         self.log_file = log_file or os.getenv("AUDIT_LOG_FILE", "./audit_trail.jsonl")
+        self._lock = threading.Lock()
 
     def run(self, params: dict) -> dict:
         action = params.get("action", "")
@@ -117,8 +119,9 @@ class AuditLog(MCPToolBase):
         try:
             log_dir = os.path.dirname(self.log_file or ".") or "."
             os.makedirs(log_dir, exist_ok=True)
-            with open(self.log_file or "audit_log.jsonl", "a") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            with self._lock:
+                with open(self.log_file or "audit_log.jsonl", "a") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             return MCPToolResult(
                 True,
                 data={
