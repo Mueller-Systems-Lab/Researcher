@@ -191,6 +191,10 @@ class CompositeRetriever:
                         searx_results = future.result()
                     else:
                         darknet_results = future.result()
+                except concurrent.futures.TimeoutError:
+                    logger.warning(
+                        f"CompositeRetriever {key}: Timeout, verwende partial results"
+                    )
                 except Exception as e:
                     logger.warning(f"CompositeRetriever {key}: {e}")
 
