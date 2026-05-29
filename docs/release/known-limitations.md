@@ -1,4 +1,4 @@
-# Known Limitations — v0.2.1
+# Known Limitations — v0.2.2
 
 ---
 
@@ -36,6 +36,7 @@
 - **No live E2E in CI**: E2E tests use mocks. Real runtime tests require `RUN_E2E_TESTS=true` and running services.
 - **Playwright CI not finalized**: Visual regression and accessibility tests need Playwright + Chromium. SSE-Stream blockiert networkidle-Wait.
 - **Benchmarks optional**: `make test-benchmarks` takes ~3min, not in `make quality`.
+- **11 pre-existing Test-Failures**: 9 Benchmark + 2 E2E — `gpt_researcher.adapters.*` nicht pip-installiert. Kein Regression durch v0.2.2.
 - **Coverage floor**: 78.5% covers project code. Submodule code not measured.
 
 ---
@@ -66,12 +67,13 @@
 
 ---
 
-## Next Steps (v0.2.1+)
+## Next Steps (v0.2.2+)
 
-1. Broader query evaluation dataset (deutsche Umlaut-Queries eingeführt ✅)
-2. Truth-adjacent evaluation (cross-reference, contradiction detection)
-3. Playwright CI integration (SSE-Blockade als bekanntes Problem dokumentiert)
-4. Upstream PR for security hardening
-5. Production darknet crawl validation
-6. LLM-Modell-Stabilität verbessern (Ollama-Config, Fallback-Mechanismen)
-7. Security-Regression-Tests vollständig in CI integrieren
+1. DB-Safety-Runde 2: SQLite FTS5, Research-Orchestrator-Storage, Evidence-Store ✅
+2. Pre-existing Test-Failures beheben: 9 Benchmark + 2 E2E (Submodul-Adapters pip-installieren)
+3. Truth-adjacent evaluation (cross-reference, contradiction detection)
+4. Playwright CI integration (SSE-Blockade als bekanntes Problem dokumentiert)
+5. Upstream PR for security hardening
+6. Production darknet crawl validation
+7. LLM-Modell-Stabilität verbessern (Ollama-Config, Fallback-Mechanismen)
+8. Security-Regression-Tests vollständig in CI integrieren

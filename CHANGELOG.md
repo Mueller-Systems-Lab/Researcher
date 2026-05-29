@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.2.2] — 2026-05-29
+### Added
+- **DB-Safety: ChromaDB Lock/Retry** (#122): RLock-basierte Serialisierung, Retry-Logik, Concurrency-Stresstests für parallele add/delete/update
+- **DB-Safety: Whoosh Write-Pfade** (#123): RLock + LockError-Handling in add_post/optimize/clear, Concurrency-Stresstests
+- **DB-Safety: JSON/JSONL Atomic-Write** (#124): tempfile + os.replace + Lock für atomare Schreibvorgänge, Partial-Line-Handling beim Lesen
+- **DB-Safety: Concurrency-Stresstests** (#125): Systematische append/read/partial-lines Stresstests für JSONL-Dateien
+- **CompositeRetriever: ValueError-Handler** (#130): as_completed()-Wrapper fängt ValueError bei Timeout/ConnectionError ab
+- **create_session(): Timeout-Verifikation** (#131): Explizite Timeout-Dokumentation und Tests für http_session.create_session()
+
+### Fixed
+- **research-serve.sh**: Review-Finding behoben (Shell-Pfad-Hardening)
+- **SSRF-Bypass**: URL-Validierung in web_fetch.py geschlossen (Host-Name-Check verstärkt)
+- **B607 × 3** (gpu_monitor.py): nvidia-smi Partial-Path — akzeptiert (Standard-Systemtool), Security-Triage aktualisiert
+
+### Changed
+- **pyproject.toml**: 0.2.1 → **0.2.2**
+- **ONNX Runtime entfernt**: Darknet-Resilience-Test nutzt keine externen Modelle mehr (`test_external_service_resilience.py`)
+
+### Quality Gates
+- `make quality`: **780 passed**, 24 skipped, 2 xfailed (+20 Tests seit v0.2.1)
+- `make security-project`: **0 Medium/High** Findings (6 Low dokumentiert)
+- `make lint`: **0 Errors**
+- `make coverage`: **≥78%** (Projektcode)
+
+### Known Failures (pre-existing)
+- **9 Benchmark-Tests** in `test_index_backends.py`: `ModuleNotFoundError` für `gpt_researcher.adapters.sqlite_fts5_adapter` — Submodul nicht als Paket installiert
+- **2 E2E Pipeline-Tests**: Gleiche `ModuleNotFoundError` + Retriever-Leerlauf (Mock-Konfiguration)
+
 ## [v0.2.1] — 2026-05-28
 ### Added
 - **Qwen3.5-Uncensored-HauhauCS als alleiniges Primary-Modell** via llama-server (Port 8082, 45 tok/s)
