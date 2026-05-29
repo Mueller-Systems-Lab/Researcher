@@ -78,7 +78,12 @@ class CompositeRetriever:
             }
             response = create_session().get(search_url, params=params, timeout=15)
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError:
+                self.last_errors["searxng"] = "SearXNG lieferte ungültiges JSON"
+                logger.warning(self.last_errors["searxng"])
+                return []
 
             results = []
             for r in data.get("results", [])[:max_results]:
@@ -171,8 +176,23 @@ class CompositeRetriever:
             searx_future = executor.submit(self._search_searxng, max_results)
             darknet_future = executor.submit(self._search_darknet, max_results)
 
-            searx_results = searx_future.result()
-            darknet_results = darknet_future.result()
+            # as_completed: Darknet-Ergebnisse sofort verfügbar,
+            # auch wenn SearXNG noch läuft (oder timeoutet)
+            future_map = {
+                searx_future: "searxng",
+                darknet_future: "darknet",
+            }
+            searx_results: list[dict] = []
+            darknet_results: list[dict] = []
+            for future in concurrent.futures.as_completed(future_map):
+                key = future_map[future]
+                try:
+                    if key == "searxng":
+                        searx_results = future.result()
+                    else:
+                        darknet_results = future.result()
+                except Exception as e:
+                    logger.warning(f"CompositeRetriever {key}: {e}")
 
         # Mischen & deduplizieren
         merged = searx_results + darknet_results
