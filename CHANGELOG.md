@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.2.3] — 2026-05-29
+### Added
+- **Submodul-Update: gpt_researcher v3.5.0** (#134): 45 neue Commits, Anthropic Tracking, max_tokens 200k, JSON-Repair, MCP env fix, OpenAlex, ModelsLab, uvm.
+- **SearchIndexRepository-Port + Adapter** (#135): `SQLiteFTS5Adapter` (sqlite3/stdlib) und `WhooshIndexAdapter` (Whoosh) implementiert. Schließt 11 pre-existing Failures.
+- **Compatibility-Layer** (#135): `gpt_researcher.adapters` und `gpt_researcher.ports` via conftest.py verfügbar.
+
+### Fixed
+- **TimeoutError in CompositeRetriever** (#136): Expliziter `TimeoutError`-Catch im `as_completed()`-Wrapper, Graceful Degradation mit partial results. 2 xfail-Tests → passed.
+- **ModuleNotFoundError in tests** (#135): `gpt_researcher.adapters.sqlite_fts5_adapter` war nie importierbar — Adapter-Implementierung nach Bytecode-Rekonstruktion erstellt.
+- **test.helpers Import** (#135): Fehlende `__init__.py` in `tests/` und `tests/helpers/` ergänzt.
+- **Test-Mock für Chaos-Tests** (#136): `_Future`-Mock durch echte `concurrent.futures.Future`-Objekte ersetzt.
+
+### Changed
+- Submodul-Pin: `92bfc038` (v3.4.4) → `b364917f` (v3.5.0)
+- `search/composite.py`: TimeoutError-Handling verbessert
+
+### Security
+- Vendor-Scan (`make security-vendor`): 8 High/16 Medium/Low Findings (report-only, per policy)
+- Projekt-Scan (`make security-project`): 0 Medium/High
+
 ## [v0.2.2] — 2026-05-29
 ### Added
 - **DB-Safety: ChromaDB Lock/Retry** (#122): RLock-basierte Serialisierung, Retry-Logik, Concurrency-Stresstests für parallele add/delete/update

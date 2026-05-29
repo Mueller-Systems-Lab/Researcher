@@ -1,5 +1,6 @@
 """Chaos-Engineering-Tests für CompositeRetriever — Timeout-Kaskaden, Race Conditions, Edge Cases."""
 
+import concurrent.futures
 import os
 import sys
 import threading
@@ -13,57 +14,38 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from search.composite import CompositeRetriever
 
 
-class _Future:
-    """Kontrolliertes Future-Double für ThreadPoolExecutor-Tests."""
-
-    def __init__(self, value=None, error=None):
-        self.value = value
-        self.error = error
-
-    def result(self, *args, **kwargs):
-        if self.error:
-            raise self.error
-        return self.value
-
-
-class _Executor:
-    """Executor-Double, das Futures anhand des Backend-Methodennamens zurückgibt."""
-
-    def __init__(self, *args, **kwargs):
-        self.futures = {
-            "_search_searxng": _Future(error=TimeoutError("SearXNG hängt")),
-            "_search_darknet": _Future(
-                [
-                    {
-                        "url": "darknet://fast/1",
-                        "title": "Schnelles Darknet-Ergebnis",
-                        "source": "Darknet Forum",
-                        "score": 0.7,
-                    }
-                ]
-            ),
-        }
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        return False
-
-    def submit(self, fn, *args, **kwargs):
-        return self.futures[fn.__name__]
-
-
 @pytest.mark.chaos
 class TestCompositeTimeoutCascade:
     """Timeout-Kaskaden: Langsame Backends blockieren nicht das Gesamtergebnis."""
 
-    @pytest.mark.xfail(
-        reason="CompositeRetriever behandelt Future-Timeouts derzeit nicht isoliert."
-    )
-    @patch("concurrent.futures.ThreadPoolExecutor", _Executor)
-    def test_timeout_searxng_slow_darknet_fast(self):
+    def _make_future(self, value=None, error=None):
+        """Erzeugt ein echtes concurrent.futures.Future mit Ergebnis/Fehler."""
+        f: concurrent.futures.Future = concurrent.futures.Future()
+        if error:
+            f.set_exception(error)
+        else:
+            f.set_result(value)
+        return f
+
+    @patch("concurrent.futures.ThreadPoolExecutor")
+    def test_timeout_searxng_slow_darknet_fast(self, mock_executor):
         """SearXNG hängt, Darknet antwortet sofort → Ergebnis wird nicht blockiert."""
+        searx_future = self._make_future(
+            error=concurrent.futures.TimeoutError("SearXNG hängt")
+        )
+        darknet_future = self._make_future(
+            [
+                {
+                    "url": "darknet://fast/1",
+                    "title": "Schnelles Darknet-Ergebnis",
+                    "source": "Darknet Forum",
+                    "score": 0.7,
+                }
+            ]
+        )
+        executor = mock_executor.return_value.__enter__.return_value
+        executor.submit.side_effect = [searx_future, darknet_future]
+
         r = CompositeRetriever("test")
         r.darknet_enabled = True
 
@@ -78,17 +60,17 @@ class TestCompositeTimeoutCascade:
             }
         ]
 
-    @pytest.mark.xfail(
-        reason="CompositeRetriever fängt Future-TimeoutError derzeit nicht ab."
-    )
     @patch("concurrent.futures.ThreadPoolExecutor")
     def test_timeout_both_slow_still_returns(self, mock_executor):
         """Beide Backends hängen → search() returned trotzdem eine leere Liste."""
+        searx_future = self._make_future(
+            error=concurrent.futures.TimeoutError("SearXNG hängt")
+        )
+        darknet_future = self._make_future(
+            error=concurrent.futures.TimeoutError("Darknet hängt")
+        )
         executor = mock_executor.return_value.__enter__.return_value
-        executor.submit.side_effect = [
-            _Future(error=TimeoutError("SearXNG hängt")),
-            _Future(error=TimeoutError("Darknet hängt")),
-        ]
+        executor.submit.side_effect = [searx_future, darknet_future]
 
         r = CompositeRetriever("test")
         r.darknet_enabled = True
