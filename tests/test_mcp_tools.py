@@ -1130,3 +1130,83 @@ def test_web_fetch_unexpected_exception():
     result = tool.run({"url": "http://example.com"})
     assert result["success"] is False
     assert "Interner Fehler" in result["error"]
+
+# ─── EvidenceStore: _store_evidence coverage gaps ────────────────────────
+
+
+def test_evidence_store_store_success():
+    """_store_evidence: success=True when add_one returns True."""
+    from mcp_tools.evidence_store import EvidenceStore
+
+    mock_store = MagicMock()
+    mock_store.add_one.return_value = True
+
+    tool = EvidenceStore(vector_store=mock_store)
+    result = tool.run({
+        "action": "store",
+        "claim": "Python is a programming language",
+        "embedding": [0.1, 0.2, 0.3],
+        "source": "https://example.com",
+    })
+
+    assert result["success"] is True
+    assert result["data"]["claim"] == "Python is a programming language"
+    assert result["data"]["source"] == "https://example.com"
+
+
+def test_evidence_store_store_chromadb_unavailable():
+    """_store_evidence: success=False when add_one returns False."""
+    from mcp_tools.evidence_store import EvidenceStore
+
+    mock_store = MagicMock()
+    mock_store.add_one.return_value = False
+
+    tool = EvidenceStore(vector_store=mock_store)
+    result = tool.run({
+        "action": "store",
+        "claim": "Test claim",
+        "embedding": [0.1, 0.2, 0.3],
+    })
+
+    assert result["success"] is False
+    assert "ChromaDB" in result["error"]
+    assert result["warnings"] == ["ChromaDB ist nicht aktiv"]
+
+
+def test_evidence_store_store_source_defaults_to_unknown():
+    """metadata['source'] ist 'unknown' when no source param."""
+    from mcp_tools.evidence_store import EvidenceStore
+
+    mock_store = MagicMock()
+    mock_store.add_one.return_value = True
+
+    tool = EvidenceStore(vector_store=mock_store)
+    result = tool.run({
+        "action": "store",
+        "claim": "Something interesting",
+        "embedding": [0.5, 0.6],
+    })
+
+    assert result["success"] is True
+    assert result["data"]["source"] == "unknown"
+
+
+def test_evidence_store_store_extra_metadata():
+    """Additional metadata passed through to add_one."""
+    from mcp_tools.evidence_store import EvidenceStore
+
+    mock_store = MagicMock()
+    mock_store.add_one.return_value = True
+
+    tool = EvidenceStore(vector_store=mock_store)
+    tool.run({
+        "action": "store",
+        "claim": "Claim with metadata",
+        "embedding": [0.7, 0.8],
+        "source": "https://x.com",
+        "metadata": {"author": "Alice", "topic": "testing"},
+    })
+
+    _, kwargs = mock_store.add_one.call_args
+    assert kwargs["metadata"]["author"] == "Alice"
+    assert kwargs["metadata"]["topic"] == "testing"

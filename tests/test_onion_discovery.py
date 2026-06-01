@@ -591,3 +591,95 @@ def test_pipeline_full_run(mock_enabled, mock_get):
         stats = pipeline.run_once()
 
         assert stats["seeds_processed"] >= 1
+
+# ─── Discovery Pipeline — enabled() pure-logic ───────────────────────────
+
+
+def test_pipeline_enabled_truthy():
+    """enabled() returns True when ONION_DISCOVERY_ENABLED='true'."""
+    from onion_discovery.engine import DiscoveryPipeline
+
+    with patch.dict(os.environ, {"ONION_DISCOVERY_ENABLED": "true"}):
+        p = DiscoveryPipeline()
+        assert p.enabled() is True
+
+
+def test_pipeline_enabled_truthy_one():
+    """enabled() returns True for '1'."""
+    from onion_discovery.engine import DiscoveryPipeline
+
+    with patch.dict(os.environ, {"ONION_DISCOVERY_ENABLED": "1"}):
+        p = DiscoveryPipeline()
+        assert p.enabled() is True
+
+
+def test_pipeline_enabled_case_insensitive():
+    """enabled() is case-insensitive via .lower()."""
+    from onion_discovery.engine import DiscoveryPipeline
+
+    with patch.dict(os.environ, {"ONION_DISCOVERY_ENABLED": "TRUE"}):
+        p = DiscoveryPipeline()
+        assert p.enabled() is True
+
+
+def test_pipeline_enabled_falsy():
+    """enabled() returns False for 'false'."""
+    from onion_discovery.engine import DiscoveryPipeline
+
+    with patch.dict(os.environ, {"ONION_DISCOVERY_ENABLED": "false"}):
+        p = DiscoveryPipeline()
+        assert p.enabled() is False
+
+
+def test_pipeline_enabled_unset_default():
+    """enabled() returns False when env var absent."""
+    from onion_discovery.engine import DiscoveryPipeline
+
+    saved = os.environ.pop("ONION_DISCOVERY_ENABLED", None)
+    try:
+        p = DiscoveryPipeline()
+        assert p.enabled() is False
+    finally:
+        if saved is not None:
+            os.environ["ONION_DISCOVERY_ENABLED"] = saved
+
+
+# ─── Human Review Queue — _load error handling ───────────────────────────
+
+
+def test_review_queue_load_corrupted_json():
+    """_load() handles JSONDecodeError — empty queue, no crash."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        queue_file = f"{tmpdir}/reviews.json"
+        with open(queue_file, "w") as f:
+            f.write("{this is not valid json [[[")
+
+        rq = ReviewQueue(queue_file=queue_file)
+        assert rq.pending_count == 0
+
+
+def test_review_queue_load_os_error():
+    """_load() handles OSError during open — empty queue."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with patch("os.path.exists", return_value=True),          patch("builtins.open", side_effect=OSError("Permission denied")):
+        rq = ReviewQueue(queue_file="/fake/reviews.json")
+        assert rq.pending_count == 0
+
+
+def test_review_queue_add_defaults_only():
+    """add() with only item_id+url builds ReviewItem with correct defaults."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        result = rq.add("min_id", "http://minimal.onion")
+        assert result is True
+
+        item = rq._items["min_id"]
+        assert item.title == ""
+        assert item.content_preview == ""
+        assert item.risk_level == "medium"
+        assert item.status == "pending"
