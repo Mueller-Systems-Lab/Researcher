@@ -11,6 +11,7 @@ Abdeckung:
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock, patch
 
 from research_workers.gap_analyzer import analyze_gaps, has_significant_gaps
 from research_workers.query_decomposer import (
@@ -21,6 +22,9 @@ from research_workers.query_decomposer import (
     decompose_node,
 )
 from research_workers.worker import (
+    _build_artifact,
+    _execute_queries,
+    _store_sources,
     queries_from_json,
     queries_to_json,
     research_worker,
@@ -304,3 +308,294 @@ def test_decomposed_queries_all_queries():
     )
     assert q.all_queries() == ["p1", "e1", "e2", "g1", "n1"]
     assert len(q) == 5
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _build_artifact — pure logic (zero external deps)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_build_artifact_full_structure():
+    """_build_artifact constructs complete JSON artifact with all fields."""
+    queries = DecomposedQueries(
+        node_id="n1",
+        language="en",
+        primary_queries=["primary query 1"],
+        entity_queries=["entity query 1"],
+        gap_queries=["gap query 1"],
+        negative_queries=["negative query 1"],
+    )
+    search_results = [
+        {
+            "url": "https://example.com/1",
+            "title": "Example Title 1",
+            "source": "SearXNG",
+            "score": 0.85,
+            "body": "This is the body content of result 1.",
+        },
+        {
+            "url": "https://example.com/2",
+            "title": "Example Title 2",
+            "source": "Wiki",
+            "score": 0.72,
+            "body": None,
+            "raw_content": "Raw content from result 2.",
+        },
+    ]
+    source_ids = ["src-abc-123", "src-def-456"]
+
+    artifact = _build_artifact(queries, search_results, source_ids, "n1")
+    data = json.loads(artifact)
+
+    assert data["node_id"] == "n1"
+    assert data["language"] == "en"
+    assert data["primary_queries"] == ["primary query 1"]
+    assert data["entity_queries"] == ["entity query 1"]
+    assert data["gap_queries"] == ["gap query 1"]
+    assert data["negative_queries"] == ["negative query 1"]
+    assert data["query_count"] == 4
+    assert data["source_ids"] == source_ids
+    assert data["sources_found"] == 2
+    assert data["sources_stored"] == 2
+    assert len(data["search_results"]) == 2
+
+    r0 = data["search_results"][0]
+    assert r0["url"] == "https://example.com/1"
+    assert r0["title"] == "Example Title 1"
+    assert r0["source"] == "SearXNG"
+    assert r0["score"] == 0.85
+    assert r0["snippet"] == "This is the body content of result 1."
+
+    r1 = data["search_results"][1]
+    assert r1["url"] == "https://example.com/2"
+    assert r1["source"] == "Wiki"
+    assert r1["snippet"] == "Raw content from result 2."
+
+
+def test_build_artifact_empty_lists():
+    """_build_artifact handles empty queries, zero search results, zero IDs."""
+    queries = DecomposedQueries(node_id="empty_node")
+    artifact = _build_artifact(queries, [], [], "empty_node")
+    data = json.loads(artifact)
+
+    assert data["node_id"] == "empty_node"
+    assert data["primary_queries"] == []
+    assert data["query_count"] == 0
+    assert data["search_results"] == []
+    assert data["source_ids"] == []
+    assert data["sources_found"] == 0
+    assert data["sources_stored"] == 0
+
+
+def test_build_artifact_snippet_truncation():
+    """_build_artifact truncates snippet to 300 characters."""
+    queries = DecomposedQueries(node_id="n1")
+    long_body = "b" * 500
+    search_results = [
+        {"url": "https://a.com", "title": "Body", "body": long_body},
+    ]
+
+    artifact = _build_artifact(queries, search_results, [], "n1")
+    data = json.loads(artifact)
+
+    assert len(data["search_results"][0]["snippet"]) == 300
+
+
+def test_build_artifact_default_values():
+    """_build_artifact uses safe defaults for missing keys."""
+    queries = DecomposedQueries(node_id="n1")
+    search_results = [{}]
+
+    artifact = _build_artifact(queries, search_results, ["src-1"], "n1")
+    data = json.loads(artifact)
+
+    r = data["search_results"][0]
+    assert r["url"] == ""
+    assert r["title"] == ""
+    assert r["source"] == "SearXNG"
+    assert r["score"] == 0
+    assert r["snippet"] == ""
+
+
+def test_build_artifact_snippet_body_priority():
+    """_build_artifact prefers body over raw_content for snippet."""
+    queries = DecomposedQueries(node_id="n1")
+    search_results = [
+        {
+            "url": "https://test.com",
+            "body": "body content",
+            "raw_content": "raw content",
+        },
+    ]
+
+    artifact = _build_artifact(queries, search_results, [], "n1")
+    data = json.loads(artifact)
+    assert data["search_results"][0]["snippet"] == "body content"
+
+
+def test_build_artifact_preserves_unicode():
+    """_build_artifact preserves non-ASCII characters."""
+    queries = DecomposedQueries(
+        node_id="n1",
+        language="de",
+        primary_queries=["Öffentliche Förderung für KI"],
+    )
+    search_results = [
+        {"url": "https://münchen.de", "title": "Förderung in München"},
+    ]
+
+    artifact = _build_artifact(queries, search_results, [], "n1")
+    assert "Öffentliche" in artifact
+    assert "München" in artifact
+
+    data = json.loads(artifact)
+    assert data["primary_queries"][0] == "Öffentliche Förderung für KI"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _execute_queries — error paths and deduplication
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_execute_queries_empty_input():
+    """Empty query_strings returns empty list immediately."""
+    assert _execute_queries([]) == []
+    assert _execute_queries([], run_id="test-empty") == []
+
+
+def test_execute_queries_importerror():
+    """ImportError for CompositeRetriever is caught gracefully."""
+    import builtins
+
+    _real_import = builtins.__import__
+
+    def _block_search(name, *a, **kw):
+        if name == "search" or name.startswith("search."):
+            raise ImportError(f"MOCK: no module {name!r}")
+        return _real_import(name, *a, **kw)
+
+    with patch("builtins.__import__", side_effect=_block_search):
+        result = _execute_queries(["test query"], run_id="test-importerror")
+
+    assert result == []
+
+
+def test_execute_queries_per_query_exception():
+    """Per-query Exception caught; does not abort the loop."""
+    failing_retriever = MagicMock()
+    failing_retriever.search.side_effect = RuntimeError("SearXNG timeout")
+
+    MockComposite = MagicMock(return_value=failing_retriever)
+
+    with patch("search.composite.CompositeRetriever", MockComposite):
+        result = _execute_queries(["failing query"], run_id="test-exc")
+
+    assert result == []
+    MockComposite.assert_called_once_with("failing query")
+
+
+def test_execute_queries_deduplication():
+    """Duplicate URLs removed; first occurrence kept; empty URL dropped."""
+    r_keep = {"url": "https://example.com", "title": "First"}
+    r_dupe = {"url": "https://example.com", "title": "Duplicate"}
+    r_other = {"url": "https://other.com", "title": "Other"}
+    r_no_url = {"url": "", "title": "No URL"}
+
+    mock_retriever = MagicMock()
+    mock_retriever.search.return_value = [r_keep, r_dupe, r_other, r_no_url]
+
+    with patch("search.composite.CompositeRetriever", return_value=mock_retriever):
+        result = _execute_queries(["test query"], run_id="test-dedup")
+
+    assert len(result) == 2
+    assert result[0] is r_keep
+    assert result[1] is r_other
+
+
+def test_execute_queries_safety_limit():
+    """Only first 3 query strings are executed."""
+    all_results = [
+        {"url": "https://q1.com"},
+        {"url": "https://q2.com"},
+        {"url": "https://q3.com"},
+        {"url": "https://q4.com"},
+        {"url": "https://q5.com"},
+    ]
+
+    # Return one unique result per query call to avoid dedup
+    mock_retriever = MagicMock()
+    mock_retriever.search.side_effect = lambda **kw: [all_results.pop(0)]
+
+    MockComposite = MagicMock(return_value=mock_retriever)
+
+    five_queries = ["q1", "q2", "q3", "q4", "q5"]
+    with patch("search.composite.CompositeRetriever", MockComposite):
+        result = _execute_queries(five_queries, run_id="test-safety")
+
+    assert MockComposite.call_count == 3
+    assert len(result) == 3
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _store_sources — error paths
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_store_sources_empty_input():
+    """Empty search_results returns empty list."""
+    assert _store_sources([], run_id="test-empty") == []
+    assert _store_sources([]) == []
+
+
+def test_store_sources_valueerror_skip():
+    """ValueError from save_source skips that result; others still stored."""
+    search_results = [
+        {"url": "https://bad.example", "title": "Bad"},
+        {"url": "https://good.example", "title": "Good"},
+    ]
+
+    bad_source = MagicMock()
+    bad_source.source_id = "src-bad"
+    good_source = MagicMock()
+    good_source.source_id = "src-good"
+
+    MockEvidenceSource = MagicMock(side_effect=[bad_source, good_source])
+
+    def _save_side_effect(source):
+        if source is bad_source:
+            raise ValueError("url must not be empty")
+
+    MockSaveSource = MagicMock(side_effect=_save_side_effect)
+
+    with patch("evidence_store.models.EvidenceSource", MockEvidenceSource):
+        with patch("evidence_store.store.save_source", MockSaveSource):
+            result = _store_sources(search_results, run_id="test-valerr")
+
+    assert result == ["src-good"]
+
+
+def test_store_sources_oserror_caught():
+    """OSError from save_source is caught per-result."""
+    search_results = [
+        {"url": "https://fail.io", "title": "Fails"},
+        {"url": "https://ok.io", "title": "OK"},
+    ]
+
+    fail_source = MagicMock()
+    fail_source.source_id = "src-fail"
+    ok_source = MagicMock()
+    ok_source.source_id = "src-ok"
+
+    MockEvidenceSource = MagicMock(side_effect=[fail_source, ok_source])
+
+    def _save_side_effect(source):
+        if source is fail_source:
+            raise OSError("Disk full")
+
+    MockSaveSource = MagicMock(side_effect=_save_side_effect)
+
+    with patch("evidence_store.models.EvidenceSource", MockEvidenceSource):
+        with patch("evidence_store.store.save_source", MockSaveSource):
+            result = _store_sources(search_results, run_id="test-oserr")
+
+    assert result == ["src-ok"]

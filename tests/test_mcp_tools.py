@@ -703,3 +703,199 @@ def test_audit_log_write_value_error(mock_dumps):
 
         assert result["success"] is False
         assert "Daten ungültig" in result["error"]
+
+
+# ─── WebFetch _handle_http_error — Pure-Logic Tests ──────────────────────
+
+
+def test_web_fetch_handle_http_error_known_status():
+    """_handle_http_error gibt korrekte Nachricht für bekannte Status-Codes."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    for status_code, fragment in {
+        400: "Bad Request",
+        403: "Forbidden",
+        404: "Not Found",
+        429: "Too Many Requests",
+        500: "Internal Server Error",
+        503: "Service Unavailable",
+    }.items():
+        mock_response = MagicMock()
+        mock_response.status_code = status_code
+        error = HTTPError(f"{status_code} Error")
+        error.response = mock_response
+
+        result = tool._handle_http_error(error, "http://example.com/page")
+        assert result["success"] is False
+        assert f"HTTP-Fehler {status_code}" in result["error"]
+        assert fragment in result["error"]
+
+
+def test_web_fetch_handle_http_error_unknown_status():
+    """_handle_http_error für unbekannten Status-Code (418)."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 418
+
+    error = HTTPError("418 Client Error")
+    error.response = mock_response
+
+    result = tool._handle_http_error(error, "http://example.com")
+    assert result["success"] is False
+    assert "HTTP-Fehler" in result["error"]
+
+
+def test_web_fetch_handle_http_error_none_response():
+    """_handle_http_error behandelt error.response=None."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    error = HTTPError("No response available")
+    error.response = None
+
+    result = tool._handle_http_error(error, "http://example.com")
+    assert result["success"] is False
+    assert "HTTP-Fehler" in result["error"]
+
+
+# ─── WebFetch _build_result — Pure-Logic Tests ─────────────────────────────
+
+
+def test_web_fetch_build_result_extract_text():
+    """_build_result extrahiert title, text, content_length."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = (
+        "<html><head><title>Test Page</title></head>"
+        "<body><p>Paragraph one.</p><p>Paragraph two.</p></body></html>"
+    )
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["url"] == "http://example.com"
+    assert result["data"]["status"] == 200
+    assert result["data"]["title"] == "Test Page"
+    assert "Paragraph one" in result["data"]["text"]
+    assert "<html>" not in result["data"]["text"]
+
+
+def test_web_fetch_build_result_truncation():
+    """_build_result setzt 'truncated': True wenn Text max_chars überschreitet."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    long_paragraph = "X" * 200
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = f"<html><body><p>{long_paragraph}</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=50, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["truncated"] is True
+    assert len(result["data"]["text"]) == 50
+
+
+def test_web_fetch_build_result_html_mode():
+    """_build_result mit extract_text=False liefert Roh-HTML."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Raw HTML</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=False
+    )
+
+    assert result["success"] is True
+    assert "html" in result["data"]
+    assert "Raw HTML" in result["data"]["html"]
+    assert "text" not in result["data"]
+
+
+def test_web_fetch_build_result_no_title():
+    """_build_result mit leerem <title>-Tag."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>No title</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["title"] == ""
+
+
+def test_web_fetch_build_result_onion_warning():
+    """_build_result fügt Onion-Warnung hinzu wenn policy.is_onion_url True."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_onion_url = MagicMock(return_value=True)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Onion</p></body></html>"
+
+    result = tool._build_result(
+        "http://dark.onion", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert "warning" in result["data"]
+    assert "Onion" in result["data"]["warning"]
+
+
+def test_web_fetch_build_result_no_onion_warning_for_clearnet():
+    """_build_result fügt keine Warnung hinzu bei Clearnet-URLs."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_onion_url = MagicMock(return_value=False)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Clearnet</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert "warning" not in result["data"]
