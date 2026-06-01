@@ -97,6 +97,136 @@ def test_seed_queue_get_stats():
         assert stats.get("approved") == 1
 
 
+# ─── SeedQueue untested pure-logic paths ─────────────────────────────────
+
+
+def test_seed_queue_add_seeds_batch():
+    """add_seeds fügt mehrere Seeds im Batch hinzu."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        count = sq.add_seeds(
+            ["http://a.onion", "http://b.onion", "http://c.onion"],
+            source="file",
+            priority=7,
+        )
+        assert count == 3
+        assert sq.total_count == 3
+        assert sq.pending_count == 3
+
+
+def test_seed_queue_add_seeds_with_duplicates():
+    """add_seeds ignoriert Duplikate im Batch."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        sq.add_seed("http://existing.onion")
+        count = sq.add_seeds(
+            [
+                "http://existing.onion",
+                "http://new.onion",
+                "http://new.onion",
+            ]
+        )
+        assert count == 1
+        assert sq.total_count == 2
+
+
+def test_seed_queue_add_seeds_empty_batch():
+    """add_seeds mit leerer Liste gibt 0 zurück."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        assert sq.add_seeds([], source="file") == 0
+
+
+def test_seed_queue_mark_error():
+    """mark_error setzt status='error'."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        sq.add_seed("http://broken.onion")
+        sq.mark_error("http://broken.onion", "Connection refused")
+        assert sq.pending_count == 0
+        assert sq.get_stats().get("error") == 1
+
+
+def test_seed_queue_mark_error_nonexistent():
+    """mark_error für nicht existierende URL ist No-Op."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        sq.mark_error("http://nonexistent.onion", "oops")
+        assert sq.total_count == 0
+
+
+def test_seed_queue_get_next_empty():
+    """get_next auf leerer Queue gibt None."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        assert sq.get_next() is None
+
+
+def test_seed_queue_get_next_max_priority_filter():
+    """get_next(max_priority=...) filtert nach Priorität."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        sq.add_seed("http://low.onion", priority=2)
+        sq.add_seed("http://high.onion", priority=9)
+
+        seed = sq.get_next(max_priority=5)
+        assert seed is not None
+        assert "low" in seed.url
+
+
+def test_seed_queue_add_priority_clamping():
+    """Priorität wird auf [1, 10] geclampt."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        sq.add_seed("http://below.onion", priority=-5)
+        sq.add_seed("http://above.onion", priority=100)
+
+        seed = sq.get_next()
+        assert seed is not None
+        assert "above" in seed.url  # priority 100→10 ist höher
+
+
+def test_seed_queue_add_with_tags():
+    """add_seed mit Tags speichert diese."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        seed_file = f"{tmpdir}/seeds.json"
+        sq = SeedQueue(seed_file=seed_file)
+        sq.add_seed("http://tagged.onion", tags=["forum", "high-value"])
+
+        sq2 = SeedQueue(seed_file=seed_file)
+        seed = list(sq2._seeds.values())[0]
+        assert "forum" in seed.tags
+
+
+def test_seed_queue_url_trailing_slash_dedup():
+    """Trailing-Slash-Varianten werden als Duplikat erkannt."""
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sq = SeedQueue(seed_file=f"{tmpdir}/seeds.json")
+        assert sq.add_seed("http://test.onion/") is True
+        assert sq.add_seed("http://test.onion") is False
+        assert sq.total_count == 1
+
+
 # ─── Policy Gateway ───────────────────────────────────────────────────────────
 
 

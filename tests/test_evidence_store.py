@@ -295,6 +295,88 @@ def test_hash_source_stable():
     assert h1 == h2
 
 
+# ── Untested pure-logic dedup paths ─────────────────────────────────────
+
+
+def test_is_duplicate_segment_exact_hash_match():
+    """is_duplicate_segment erkennt exaktes Duplikat via Content-Hash."""
+    existing = [EvidenceSegment(source_id="s1", text="Exact same.")]
+    candidate = EvidenceSegment(source_id="s1", text="Exact same.")
+    assert is_duplicate_segment(candidate, existing) is True
+
+
+def test_is_duplicate_segment_completely_different():
+    """is_duplicate_segment gibt False für verschiedene Texte."""
+    existing = [EvidenceSegment(source_id="s1", text="The quick brown fox.")]
+    candidate = EvidenceSegment(source_id="s2", text="A completely unrelated sentence.")
+    assert is_duplicate_segment(candidate, existing) is False
+
+
+def test_text_similarity_identical():
+    """_text_similarity gibt 1.0 für identische Texte."""
+    from evidence_store.dedup import _text_similarity
+
+    assert _text_similarity("hello world", "hello world") == 1.0
+
+
+def test_text_similarity_completely_disjoint():
+    """_text_similarity gibt 0.0 für disjunkte Wörter."""
+    from evidence_store.dedup import _text_similarity
+
+    assert _text_similarity("alpha beta", "gamma delta") == 0.0
+
+
+def test_text_similarity_empty_strings():
+    """_text_similarity gibt 0.0 für leere Strings."""
+    from evidence_store.dedup import _text_similarity
+
+    assert _text_similarity("", "something") == 0.0
+    assert _text_similarity("something", "") == 0.0
+
+
+def test_text_similarity_single_word():
+    """_text_similarity mit einzelnen Wörtern."""
+    from evidence_store.dedup import _text_similarity
+
+    assert _text_similarity("hello", "hello") == 1.0
+    assert _text_similarity("hello", "world") == 0.0
+
+
+def test_hash_segment_different_inputs():
+    """hash_segment: verschiedene Inputs → verschiedene Hashes."""
+    a = EvidenceSegment(source_id="s1", text="Content A")
+    b = EvidenceSegment(source_id="s2", text="Content B")
+    assert hash_segment(a) != hash_segment(b)
+
+
+def test_hash_source_different_inputs():
+    """hash_source: verschiedene Inputs → verschiedene Hashes."""
+    a = _make_source(url="https://a.com")
+    b = _make_source(url="https://b.com")
+    assert hash_source(a) != hash_source(b)
+
+
+def test_deduplicate_segments_empty():
+    """deduplicate_segments mit leerer Liste → leere Liste."""
+    assert deduplicate_segments([], []) == []
+
+
+def test_deduplicate_sources_empty():
+    """deduplicate_sources mit leerer Liste → leere Liste."""
+    assert deduplicate_sources([], []) == []
+
+
+def test_deduplicate_segments_intra_batch():
+    """deduplicate_segments entfernt Duplikate innerhalb des Batches."""
+    candidates = [
+        EvidenceSegment(source_id="s1", text="Unique."),
+        EvidenceSegment(source_id="s1", text="Unique."),
+        EvidenceSegment(source_id="s2", text="Another."),
+    ]
+    result = deduplicate_segments(candidates, [])
+    assert len(result) == 2
+
+
 # ── Edge Cases ───────────────────────────────────────────────────────────
 
 
