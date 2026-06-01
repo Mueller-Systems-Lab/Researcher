@@ -77,14 +77,15 @@ def temp_index_dir():
 @pytest.mark.e2e
 def test_full_pipeline_searxng_mock(mock_searxng_response, temp_index_dir):
     """E2E: Mock SearXNG → Retriever → Claim Validator → Index → Query."""
-    # 1. Mock SearXNG (Scope deckt Retriever + Claim Validator + Index ab)
-    with patch("requests.get") as mock_get:
-        mock_response = MagicMock()
-        mock_response.json.return_value = mock_searxng_response
-        mock_response.status_code = 200
-        mock_response.headers = {"Content-Type": "application/json"}
-        mock_get.return_value = mock_response
+    # 1. Mock SearXNG via create_session (CompositeRetriever uses Session.get, not requests.get)
+    mock_session = MagicMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = mock_searxng_response
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "application/json"}
+    mock_session.get.return_value = mock_response
 
+    with patch("scrapers.http_session.create_session", return_value=mock_session):
         # 2. Retriever (CompositeRetriever)
         from search.composite import CompositeRetriever
 
