@@ -187,3 +187,20 @@ def test_embedding_is_available_mocked():
 
         assert svc.is_available is True
         mock_get.assert_called_once_with("http://localhost:11434/api/tags", timeout=5)
+
+
+def test_embed_batch_connection_error_propagates():
+    """ConnectionError in batch embedding is re-raised."""
+    from unittest.mock import patch
+    import requests
+    from vectordb.embedding import EmbeddingService
+
+    svc = EmbeddingService(base_url="http://localhost:11434")
+    conn_err = requests.exceptions.ConnectionError("refused")
+
+    with patch("vectordb.embedding.requests.post", side_effect=conn_err):
+        try:
+            svc.embed_batch(["text1", "text2"])
+            assert False, "Should have raised"
+        except ConnectionError:
+            pass

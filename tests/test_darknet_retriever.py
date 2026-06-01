@@ -139,3 +139,17 @@ def test_darknet_uri_format():
     assert uri.startswith("darknet://"), "Sollte mit darknet:// beginnen"
     assert "forum1" in uri, "Sollte forum_id enthalten"
     assert len(uri) > len("darknet://forum1/post/"), "Sollte Hash enthalten"
+
+def test_darknet_retriever_duplicate_deduplication():
+    """Duplicate URIs are silently skipped."""
+    from unittest.mock import patch
+    from darknet_search.retriever import DarknetRetriever
+
+    retriever = DarknetRetriever("test", index_dir="/tmp/fake")
+    fake_results = [
+        {"forum_id": "f1", "url": "http://f.onion/p/1", "title": "T1", "content": "C1"},
+        {"forum_id": "f1", "url": "http://f.onion/p/1", "title": "T2", "content": "C2"},
+    ]
+    with patch.object(retriever.index, "search", return_value=fake_results):
+        results = retriever.search(max_results=5)
+    assert len(results) == 1

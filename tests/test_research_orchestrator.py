@@ -547,3 +547,46 @@ def test_compute_ready_multiple_deps_one_failed_blocks():
     ready = compute_ready_nodes(plan, state)
     assert n3.node_id not in ready
     assert state.node_states[n3.node_id].status == NodeRunStatus.BLOCKED
+
+def test_emit_event_with_payload():
+    """emit_event serializes payload."""
+    from research_orchestrator.events import EventType, emit_event
+
+    event = emit_event(EventType.RUN_CREATED, "r1", payload={"key": "value"})
+    assert event["payload"] == {"key": "value"}
+
+
+def test_set_node_status_creates_new_node():
+    """set_node_status creates NodeState for missing node_id."""
+    from research_orchestrator.state import NodeRunStatus, RunState
+
+    state = RunState(run_id="r1", plan_id="p1")
+    state.set_node_status("n99", NodeRunStatus.RUNNING)
+    assert "n99" in state.node_states
+    assert state.node_states["n99"].status == NodeRunStatus.RUNNING
+
+
+def test_compute_ready_dep_not_in_state():
+    """Missing dependency in state → node not ready."""
+    from research_orchestrator.scheduler import compute_ready_nodes
+    from research_orchestrator.state import NodeRunStatus, NodeState, RunState
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Dep missing")
+    n1 = ResearchNode(title="A", question="Q1")
+    n2 = ResearchNode(title="B", question="Q2", depends_on=["nonexistent_dep"])
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.PENDING
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert n1.node_id in ready
+    assert n2.node_id not in ready

@@ -899,3 +899,234 @@ def test_web_fetch_build_result_no_onion_warning_for_clearnet():
 
     assert result["success"] is True
     assert "warning" not in result["data"]
+
+
+# ─── WebFetch _validate_url_target error handlers ──────────────────────
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_validate_url_target_os_error(mock_getaddrinfo):
+    """OSError (non-gaierror) in _validate_url_target."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.side_effect = OSError("Network is unreachable")
+
+    tool = WebFetchTool()
+    error = tool._validate_url_target("http://example.com")
+    assert error is not None
+    assert "Netzwerkfehler" in error
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_validate_url_target_value_error(mock_getaddrinfo):
+    """Malformed addrinfo tuple → ValueError caught."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [("too", "short")]
+
+    tool = WebFetchTool()
+    error = tool._validate_url_target("http://example.com")
+    assert error is not None
+    assert "ungültige Adresse" in error
+
+
+# ─── WebFetch _fetch_with_resilience 505 fallback ───────────────────────
+
+
+def test_web_fetch_with_resilience_505_fallback():
+    """505 HTTP error triggers refetch_with_fallback_ua."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_505 = MagicMock()
+    mock_505.status_code = 505
+    mock_200 = MagicMock()
+    mock_200.status_code = 200
+    mock_200.raise_for_status.return_value = None
+
+    tool._session.get = MagicMock(side_effect=[mock_505, mock_200])
+    response = tool._fetch_with_resilience("http://example.com")
+    assert response.status_code == 200
+    assert tool._session.get.call_count == 2
+
+
+# ─── WebFetch _check_js_only high-confidence ───────────────────────────
+
+
+@patch("mcp_tools.web_fetch.detect_js_only")
+def test_web_fetch_check_js_only_high_confidence(mock_detect):
+    """High-confidence JS-only detection blocks request."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_detect.return_value = {
+        "js_required": True,
+        "confidence": "high",
+        "reason": "Cloudflare-Challenge",
+    }
+
+    tool = WebFetchTool()
+    mock_response = MagicMock()
+    mock_response.text = "<div>checking your browser</div>"
+    mock_response.status_code = 200
+
+    result = tool._check_js_only(mock_response, "http://example.com")
+    assert result is not None
+    assert result["success"] is False
+    assert result["data"]["js_required"] is True
+    assert "JavaScript" in result["error"]
+
+
+# ─── WebFetch run() error handlers ─────────────────────────────────────
+
+
+def test_web_fetch_policy_blocks_url():
+    """Policy gate blocks URL in run()."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    mock_decision = MagicMock()
+    mock_decision.allowed = False
+    mock_decision.reason = "Blocklist-Match"
+    tool.policy.is_allowed = MagicMock(return_value=mock_decision)
+
+    result = tool.run({"url": "http://blocked.com"})
+    assert result["success"] is False
+    assert "blockiert" in result["error"]
+
+
+def test_web_fetch_js_only_blocks_request():
+    """JS-only detection blocks in run() flow."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.history = []
+    tool._fetch_with_resilience = MagicMock(return_value=mock_response)
+
+    js_block = {
+        "success": False,
+        "data": {"url": "http://x.com", "status": 200, "js_required": True},
+        "error": "Seite benötigt JavaScript",
+    }
+    tool._check_js_only = MagicMock(return_value=js_block)
+
+    result = tool.run({"url": "http://x.com"})
+    assert result["success"] is False
+    assert "JavaScript" in result["error"]
+
+
+@patch("mcp_tools.web_fetch.ssl_fallback_fetch")
+def test_web_fetch_ssl_error_fallback_success(mock_ssl_fallback):
+    """SSLError → ssl_fallback_fetch succeeds."""
+    from requests.exceptions import SSLError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+    tool._fetch_with_resilience = MagicMock(side_effect=SSLError("cert fail"))
+
+    mock_fb = MagicMock()
+    mock_fb.status_code = 200
+    mock_fb.headers = {"Content-Type": "text/html"}
+    mock_fb.text = "<html><body><p>OK</p></body></html>"
+    mock_fb.raise_for_status.return_value = None
+    mock_fb.history = []
+    mock_ssl_fallback.return_value = mock_fb
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is True
+    mock_ssl_fallback.assert_called_once()
+
+
+@patch("mcp_tools.web_fetch.ssl_fallback_fetch")
+def test_web_fetch_ssl_error_fallback_fails(mock_ssl_fallback):
+    """SSLError → fallback also fails."""
+    from requests.exceptions import RequestException, SSLError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+    tool._fetch_with_resilience = MagicMock(side_effect=SSLError("cert fail"))
+    mock_ssl_fallback.side_effect = RequestException("Fallback failed")
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is False
+    assert "SSL-Fehler" in result["error"]
+
+
+def test_web_fetch_timeout_error():
+    """Timeout in run()."""
+    from requests.exceptions import Timeout
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+    tool._fetch_with_resilience = MagicMock(side_effect=Timeout("Read timed out"))
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is False
+    assert "Timeout" in result["error"]
+
+
+def test_web_fetch_http_error_delegation():
+    """HTTPError in run() → _handle_http_error."""
+    from requests.exceptions import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+
+    err_resp = MagicMock()
+    err_resp.status_code = 403
+    http_err = HTTPError("403 Forbidden")
+    http_err.response = err_resp
+    tool._fetch_with_resilience = MagicMock(side_effect=http_err)
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is False
+    assert "HTTP-Fehler 403" in result["error"]
+
+
+def test_web_fetch_generic_request_exception():
+    """Generic RequestException in run()."""
+    from requests.exceptions import RequestException
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+    tool._fetch_with_resilience = MagicMock(
+        side_effect=RequestException("Transport error")
+    )
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is False
+    assert "HTTP-Fehler" in result["error"]
+
+
+def test_web_fetch_unexpected_exception():
+    """Non-requests Exception in run() → Interner Fehler."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_allowed = MagicMock(return_value=MagicMock(allowed=True))
+    tool._validate_url_target = MagicMock(return_value=None)
+    tool._fetch_with_resilience = MagicMock(side_effect=ValueError("Not an HTTP error"))
+
+    result = tool.run({"url": "http://example.com"})
+    assert result["success"] is False
+    assert "Interner Fehler" in result["error"]

@@ -663,3 +663,11 @@ def test_robots_parse_line_without_colon_ignored():
     content = "just random text\nUser-agent: *\nDisallow: /x"
     policy = _parse_robots_content("test.com", content)
     assert "/x" in policy.disallowed_paths
+
+def test_extract_metadata_description():
+    """Meta-Description from HTML."""
+    from searcher_pipeline.content_extractor import extract_metadata
+
+    html = '<html><head><meta name="description" content="A test page."></head></html>'
+    meta = extract_metadata(html)
+    assert meta["description"] == "A test page."

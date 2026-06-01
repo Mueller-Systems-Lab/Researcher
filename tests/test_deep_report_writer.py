@@ -313,3 +313,26 @@ def test_write_report_empty_sources():
     report = write_report(query="Minimal test")
     assert "Research Question" in report
     assert "*No sources" in report
+
+def test_insert_citations_fuzzy_match():
+    """Citations via fuzzy (non-exact) match."""
+    from deep_report.citation_inserter import insert_citations
+
+    text = "GPUs are crucial for machine learning workloads."
+    citations = [
+        {"label": "[S1]", "quote": "GPUs are important for machine learning."},
+    ]
+    result = insert_citations(text, citations)
+    assert "[S1]" in result
+
+
+def test_generate_gap_queries_with_node_questions():
+    """Gap-Queries from node_questions."""
+    from deep_report.revision_loop import generate_gap_queries
+
+    gaps = generate_gap_queries(
+        {"source_coverage": 30, "traceability": 40, "evidence_diversity": 20},
+        original_query="GPU comparison",
+        node_questions=["How fast?", "What cost?"],
+    )
+    assert any("verifiable citation" in g for g in gaps)

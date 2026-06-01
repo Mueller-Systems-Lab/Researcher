@@ -599,3 +599,69 @@ def test_store_sources_oserror_caught():
             result = _store_sources(search_results, run_id="test-oserr")
 
     assert result == ["src-ok"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Final gaps → 100% coverage
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_store_sources_importerror():
+    """ImportError for evidence_store is caught; returns empty list."""
+    import builtins
+
+    _real_import = builtins.__import__
+
+    def _block_evidence(name, *a, **kw):
+        if name == "evidence_store" or name.startswith("evidence_store."):
+            raise ImportError("MOCK: no evidence_store")
+        return _real_import(name, *a, **kw)
+
+    search_results = [{"url": "https://example.com", "title": "Test"}]
+
+    with patch("builtins.__import__", side_effect=_block_evidence):
+        result = _store_sources(search_results, run_id="test-importerr")
+
+    assert result == []
+
+
+def test_worker_exception_returns_false():
+    """Exception in decompose_node returns (False, [])."""
+    with patch(
+        "research_workers.worker.decompose_node",
+        side_effect=ValueError("Decomposition failed"),
+    ):
+        ok, artifacts = research_worker(
+            node_id="n1",
+            question="This will raise",
+            context={},
+        )
+
+    assert ok is False
+    assert artifacts == []
+
+
+def test_worker_search_results_no_sources_warning():
+    """Warning when search succeeds but evidence store stores nothing."""
+    fake_search_results = [{"url": "https://example.com/1", "title": "R1"}]
+
+    with (
+        patch(
+            "research_workers.worker._execute_queries",
+            return_value=fake_search_results,
+        ),
+        patch(
+            "research_workers.worker._store_sources",
+            return_value=[],
+        ),
+        patch("research_workers.worker.logger") as mock_logger,
+    ):
+        ok, artifacts = research_worker(
+            node_id="warn-node",
+            question="Test question",
+            context={"run_id": "run-store-fail"},
+        )
+
+    assert ok is True
+    warning_msgs = [c.args[0] for c in mock_logger.warning.call_args_list]
+    assert any("zero stored in evidence store" in msg for msg in warning_msgs)
