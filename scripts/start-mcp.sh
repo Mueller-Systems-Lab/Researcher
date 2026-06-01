@@ -3,7 +3,7 @@
 # start-mcp.sh — Startet den MCP-Tools-Server
 # =============================================================================
 # Nutzung:
-#   ./scripts/start-mcp.sh              # Port 8765 (default)
+#   ./scripts/start-mcp.sh              # Port 8766 (default)
 #   ./scripts/start-mcp.sh --port 9000  # Anderer Port
 #   ./scripts/start-mcp.sh --check      # Nur Tools auflisten
 # =============================================================================
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT=8765
+PORT=8766
 
 case "${1:-}" in
     --check|-c)
@@ -25,12 +25,12 @@ print(f'  ({len(list_tools())} Tools registriert)')
         exit 0
         ;;
     --port|-p)
-        PORT="${2:-8765}"
+        PORT="${2:-8766}"
         ;;
     --help|-h)
         echo "start-mcp.sh — MCP-Tools-Server"
         echo ""
-        echo "  ./scripts/start-mcp.sh             Port 8765"
+        echo "  ./scripts/start-mcp.sh             Port 8766"
         echo "  ./scripts/start-mcp.sh --port 9000 Port 9000"
         echo "  ./scripts/start-mcp.sh --check     Tools auflisten"
         exit 0

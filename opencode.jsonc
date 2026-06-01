@@ -9,7 +9,7 @@
     // Repo-local MCP server exposing the security-gated tools in mcp_tools/.
     "researcher-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:8765/mcp",
+      "url": "http://127.0.0.1:8766/mcp",
       "enabled": true
     },
     // Ambient workspace gptr-mcp is disabled here to avoid cross-project bleed.

@@ -55,7 +55,7 @@ def test_e2e_mcp_server_available():
     """MCP-Server ist erreichbar."""
     import requests
 
-    r = requests.get("http://localhost:8765/health", timeout=5)
+    r = requests.get("http://localhost:8766/health", timeout=5)
     assert r.status_code == 200
 
 

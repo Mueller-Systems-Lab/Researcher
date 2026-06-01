@@ -30,7 +30,7 @@ DASHBOARD_PORT: int = int(os.getenv("DASHBOARD_PORT", "8888"))
 DASHBOARD_HOST: str = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 
 # ── MCP Server ──────────────────────────────────────────────────────────────
-MCP_PORT: int = int(os.getenv("MCP_PORT", "8765"))
+MCP_PORT: int = int(os.getenv("MCP_PORT", "8766"))
 MCP_HOST: str = os.getenv("MCP_HOST", "127.0.0.1")
 
 # ── Llama Server (OpenAI-compatible) ────────────────────────────────────────

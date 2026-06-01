@@ -12,7 +12,7 @@ Detected stack and workflow signals:
 - Docker Compose for local runtime services
 - Playwright-based browser test coverage under `tests/playwright/`
 - Local research runtime services: Ollama, SearXNG, Tor, ChromaDB, Whoosh
-- Project-local MCP server on `127.0.0.1:8765`
+- Project-local MCP server on `127.0.0.1:8766`
 
 ## 2. Existing OpenCode/MCP Configuration
 
@@ -71,7 +71,7 @@ Current project-level OpenCode configuration:
     // Repo-local MCP server exposing the security-gated tools in mcp_tools/.
     "researcher-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:8765/mcp",
+      "url": "http://127.0.0.1:8766/mcp",
       "enabled": true
     },
     // Project-scoped Playwright override: headless and restricted to local app origins.
@@ -118,8 +118,10 @@ opencode --version
 opencode auth list
 opencode mcp list
 python3 -m mcp_tools.server
-curl -fsS http://127.0.0.1:8765/health
-curl -fsS -X POST http://127.0.0.1:8765/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+curl -fsS http://127.0.0.1:8766/
+curl -fsS http://127.0.0.1:8766/health
+opencode mcp debug researcher-mcp
+bash -lc 'opencode mcp list'
 bash scripts/start-mcp.sh --check
 npx -y @playwright/mcp@latest --help
 node -e "JSON.parse(require('fs').readFileSync('config/playwright-mcp.local.json', 'utf8')); console.log('ok')"
@@ -131,9 +133,11 @@ node -e "JSON.parse(require('fs').readFileSync('config/playwright-mcp.local.json
 opencode --version: PASS (1.15.0)
 opencode auth list: PASS
 opencode mcp list: PARTIAL/FAIL (local OpenCode state reported PRAGMA wal_checkpoint(PASSIVE); clean-data retry stalled after printing the header)
-python3 -m mcp_tools.server: PASS (server announced http://127.0.0.1:8765/mcp and 5 tools)
+python3 -m mcp_tools.server: PASS (server announced http://127.0.0.1:8766/mcp and 5 tools)
+curl /: PASS
 curl /health: PASS
-curl tools/list: PASS
+opencode mcp debug researcher-mcp: PASS (HTTP 200, no auth required)
+bash -lc 'opencode mcp list': PASS (researcher-mcp connected)
 bash scripts/start-mcp.sh --check: PASS
 npx @playwright/mcp --help: PASS (official CLI exposes `--config`, `--browser`, `--allowed-origins`, and related browser controls)
 config/playwright-mcp.local.json: PASS (valid JSON)
@@ -160,5 +164,6 @@ config/playwright-mcp.local.json: PASS (valid JSON)
 
 - If `opencode mcp list` keeps failing with `PRAGMA wal_checkpoint(PASSIVE)`, the issue is in the user-level OpenCode state, not this repo-local config.
 - If `python3 -m mcp_tools.server` fails, verify the project dependencies are installed in the active Python environment.
-- If port `8765` is already in use, change `MCP_PORT` before starting the server.
+- If `opencode mcp auth researcher-mcp` returns `WWW-Authenticate: Bearer` or `Missing or invalid authentication`, the URL is pointing at the wrong process. `researcher-mcp` is not OAuth-enabled; stop the conflicting service or start the MCP server on the configured `MCP_PORT`.
+- If port `8766` is already in use, change `MCP_PORT` before starting the server.
 - If `scripts/start-mcp.sh` is called directly and fails with permission denied, invoke it as `bash scripts/start-mcp.sh ...` or fix the executable bit.
