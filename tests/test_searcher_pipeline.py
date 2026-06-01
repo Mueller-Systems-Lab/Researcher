@@ -12,7 +12,13 @@ from searcher_pipeline.prompt_injection_filter import (
     is_suspicious,
     sanitize_for_safe_display,
 )
-from searcher_pipeline.rate_limiter import check_rate, record_request, reset
+from searcher_pipeline.rate_limiter import (
+    check_rate,
+    record_request,
+    reset,
+    set_domain_delay,
+    wait_if_needed,
+)
 from searcher_pipeline.reranker import calculate_score, rerank
 from searcher_pipeline.robots_policy import (
     _check_path,
@@ -430,3 +436,95 @@ def test_canonicalize_empty_fragment_query():
     """URL ohne Query und Fragment — root erhält Slash."""
     result = canonicalize("https://example.com")
     assert result in ("https://example.com", "https://example.com/")
+
+
+# ── Rate Limiter (set_domain_delay) ────────────────────────────────────────
+
+
+def test_set_domain_delay_new_domain():
+    """set_domain_delay setzt Delay für neue Domain ohne vorherige Request."""
+    reset()
+    set_domain_delay("slow.example.com", 5.0)
+    assert check_rate("slow.example.com") is True
+
+
+def test_set_domain_delay_preserves_last():
+    """set_domain_delay ändert nur Delay, nicht den last-request-Timestamp."""
+    reset()
+    record_request("example.com")
+    assert check_rate("example.com") is False
+    set_domain_delay("example.com", 10.0)
+    assert check_rate("example.com") is False
+
+
+def test_set_domain_delay_multiple_domains():
+    """set_domain_delay arbeitet pro Domain isoliert."""
+    reset()
+    set_domain_delay("cnn.com", 3.0)
+    set_domain_delay("wikipedia.org", 5.0)
+    record_request("cnn.com")
+    record_request("wikipedia.org")
+    assert check_rate("cnn.com") is False
+    assert check_rate("wikipedia.org") is False
+
+
+# ── Rate Limiter (wait_if_needed) ─────────────────────────────────────────
+
+
+def test_wait_if_needed_no_delay_needed():
+    """wait_if_needed: keine vorherige Request → kein sleep."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep:
+        wait_if_needed("example.com")
+        mock_sleep.assert_not_called()
+
+
+def test_wait_if_needed_delay_expired():
+    """wait_if_needed: Delay ist abgelaufen → kein sleep."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        record_request("example.com")
+        mock_time.return_value = 1002.5
+        wait_if_needed("example.com")
+        mock_sleep.assert_not_called()
+
+
+def test_wait_if_needed_delay_not_expired():
+    """wait_if_needed: Delay noch nicht abgelaufen → time.sleep wird aufgerufen."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        record_request("example.com")
+        mock_time.return_value = 1000.5
+        wait_if_needed("example.com")
+        mock_sleep.assert_called_once_with(1.5)
+
+
+def test_wait_if_needed_custom_delay():
+    """wait_if_needed respektiert ein per set_domain_delay gesetztes Delay."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        set_domain_delay("slow.example.com", 5.0)
+        record_request("slow.example.com")
+        mock_time.return_value = 1001.0
+        wait_if_needed("slow.example.com")
+        mock_sleep.assert_called_once_with(4.0)

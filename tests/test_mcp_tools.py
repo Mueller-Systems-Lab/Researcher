@@ -485,3 +485,221 @@ def test_web_fetch_ssrf_resolution_failure(mock_getaddrinfo):
     result = tool.run({"url": "http://nonexistent-domain-xyz-123.com"})
     assert result["success"] is False
     assert "nicht auflösbar" in result["error"]
+
+
+# ─── AuditLog Properties ────────────────────────────────────────────────────
+
+
+def test_audit_log_name_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    assert tool.name == "audit-log"
+
+
+def test_audit_log_description_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    assert "Append-only" in tool.description
+    assert "Audit-Trail" in tool.description
+
+
+def test_audit_log_parameters_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    params = tool.parameters
+    assert params["type"] == "object"
+    assert params["required"] == ["action"]
+
+    props = params["properties"]
+    assert "action" in props
+    assert props["action"]["type"] == "string"
+    assert "write" in props["action"]["enum"]
+    assert "read" in props["action"]["enum"]
+    assert "stats" in props["action"]["enum"]
+    assert "event" in props
+    assert "actor" in props
+    assert "details" in props
+    assert "limit" in props
+    assert "event_filter" in props
+    assert "since" in props
+
+
+# ─── AuditLog _read_entries: event_filter ───────────────────────────────────
+
+
+def test_audit_log_read_event_filter():
+    """_read_entries filtert korrekt nach event_filter."""
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+        tool.run({"action": "write", "event": "beta", "actor": "test"})
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+
+        result = tool.run({"action": "read", "event_filter": "alpha"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        for entry in result["data"]["entries"]:
+            assert entry["event"] == "alpha"
+
+
+def test_audit_log_read_event_filter_no_match():
+    """event_filter ohne Treffer liefert leere Liste."""
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+
+        result = tool.run({"action": "read", "event_filter": "nonexistent"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 0
+        assert result["data"]["entries"] == []
+
+
+# ─── AuditLog _read_entries: since (ISO timestamp) ──────────────────────────
+
+
+def test_audit_log_read_since_filter():
+    """_read_entries filtert korrekt nach since."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        entries = [
+            {
+                "timestamp": "2024-01-01T00:00:00",
+                "event": "old_1",
+                "actor": "test",
+                "details": {},
+            },
+            {
+                "timestamp": "2025-06-01T00:00:00",
+                "event": "mid",
+                "actor": "test",
+                "details": {},
+            },
+            {
+                "timestamp": "2025-12-01T00:00:00",
+                "event": "new_1",
+                "actor": "test",
+                "details": {},
+            },
+        ]
+        with open(log_file, "w") as f:
+            for entry in entries:
+                f.write(json_mod.dumps(entry) + "\n")
+
+        result = tool.run({"action": "read", "since": "2025-06-01T00:00:00"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        events = [e["event"] for e in result["data"]["entries"]]
+        assert "old_1" not in events
+        assert "mid" in events
+        assert "new_1" in events
+
+
+# ─── AuditLog _read_entries: JSONDecodeError + empty line skip ──────────────
+
+
+def test_audit_log_read_json_decode_error_skip():
+    """_read_entries überspringt Zeilen mit JSONDecodeError."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        valid = {
+            "timestamp": "2025-01-01T00:00:00",
+            "event": "valid",
+            "actor": "test",
+            "details": {},
+        }
+
+        with open(log_file, "w") as f:
+            f.write(json_mod.dumps(valid) + "\n")
+            f.write("this is not valid json\n")
+            f.write("{broken json\n")
+            f.write(json_mod.dumps(valid) + "\n")
+
+        result = tool.run({"action": "read"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        for entry in result["data"]["entries"]:
+            assert entry["event"] == "valid"
+
+
+def test_audit_log_read_empty_line_skip():
+    """_read_entries überspringt Leerzeilen."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        valid = {
+            "timestamp": "2025-01-01T00:00:00",
+            "event": "valid",
+            "actor": "test",
+            "details": {},
+        }
+
+        with open(log_file, "w") as f:
+            f.write("\n")
+            f.write(json_mod.dumps(valid) + "\n")
+            f.write("\n")
+            f.write("    \n")
+            f.write(json_mod.dumps(valid) + "\n")
+
+        result = tool.run({"action": "read"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+
+
+# ─── AuditLog _write_entry: OSError ─────────────────────────────────────────
+
+
+@patch("builtins.open")
+def test_audit_log_write_os_error(mock_open):
+    """_write_entry fängt OSError beim Dateischreiben ab."""
+    from mcp_tools.audit_log import AuditLog
+
+    mock_open.side_effect = OSError("Disk full")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/write_test.jsonl"
+        tool = AuditLog(log_file=log_file)
+        result = tool.run({"action": "write", "event": "test_event"})
+
+        assert result["success"] is False
+        assert "Audit-Log kann nicht geschrieben werden" in result["error"]
+
+
+@patch("json.dumps")
+def test_audit_log_write_value_error(mock_dumps):
+    """_write_entry fängt TypeError bei json.dumps."""
+    from mcp_tools.audit_log import AuditLog
+
+    mock_dumps.side_effect = TypeError("Object of type bytes is not JSON serializable")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/write_test.jsonl"
+        tool = AuditLog(log_file=log_file)
+        result = tool.run({"action": "write", "event": "test_event"})
+
+        assert result["success"] is False
+        assert "Daten ungültig" in result["error"]
