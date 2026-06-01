@@ -276,3 +276,78 @@ def test_write_results_to_index_partial_failure():
     results = [{"url": f"http://{i}.com"} for i in range(3)]
     count = write_results_to_index(results, index_backend=mock_backend)
     assert count == 2
+
+
+# --- write_results_to_index: index_backend=None branches ---
+
+
+def test_write_results_to_index_none_backend_whoosh(monkeypatch):
+    """index_backend=None, kein SEARCH_INDEX_BACKEND gesetzt -> whoosh default."""
+    import os as _os
+
+    from mcp_tools.claim_index_writer import write_results_to_index
+
+    monkeypatch.setenv("DARKNET_INDEX_PATH", "/tmp/test_whoosh_idx")
+
+    mock_adapter_cls = MagicMock()
+    mock_instance = MagicMock()
+    mock_instance.index.return_value = True
+    mock_adapter_cls.return_value = mock_instance
+
+    with patch(
+        "search.adapters.whoosh_index_adapter.WhooshIndexAdapter",
+        mock_adapter_cls,
+    ):
+        results = [{"url": "http://a.com", "title": "T", "snippet": "S"}]
+        count = write_results_to_index(results, claim="test", index_backend=None)
+
+    assert count == 1
+    mock_adapter_cls.assert_called_once_with("/tmp/test_whoosh_idx")
+    mock_instance.index.assert_called_once()
+
+
+def test_write_results_to_index_none_backend_sqlite(monkeypatch):
+    """index_backend=None, SEARCH_INDEX_BACKEND=sqlite_fts5 -> SQLiteFTS5Adapter."""
+    from mcp_tools.claim_index_writer import write_results_to_index
+
+    monkeypatch.setenv("SEARCH_INDEX_BACKEND", "sqlite_fts5")
+    monkeypatch.setenv("DARKNET_INDEX_PATH", "/tmp/test_sqlite_idx")
+
+    mock_adapter_cls = MagicMock()
+    mock_instance = MagicMock()
+    mock_instance.index.return_value = True
+    mock_adapter_cls.return_value = mock_instance
+
+    with patch(
+        "search.adapters.sqlite_fts5_adapter.SQLiteFTS5Adapter",
+        mock_adapter_cls,
+    ):
+        results = [{"url": "http://b.com", "title": "T", "snippet": "S"}]
+        count = write_results_to_index(results, claim="test", index_backend=None)
+
+    assert count == 1
+    mock_adapter_cls.assert_called_once()
+    mock_instance.index.assert_called_once()
+
+
+def test_write_results_to_index_none_backend_default_path(monkeypatch):
+    """index_backend=None, DARKNET_INDEX_PATH nicht gesetzt -> default ./darknet_index."""
+    from mcp_tools.claim_index_writer import write_results_to_index
+
+    monkeypatch.delenv("DARKNET_INDEX_PATH", raising=False)
+
+    mock_adapter_cls = MagicMock()
+    mock_instance = MagicMock()
+    mock_instance.index.return_value = True
+    mock_adapter_cls.return_value = mock_instance
+
+    with patch(
+        "search.adapters.whoosh_index_adapter.WhooshIndexAdapter",
+        mock_adapter_cls,
+    ):
+        results = [{"url": "http://c.com", "title": "T", "snippet": "S"}]
+        count = write_results_to_index(results, claim="test", index_backend=None)
+
+    assert count == 1
+    mock_adapter_cls.assert_called_once_with("./darknet_index")
+    mock_instance.index.assert_called_once()

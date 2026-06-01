@@ -12,7 +12,13 @@ from searcher_pipeline.prompt_injection_filter import (
     is_suspicious,
     sanitize_for_safe_display,
 )
-from searcher_pipeline.rate_limiter import check_rate, record_request, reset
+from searcher_pipeline.rate_limiter import (
+    check_rate,
+    record_request,
+    reset,
+    set_domain_delay,
+    wait_if_needed,
+)
 from searcher_pipeline.reranker import calculate_score, rerank
 from searcher_pipeline.robots_policy import (
     _check_path,
@@ -430,3 +436,230 @@ def test_canonicalize_empty_fragment_query():
     """URL ohne Query und Fragment — root erhält Slash."""
     result = canonicalize("https://example.com")
     assert result in ("https://example.com", "https://example.com/")
+
+
+# ── Rate Limiter (set_domain_delay) ────────────────────────────────────────
+
+
+def test_set_domain_delay_new_domain():
+    """set_domain_delay setzt Delay für neue Domain ohne vorherige Request."""
+    reset()
+    set_domain_delay("slow.example.com", 5.0)
+    assert check_rate("slow.example.com") is True
+
+
+def test_set_domain_delay_preserves_last():
+    """set_domain_delay ändert nur Delay, nicht den last-request-Timestamp."""
+    reset()
+    record_request("example.com")
+    assert check_rate("example.com") is False
+    set_domain_delay("example.com", 10.0)
+    assert check_rate("example.com") is False
+
+
+def test_set_domain_delay_multiple_domains():
+    """set_domain_delay arbeitet pro Domain isoliert."""
+    reset()
+    set_domain_delay("cnn.com", 3.0)
+    set_domain_delay("wikipedia.org", 5.0)
+    record_request("cnn.com")
+    record_request("wikipedia.org")
+    assert check_rate("cnn.com") is False
+    assert check_rate("wikipedia.org") is False
+
+
+# ── Rate Limiter (wait_if_needed) ─────────────────────────────────────────
+
+
+def test_wait_if_needed_no_delay_needed():
+    """wait_if_needed: keine vorherige Request → kein sleep."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep:
+        wait_if_needed("example.com")
+        mock_sleep.assert_not_called()
+
+
+def test_wait_if_needed_delay_expired():
+    """wait_if_needed: Delay ist abgelaufen → kein sleep."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        record_request("example.com")
+        mock_time.return_value = 1002.5
+        wait_if_needed("example.com")
+        mock_sleep.assert_not_called()
+
+
+def test_wait_if_needed_delay_not_expired():
+    """wait_if_needed: Delay noch nicht abgelaufen → time.sleep wird aufgerufen."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        record_request("example.com")
+        mock_time.return_value = 1000.5
+        wait_if_needed("example.com")
+        mock_sleep.assert_called_once_with(1.5)
+
+
+def test_wait_if_needed_custom_delay():
+    """wait_if_needed respektiert ein per set_domain_delay gesetztes Delay."""
+    from unittest.mock import patch as mock_patch
+
+    reset()
+    with (
+        mock_patch("searcher_pipeline.rate_limiter.time.time") as mock_time,
+        mock_patch("searcher_pipeline.rate_limiter.time.sleep") as mock_sleep,
+    ):
+        mock_time.return_value = 1000.0
+        set_domain_delay("slow.example.com", 5.0)
+        record_request("slow.example.com")
+        mock_time.return_value = 1001.0
+        wait_if_needed("slow.example.com")
+        mock_sleep.assert_called_once_with(4.0)
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Robots: _check_path — untested pure-logic paths
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_robots_check_path_empty_disallowed():
+    """_check_path: Leeres disallowed → True."""
+    assert _check_path("/anything", []) is True
+
+
+def test_robots_check_path_multiple_patterns_match_second():
+    """_check_path: Erstes Pattern matcht nicht, zweites matcht → False."""
+    assert _check_path("/admin/secret", ["/public", "/admin"]) is False
+
+
+def test_robots_check_path_multiple_patterns_none_match():
+    """_check_path: Kein Pattern matcht → True."""
+    assert _check_path("/public/page", ["/private", "/admin"]) is True
+
+
+def test_robots_check_path_root_with_nonroot_pattern():
+    """_check_path: Pfad '/' erlaubt wenn nur Unterpfade geblockt."""
+    assert _check_path("/", ["/private"]) is True
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Robots: _parse_robots_content — untested pure-logic paths
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_robots_parse_comment_skipped():
+    """Kommentarzeilen (#) werden ignoriert."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "# Comment\nUser-agent: *\n# Another\nDisallow: /private"
+    policy = _parse_robots_content("test.com", content)
+    assert "/private" in policy.disallowed_paths
+    assert len(policy.disallowed_paths) == 1
+
+
+def test_robots_parse_empty_content():
+    """Leeres robots.txt → keine Disallows, default TTL."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    policy = _parse_robots_content("test.com", "")
+    assert policy.disallowed_paths == []
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_researcher_agent_matches():
+    """User-agent mit 'researcher' collected Disallows."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: Researcher/1.0\nDisallow: /admin"
+    policy = _parse_robots_content("test.com", content)
+    assert "/admin" in policy.disallowed_paths
+
+
+def test_robots_parse_non_wildcard_agent_skipped():
+    """Nicht-wildcard Agent: Disallows werden ignoriert."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: googlebot\nDisallow: /search"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.disallowed_paths == []
+
+
+def test_robots_parse_disallow_empty_value_skipped():
+    """Disallow mit leerem Wert wird nicht hinzugefuegt."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nDisallow: \nDisallow: /valid"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.disallowed_paths == ["/valid"]
+
+
+def test_robots_parse_crawl_delay_non_numeric_ignored():
+    """Nicht-numerischer Crawl-Delay → TTL bleibt default."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: abc"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_crawl_delay_smaller_than_default():
+    """Crawl-Delay < default TTL: max() behaelt 3600."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: 10"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_crawl_delay_larger_than_default():
+    """Crawl-Delay > default TTL: max() erhoeht TTL."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: 7200"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 7200
+
+
+def test_robots_parse_multiple_user_agent_blocks():
+    """Nur Disallows fuer * oder researcher werden gesammelt."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = (
+        "User-agent: googlebot\nDisallow: /google-search\n"
+        "User-agent: *\nDisallow: /general"
+    )
+    policy = _parse_robots_content("test.com", content)
+    assert "/google-search" not in policy.disallowed_paths
+    assert "/general" in policy.disallowed_paths
+
+
+def test_robots_parse_case_insensitive_keys():
+    """Schluesselwoerter sind case-insensitive."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "USER-AGENT: *\nDISALLOW: /private\nCRAWL-DELAY: 9000"
+    policy = _parse_robots_content("test.com", content)
+    assert "/private" in policy.disallowed_paths
+    assert policy.ttl == 9000
+
+
+def test_robots_parse_line_without_colon_ignored():
+    """Zeilen ohne ':' sind no-ops."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "just random text\nUser-agent: *\nDisallow: /x"
+    policy = _parse_robots_content("test.com", content)
+    assert "/x" in policy.disallowed_paths

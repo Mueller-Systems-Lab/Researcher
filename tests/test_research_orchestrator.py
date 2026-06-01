@@ -391,3 +391,159 @@ def test_load_state_nonexistent():
 def test_run_exists_false():
     """run_exists gibt False für nicht existierenden Run."""
     assert not run_exists("nonexistent-run")
+
+
+# ── Scheduler: compute_ready_nodes untested paths ─────────────────────
+
+
+def test_compute_ready_no_deps_standalone():
+    """Node with empty depends_on is immediately ready (standalone)."""
+    plan = ResearchPlan(query="Solo")
+    node = ResearchNode(title="Solo", question="Q")
+    plan.add_node(node)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[node.node_id] = NodeState(
+        node_id=node.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert node.node_id in ready
+    assert state.node_states[node.node_id].status == NodeRunStatus.READY
+
+
+def test_compute_ready_dep_failed_blocks_node():
+    """If a dependency is FAILED, the dependent node is set to BLOCKED and not ready."""
+
+    plan = ResearchPlan(query="Dep failed")
+    n1 = ResearchNode(title="A", question="Q1")
+    n2 = ResearchNode(title="B", question="Q2", depends_on=[n1.node_id])
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.add_dependency(n1.node_id, n2.node_id)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.FAILED
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert n2.node_id not in ready
+    assert state.node_states[n2.node_id].status == NodeRunStatus.BLOCKED
+
+
+def test_compute_ready_dep_pending_not_satisfied():
+    """Dependency in PENDING status → deps not satisfied; node stays PENDING."""
+
+    plan = ResearchPlan(query="Dep pending")
+    n1 = ResearchNode(title="A", question="Q1")
+    n2 = ResearchNode(title="B", question="Q2", depends_on=[n1.node_id])
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.add_dependency(n1.node_id, n2.node_id)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.PENDING
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert n2.node_id not in ready
+    assert state.node_states[n2.node_id].status == NodeRunStatus.PENDING
+
+
+def test_compute_ready_skip_completed():
+    """Node already COMPLETED is skipped (not in ready list)."""
+
+    plan = ResearchPlan(query="Skip completed")
+    node = ResearchNode(title="A", question="Q")
+    plan.add_node(node)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[node.node_id] = NodeState(
+        node_id=node.node_id, status=NodeRunStatus.COMPLETED
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert node.node_id not in ready
+
+
+def test_compute_ready_skip_failed():
+    """Node already FAILED is skipped."""
+
+    plan = ResearchPlan(query="Skip failed")
+    node = ResearchNode(title="A", question="Q")
+    plan.add_node(node)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[node.node_id] = NodeState(
+        node_id=node.node_id, status=NodeRunStatus.FAILED
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert node.node_id not in ready
+
+
+def test_compute_ready_pending_all_deps_completed_becomes_ready():
+    """Node in PENDING with all deps COMPLETED → transitions to READY."""
+
+    plan = ResearchPlan(query="All deps done")
+    n1 = ResearchNode(title="A", question="Q1")
+    n2 = ResearchNode(title="B", question="Q2", depends_on=[n1.node_id])
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.add_dependency(n1.node_id, n2.node_id)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.COMPLETED
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert n2.node_id in ready
+    assert state.node_states[n2.node_id].status == NodeRunStatus.READY
+
+
+def test_compute_ready_multiple_deps_one_failed_blocks():
+    """With multiple dependencies, one FAILED dep blocks the dependent node."""
+
+    plan = ResearchPlan(query="Multi dep one failed")
+    n1 = ResearchNode(title="A", question="Q1")
+    n2 = ResearchNode(title="B", question="Q2")
+    n3 = ResearchNode(title="C", question="Q3", depends_on=[n1.node_id, n2.node_id])
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.add_node(n3)
+    plan.add_dependency(n1.node_id, n3.node_id)
+    plan.add_dependency(n2.node_id, n3.node_id)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.COMPLETED
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.FAILED
+    )
+    state.node_states[n3.node_id] = NodeState(
+        node_id=n3.node_id, status=NodeRunStatus.PENDING
+    )
+
+    ready = compute_ready_nodes(plan, state)
+    assert n3.node_id not in ready
+    assert state.node_states[n3.node_id].status == NodeRunStatus.BLOCKED

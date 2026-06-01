@@ -485,3 +485,417 @@ def test_web_fetch_ssrf_resolution_failure(mock_getaddrinfo):
     result = tool.run({"url": "http://nonexistent-domain-xyz-123.com"})
     assert result["success"] is False
     assert "nicht auflösbar" in result["error"]
+
+
+# ─── AuditLog Properties ────────────────────────────────────────────────────
+
+
+def test_audit_log_name_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    assert tool.name == "audit-log"
+
+
+def test_audit_log_description_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    assert "Append-only" in tool.description
+    assert "Audit-Trail" in tool.description
+
+
+def test_audit_log_parameters_property():
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    params = tool.parameters
+    assert params["type"] == "object"
+    assert params["required"] == ["action"]
+
+    props = params["properties"]
+    assert "action" in props
+    assert props["action"]["type"] == "string"
+    assert "write" in props["action"]["enum"]
+    assert "read" in props["action"]["enum"]
+    assert "stats" in props["action"]["enum"]
+    assert "event" in props
+    assert "actor" in props
+    assert "details" in props
+    assert "limit" in props
+    assert "event_filter" in props
+    assert "since" in props
+
+
+# ─── AuditLog _read_entries: event_filter ───────────────────────────────────
+
+
+def test_audit_log_read_event_filter():
+    """_read_entries filtert korrekt nach event_filter."""
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+        tool.run({"action": "write", "event": "beta", "actor": "test"})
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+
+        result = tool.run({"action": "read", "event_filter": "alpha"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        for entry in result["data"]["entries"]:
+            assert entry["event"] == "alpha"
+
+
+def test_audit_log_read_event_filter_no_match():
+    """event_filter ohne Treffer liefert leere Liste."""
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        tool.run({"action": "write", "event": "alpha", "actor": "test"})
+
+        result = tool.run({"action": "read", "event_filter": "nonexistent"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 0
+        assert result["data"]["entries"] == []
+
+
+# ─── AuditLog _read_entries: since (ISO timestamp) ──────────────────────────
+
+
+def test_audit_log_read_since_filter():
+    """_read_entries filtert korrekt nach since."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        entries = [
+            {
+                "timestamp": "2024-01-01T00:00:00",
+                "event": "old_1",
+                "actor": "test",
+                "details": {},
+            },
+            {
+                "timestamp": "2025-06-01T00:00:00",
+                "event": "mid",
+                "actor": "test",
+                "details": {},
+            },
+            {
+                "timestamp": "2025-12-01T00:00:00",
+                "event": "new_1",
+                "actor": "test",
+                "details": {},
+            },
+        ]
+        with open(log_file, "w") as f:
+            for entry in entries:
+                f.write(json_mod.dumps(entry) + "\n")
+
+        result = tool.run({"action": "read", "since": "2025-06-01T00:00:00"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        events = [e["event"] for e in result["data"]["entries"]]
+        assert "old_1" not in events
+        assert "mid" in events
+        assert "new_1" in events
+
+
+# ─── AuditLog _read_entries: JSONDecodeError + empty line skip ──────────────
+
+
+def test_audit_log_read_json_decode_error_skip():
+    """_read_entries überspringt Zeilen mit JSONDecodeError."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        valid = {
+            "timestamp": "2025-01-01T00:00:00",
+            "event": "valid",
+            "actor": "test",
+            "details": {},
+        }
+
+        with open(log_file, "w") as f:
+            f.write(json_mod.dumps(valid) + "\n")
+            f.write("this is not valid json\n")
+            f.write("{broken json\n")
+            f.write(json_mod.dumps(valid) + "\n")
+
+        result = tool.run({"action": "read"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+        for entry in result["data"]["entries"]:
+            assert entry["event"] == "valid"
+
+
+def test_audit_log_read_empty_line_skip():
+    """_read_entries überspringt Leerzeilen."""
+    from mcp_tools.audit_log import AuditLog
+    import json as json_mod
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/audit.jsonl"
+        tool = AuditLog(log_file=log_file)
+
+        valid = {
+            "timestamp": "2025-01-01T00:00:00",
+            "event": "valid",
+            "actor": "test",
+            "details": {},
+        }
+
+        with open(log_file, "w") as f:
+            f.write("\n")
+            f.write(json_mod.dumps(valid) + "\n")
+            f.write("\n")
+            f.write("    \n")
+            f.write(json_mod.dumps(valid) + "\n")
+
+        result = tool.run({"action": "read"})
+        assert result["success"] is True
+        assert result["data"]["count"] == 2
+
+
+# ─── AuditLog _write_entry: OSError ─────────────────────────────────────────
+
+
+@patch("builtins.open")
+def test_audit_log_write_os_error(mock_open):
+    """_write_entry fängt OSError beim Dateischreiben ab."""
+    from mcp_tools.audit_log import AuditLog
+
+    mock_open.side_effect = OSError("Disk full")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/write_test.jsonl"
+        tool = AuditLog(log_file=log_file)
+        result = tool.run({"action": "write", "event": "test_event"})
+
+        assert result["success"] is False
+        assert "Audit-Log kann nicht geschrieben werden" in result["error"]
+
+
+@patch("json.dumps")
+def test_audit_log_write_value_error(mock_dumps):
+    """_write_entry fängt TypeError bei json.dumps."""
+    from mcp_tools.audit_log import AuditLog
+
+    mock_dumps.side_effect = TypeError("Object of type bytes is not JSON serializable")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = f"{tmpdir}/write_test.jsonl"
+        tool = AuditLog(log_file=log_file)
+        result = tool.run({"action": "write", "event": "test_event"})
+
+        assert result["success"] is False
+        assert "Daten ungültig" in result["error"]
+
+
+# ─── WebFetch _handle_http_error — Pure-Logic Tests ──────────────────────
+
+
+def test_web_fetch_handle_http_error_known_status():
+    """_handle_http_error gibt korrekte Nachricht für bekannte Status-Codes."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    for status_code, fragment in {
+        400: "Bad Request",
+        403: "Forbidden",
+        404: "Not Found",
+        429: "Too Many Requests",
+        500: "Internal Server Error",
+        503: "Service Unavailable",
+    }.items():
+        mock_response = MagicMock()
+        mock_response.status_code = status_code
+        error = HTTPError(f"{status_code} Error")
+        error.response = mock_response
+
+        result = tool._handle_http_error(error, "http://example.com/page")
+        assert result["success"] is False
+        assert f"HTTP-Fehler {status_code}" in result["error"]
+        assert fragment in result["error"]
+
+
+def test_web_fetch_handle_http_error_unknown_status():
+    """_handle_http_error für unbekannten Status-Code (418)."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 418
+
+    error = HTTPError("418 Client Error")
+    error.response = mock_response
+
+    result = tool._handle_http_error(error, "http://example.com")
+    assert result["success"] is False
+    assert "HTTP-Fehler" in result["error"]
+
+
+def test_web_fetch_handle_http_error_none_response():
+    """_handle_http_error behandelt error.response=None."""
+    from requests import HTTPError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    error = HTTPError("No response available")
+    error.response = None
+
+    result = tool._handle_http_error(error, "http://example.com")
+    assert result["success"] is False
+    assert "HTTP-Fehler" in result["error"]
+
+
+# ─── WebFetch _build_result — Pure-Logic Tests ─────────────────────────────
+
+
+def test_web_fetch_build_result_extract_text():
+    """_build_result extrahiert title, text, content_length."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = (
+        "<html><head><title>Test Page</title></head>"
+        "<body><p>Paragraph one.</p><p>Paragraph two.</p></body></html>"
+    )
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["url"] == "http://example.com"
+    assert result["data"]["status"] == 200
+    assert result["data"]["title"] == "Test Page"
+    assert "Paragraph one" in result["data"]["text"]
+    assert "<html>" not in result["data"]["text"]
+
+
+def test_web_fetch_build_result_truncation():
+    """_build_result setzt 'truncated': True wenn Text max_chars überschreitet."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    long_paragraph = "X" * 200
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = f"<html><body><p>{long_paragraph}</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=50, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["truncated"] is True
+    assert len(result["data"]["text"]) == 50
+
+
+def test_web_fetch_build_result_html_mode():
+    """_build_result mit extract_text=False liefert Roh-HTML."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Raw HTML</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=False
+    )
+
+    assert result["success"] is True
+    assert "html" in result["data"]
+    assert "Raw HTML" in result["data"]["html"]
+    assert "text" not in result["data"]
+
+
+def test_web_fetch_build_result_no_title():
+    """_build_result mit leerem <title>-Tag."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>No title</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert result["data"]["title"] == ""
+
+
+def test_web_fetch_build_result_onion_warning():
+    """_build_result fügt Onion-Warnung hinzu wenn policy.is_onion_url True."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_onion_url = MagicMock(return_value=True)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Onion</p></body></html>"
+
+    result = tool._build_result(
+        "http://dark.onion", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert "warning" in result["data"]
+    assert "Onion" in result["data"]["warning"]
+
+
+def test_web_fetch_build_result_no_onion_warning_for_clearnet():
+    """_build_result fügt keine Warnung hinzu bei Clearnet-URLs."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+    tool.policy.is_onion_url = MagicMock(return_value=False)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Clearnet</p></body></html>"
+
+    result = tool._build_result(
+        "http://example.com", mock_response, max_chars=5000, extract_text=True
+    )
+
+    assert result["success"] is True
+    assert "warning" not in result["data"]
