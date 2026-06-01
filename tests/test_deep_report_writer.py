@@ -336,3 +336,170 @@ def test_generate_gap_queries_with_node_questions():
         node_questions=["How fast?", "What cost?"],
     )
     assert any("verifiable citation" in g for g in gaps)
+
+# ── Outline: untested branches (pure logic) ─────────────────────────────
+
+import json as _json
+from unittest.mock import patch as _patch
+
+from deep_report.outline import (
+    _extract_domain,
+    _extract_sources_from_artifacts,
+    _merge_sources,
+    generate_outline,
+    load_run_data_for_outline,
+    REQUIRED_SECTIONS,
+)
+
+
+def test_outline_uncertainty_with_evaluation():
+    """Line 141: evaluation['uncertainty'] used when provided."""
+    outline = generate_outline(
+        "Test query",
+        evaluation={"overall": 88, "uncertainty": "Low confidence"},
+    )
+    uncertainty = next(s for s in outline if s["title"] == "Uncertainty")
+    assert uncertainty["content"] == "Low confidence"
+    assert "will be populated after evaluation" not in uncertainty["content"]
+
+
+def test_outline_source_list_with_sources():
+    """Lines 152-154: Source List with non-empty sources."""
+    outline = generate_outline(
+        "Test query",
+        sources=[
+            {"title": "GPU Benchmarks", "url": "https://gpu.example.com"},
+            {"title": "CPU Review", "url": "https://cpu.example.com/review"},
+        ],
+    )
+    source_list = next(s for s in outline if s["title"] == "Source List")
+    assert "- GPU Benchmarks: https://gpu.example.com" in source_list["content"]
+    assert "Sources will be listed" not in source_list["content"]
+
+
+def test_outline_evaluation_summary_with_evaluation():
+    """Lines 159-160: Evaluation Summary with evaluation truthy."""
+    evaluation = {"overall": 92, "source_coverage": 100}
+    outline = generate_outline("Test query", evaluation=evaluation)
+    summary = next(s for s in outline if s["title"] == "Evaluation Summary")
+    parsed = _json.loads(summary["content"])
+    assert parsed == evaluation
+    assert "will appear after run completion" not in summary["content"]
+
+
+def test_outline_fully_populated():
+    """Smoke test: outline with every optional parameter."""
+    outline = generate_outline(
+        "Full test query",
+        node_titles=["Node A", "Node B"],
+        node_results={
+            "node_a": {
+                "title": "Node A", "status": "completed",
+                "artifacts": ['{"findings": "Result A"}'],
+            },
+        },
+        sources=[{"title": "Src", "url": "https://s.com", "retrieved": "today"}],
+        evaluation={"overall": 90, "uncertainty": "Medium"},
+    )
+    titles = [s["title"] for s in outline]
+    assert len(titles) == len(REQUIRED_SECTIONS)
+
+
+def test_load_run_data_success(tmp_path, monkeypatch):
+    """load_run_data_for_outline happy path."""
+    run_id = "test-run-001"
+    deep_dir = tmp_path / "deep_research"
+    monkeypatch.setenv("DEEP_REPORT_DIR", str(deep_dir))
+
+    runs_dir = deep_dir / "runs" / run_id
+    runs_dir.mkdir(parents=True)
+    state_data = {
+        "query": "GPU comparison",
+        "language": "en",
+        "node_states": {
+            "gpu_speed": {"status": "completed", "artifacts": []},
+        },
+        "node_questions": {"gpu_speed": "How fast?"},
+    }
+    (runs_dir / "state.json").write_text(_json.dumps(state_data), encoding="utf-8")
+
+    with _patch(
+        "deep_report.outline._load_sources_from_evidence_store", return_value=[]
+    ):
+        result = load_run_data_for_outline(run_id)
+
+    assert result["query"] == "GPU comparison"
+    assert len(result["node_results"]) == 1
+
+
+def test_load_run_data_missing_run_dir(tmp_path, monkeypatch):
+    """Returns {} when run directory does not exist."""
+    monkeypatch.setenv("DEEP_REPORT_DIR", str(tmp_path / "deep_research"))
+    assert load_run_data_for_outline("nonexistent-run") == {}
+
+
+def test_extract_sources_from_artifacts_normal():
+    """Extracts search_results from artifact JSON blobs."""
+    node_results = {
+        "n1": {
+            "status": "completed",
+            "artifacts": [_json.dumps({
+                "search_results": [{"url": "https://a.com", "title": "A"}]
+            })],
+        },
+    }
+    sources = _extract_sources_from_artifacts(node_results)
+    assert len(sources) == 1
+    assert sources[0]["url"] == "https://a.com"
+
+
+def test_extract_sources_from_artifacts_empty():
+    """Returns empty when no node_results."""
+    assert _extract_sources_from_artifacts({}) == []
+
+
+def test_extract_sources_from_artifacts_invalid_json():
+    """Skips artifact entries with invalid JSON."""
+    node_results = {"n1": {"status": "completed", "artifacts": ["not json"]}}
+    assert _extract_sources_from_artifacts(node_results) == []
+
+
+def test_merge_sources_artifacts_take_priority():
+    """Artifacts take priority over evidence sources."""
+    evidence = [{"url": "https://ev.com", "title": "Ev"}]
+    artifacts = [{"url": "https://art.com", "title": "Art"}]
+    result = _merge_sources(evidence, artifacts)
+    assert len(result) == 1
+    assert result[0]["url"] == "https://art.com"
+
+
+def test_merge_sources_fallback_to_evidence():
+    """Fallback to evidence when no artifacts."""
+    result = _merge_sources([{"url": "https://ev.com", "title": "E"}], [])
+    assert len(result) == 1
+
+
+def test_merge_sources_dedup():
+    """Duplicate URLs are removed."""
+    artifacts = [
+        {"url": "https://dup.com", "title": "First"},
+        {"url": "https://dup.com", "title": "Dup"},
+        {"url": "https://uniq.com", "title": "Unique"},
+    ]
+    result = _merge_sources([], artifacts)
+    assert len(result) == 2
+
+
+def test_merge_sources_empty_url_skipped():
+    """Sources with empty URLs are dropped."""
+    assert _merge_sources([], [{"url": "", "title": "No URL"}]) == []
+
+
+def test_merge_sources_both_empty():
+    """Both inputs empty → empty list."""
+    assert _merge_sources([], []) == []
+
+
+def test_extract_domain_with_path():
+    """Domain extraction strips path."""
+    assert _extract_domain("https://example.com/path") == "example.com"

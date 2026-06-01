@@ -200,3 +200,111 @@ def test_vector_store_count_after_clear():
 
         store.add_one("doc2", [0.2] * 768, metadata={"source": "test"})
         assert store.count == 2
+
+
+def test_get_client_import_error():
+    """_get_client: ImportError branch — sets last_error and returns None."""
+    import builtins
+    import sys
+    from vectordb.store import VectorStore
+
+    chromadb_saved = sys.modules.pop("chromadb", None)
+    _original_import = builtins.__import__
+
+    def _selective_import_fail(name, *args, **kwargs):
+        if name == "chromadb" or name.startswith("chromadb."):
+            raise ImportError("No module named 'chromadb'")
+        return _original_import(name, *args, **kwargs)
+
+    try:
+        builtins.__import__ = _selective_import_fail
+        store = VectorStore(persist_directory="/tmp/test_vdb")
+        client = store._get_client()
+        assert client is None
+        assert "chromadb nicht installiert" in (store.last_error or "")
+    finally:
+        builtins.__import__ = _original_import
+        if chromadb_saved is not None:
+            sys.modules["chromadb"] = chromadb_saved
+
+
+def test_get_client_double_check_lock():
+    """_get_client: inner double-check returns client — simulates thread race."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore(persist_directory="/tmp/test_vdb")
+    mock_client = MagicMock()
+
+    # Simulate: outer check sees None, but lock acquisition triggers
+    # another "thread" to set _client. We replace the lock with a mock.
+    def _lock_side_effect(*args):
+        store._client = mock_client
+
+    mock_lock = MagicMock()
+    mock_lock.__enter__.side_effect = _lock_side_effect
+    mock_lock.__exit__.return_value = None
+
+    store._lock = mock_lock
+    store._client = None  # Outer check at line 58 sees None
+    result = store._get_client()
+    assert result is mock_client
+
+
+def test_execute_with_retry_exhausted():
+    """_execute_with_retry: raises last_error after all retries exhausted."""
+    import sqlite3
+    import pytest
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    call_count = [0]
+
+    def _always_locked(*_args, **_kwargs):
+        call_count[0] += 1
+        raise sqlite3.OperationalError("database is locked")
+        return None
+
+    with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+        store._execute_with_retry("test", _always_locked)
+
+    assert call_count[0] == 3
+
+
+def test_add_fallback_ids_and_metadatas():
+    """add(): generates UUIDs and empty metadatas when None is passed."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+    store._collection = mock_collection
+
+    result = store.add(
+        documents=["alpha", "beta"],
+        embeddings=[[0.1] * 768, [0.2] * 768],
+        metadatas=None,
+        ids=None,
+    )
+
+    assert result is True
+    assert mock_collection.add.call_count == 1
+    add_kwargs = mock_collection.add.call_args[1]
+    assert len(add_kwargs["ids"]) == 2
+    for doc_id in add_kwargs["ids"]:
+        assert len(doc_id) == 36
+    assert add_kwargs["metadatas"] == [{}, {}]
+
+
+def test_query_collection_unavailable():
+    """query(): returns [] when _get_collection returns None."""
+    from unittest.mock import patch
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    store.last_error = "mock unavailable"
+
+    with patch.object(store, "_get_collection", return_value=None):
+        results = store.query(query_embedding=[0.1] * 768)
+
+    assert results == []

@@ -153,3 +153,69 @@ def test_darknet_retriever_duplicate_deduplication():
     with patch.object(retriever.index, "search", return_value=fake_results):
         results = retriever.search(max_results=5)
     assert len(results) == 1
+
+
+# ── DarknetIndex coverage gap tests ─────────────────────────────────────
+
+
+def test_add_post_invalid_timestamp_fallback():
+    """Ungültiger Timestamp-String → Fallback auf datetime.now()."""
+    from darknet_search.index import WhooshIndex
+    from datetime import datetime
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        idx = WhooshIndex(tmpdir)
+        post = {
+            "url": "http://forum.onion/invalid-ts",
+            "author": "testuser",
+            "title": "Invalid Timestamp Post",
+            "timestamp": "dies-ist-kein-iso-8601-datum",
+            "content": "Test content with bad timestamp.",
+            "forum_id": "f1",
+        }
+        success = idx.add_post(post)
+        assert success
+
+        results = idx.search("bad timestamp", limit=10)
+        assert len(results) == 1
+
+
+def test_clear_index_happy_path():
+    """Index leeren (clear) — Happy Path."""
+    from darknet_search.index import WhooshIndex
+    from datetime import datetime
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        idx = WhooshIndex(tmpdir)
+        posts = [
+            {
+                "url": f"http://forum.onion/clear-test-{i}",
+                "author": "testuser",
+                "title": f"Clear Test {i}",
+                "timestamp": datetime.now(),
+                "content": f"Content #{i}.",
+                "forum_id": "f1",
+            }
+            for i in range(5)
+        ]
+        count = idx.add_posts(posts)
+        assert count == 5
+        assert idx.doc_count == 5
+
+        idx.clear()
+        assert idx.doc_count == 0
+
+        results = idx.search("cleared", limit=10)
+        assert results == []
+
+        # Can re-add after clear
+        idx.add_post({
+            "url": "http://forum.onion/after-clear",
+            "author": "newuser",
+            "title": "After Clear",
+            "timestamp": datetime.now(),
+            "content": "New post after clearing the index.",
+            "forum_id": "f2",
+        })
+        assert idx.doc_count == 1
+
