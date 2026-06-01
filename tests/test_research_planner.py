@@ -27,8 +27,15 @@ from research_planner.models import (
     ResearchNode,
     ResearchPlan,
     ResearchPlanStatus,
+    RiskLevel,
 )
-from research_planner.planner import generate_plan
+from research_planner.planner import (
+    _deterministic_plan,
+    _parse_llm_output,
+    _parse_risk,
+    _split_query,
+    generate_plan,
+)
 from research_planner.serialization import (
     plan_from_dict,
     plan_from_json,
@@ -358,3 +365,118 @@ def test_topological_order_none_on_invalid():
     plan.add_dependency(a.node_id, b.node_id)
     plan.add_dependency(b.node_id, a.node_id)
     assert get_topological_order(plan) is None
+
+
+# ── _parse_risk ───────────────────────────────────────────────────────────
+
+
+def test_parse_risk_low():
+    """_parse_risk maps 'low' to RiskLevel.LOW."""
+    assert _parse_risk("low") == RiskLevel.LOW
+
+
+def test_parse_risk_medium():
+    assert _parse_risk("medium") == RiskLevel.MEDIUM
+
+
+def test_parse_risk_case_insensitive():
+    assert _parse_risk("HIGH") == RiskLevel.HIGH
+    assert _parse_risk("Medium") == RiskLevel.MEDIUM
+
+
+def test_parse_risk_invalid_fallback():
+    assert _parse_risk("invalid") == RiskLevel.UNKNOWN
+    assert _parse_risk("") == RiskLevel.UNKNOWN
+
+
+# ── _split_query ──────────────────────────────────────────────────────────
+
+
+def test_split_query_semicolon():
+    assert _split_query("A; B; C") == ["A", "B", "C"]
+
+
+def test_split_query_semicolon_filters_empty():
+    assert _split_query("A; ; B") == ["A", "B"]
+
+
+def test_split_query_english_and_determine():
+    result = _split_query("Find sources and determine their relevance")
+    assert len(result) == 2
+
+
+def test_split_query_numbered_list():
+    result = _split_query("1. Hardware 2. Software 3. Compare")
+    assert len(result) == 3
+
+
+def test_split_query_sentence_boundary():
+    result = _split_query("First analyze hardware. Then compare software.")
+    assert len(result) == 2
+
+
+def test_split_query_empty_semicolons():
+    assert _split_query(";") == []
+
+
+# ── _parse_llm_output ─────────────────────────────────────────────────────
+
+
+def test_parse_llm_output_valid_single_node():
+    data = {
+        "nodes": [
+            {"title": "R", "question": "Q", "rationale": "r", "risk_level": "low"}
+        ],
+        "dependencies": [],
+    }
+    plan = _parse_llm_output(data, "query")
+    assert plan is not None
+    assert len(plan.nodes) == 1
+    assert plan.nodes[0].risk_level == RiskLevel.LOW
+
+
+def test_parse_llm_output_empty_nodes():
+    assert _parse_llm_output({"nodes": [], "dependencies": []}, "t") is None
+
+
+def test_parse_llm_output_missing_nodes():
+    assert _parse_llm_output({"dependencies": []}, "t") is None
+
+
+def test_parse_llm_output_two_nodes_with_dep():
+    data = {
+        "nodes": [
+            {"title": "A", "question": "Q", "rationale": "r", "risk_level": "low"},
+            {"title": "B", "question": "Q2", "rationale": "r2", "risk_level": "medium"},
+        ],
+        "dependencies": [{"from": 0, "to": 1}],
+    }
+    plan = _parse_llm_output(data, "t")
+    assert plan is not None
+    assert len(plan.dependencies) == 1
+
+
+def test_parse_llm_output_invalid_dep_ignored():
+    data = {
+        "nodes": [
+            {"title": "A", "question": "Q", "rationale": "r", "risk_level": "low"}
+        ],
+        "dependencies": [{"from": 0, "to": 99}],
+    }
+    plan = _parse_llm_output(data, "t")
+    assert plan is not None
+    assert len(plan.dependencies) == 0
+
+
+# ── _deterministic_plan edge cases ────────────────────────────────────────
+
+
+def test_deterministic_plan_empty_split():
+    plan = _deterministic_plan(";")
+    assert len(plan.nodes) == 1
+
+
+def test_deterministic_plan_sequential_deps():
+    plan = _deterministic_plan("A; B; C")
+    assert len(plan.nodes) == 3
+    assert len(plan.dependencies) == 2

@@ -138,3 +138,101 @@ def test_mcp_server_call_tool_returns_error_no_message(mock_run_sync):
         asyncio.run(_call_tool_json("web-fetch", {"url": "http://x"}))
 
     mock_run_sync.assert_awaited_once()
+
+
+# ── Tool wrapper coverage (server.call_tool paths) ───────────────────────
+
+from unittest.mock import MagicMock
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_web_fetch_tool_handler(mock_run_sync):
+    """web-fetch tool wrapper passes args via call_tool."""
+    mock_run_sync.return_value = {"success": True, "data": {"text": "ok"}}
+    server = create_server()
+    asyncio.run(
+        server.call_tool(
+            "web-fetch",
+            {"url": "http://x.com", "max_chars": 2000, "extract_text": False},
+        )
+    )
+    mock_run_sync.assert_awaited_once()
+    assert mock_run_sync.call_args.args[1] == "web-fetch"
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_evidence_store_tool_handler(mock_run_sync):
+    """evidence-store tool wrapper passes args via call_tool."""
+    mock_run_sync.return_value = {"success": True, "data": {"count": 1}}
+    server = create_server()
+    asyncio.run(
+        server.call_tool(
+            "evidence-store", {"action": "store", "claim": "T", "embedding": [0.1]}
+        )
+    )
+    mock_run_sync.assert_awaited_once()
+    assert mock_run_sync.call_args.args[1] == "evidence-store"
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_claim_validator_tool_handler(mock_run_sync):
+    """claim-validator tool wrapper passes args via call_tool."""
+    mock_run_sync.return_value = {"success": True, "data": {"verdict": "true"}}
+    server = create_server()
+    asyncio.run(
+        server.call_tool(
+            "claim-validator",
+            {"claim": "test", "max_sources": 3, "search_mode": "composite"},
+        )
+    )
+    mock_run_sync.assert_awaited_once()
+    assert mock_run_sync.call_args.args[1] == "claim-validator"
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_audit_log_tool_handler(mock_run_sync):
+    """audit-log tool wrapper passes args via call_tool."""
+    mock_run_sync.return_value = {"success": True, "data": {"entries": []}}
+    server = create_server()
+    asyncio.run(server.call_tool("audit-log", {"action": "read", "limit": 10}))
+    mock_run_sync.assert_awaited_once()
+    assert mock_run_sync.call_args.args[1] == "audit-log"
+
+
+# ── Error handling ───────────────────────────────────────────────────────
+
+
+def test_server_call_tool_not_found():
+    """Non-existent tool raises ToolError."""
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    server = create_server()
+    with pytest.raises(ToolError, match="Unknown tool"):
+        asyncio.run(server.call_tool("ghost-tool", {}))
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_server_call_tool_error_response(mock_run_sync):
+    """Failing tool raises ToolError."""
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    mock_run_sync.return_value = {"success": False, "error": "internal failure"}
+    server = create_server()
+    with pytest.raises(ToolError, match="internal failure"):
+        asyncio.run(server.call_tool("claim-validator", {"claim": "test"}))
+
+
+def test_root_info_handler():
+    """Root-info handler returns server metadata."""
+    server = create_server()
+    app = server.streamable_http_app()
+    root_handler = None
+    for route in app.routes:
+        if hasattr(route, "path") and route.path == "/":
+            root_handler = route.endpoint
+            break
+    assert root_handler is not None
+    mock_request = MagicMock()
+    response = asyncio.run(root_handler(mock_request))
+    body = json.loads(response.body)
+    assert body["server"] == "researcher-mcp"

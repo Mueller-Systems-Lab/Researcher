@@ -271,3 +271,174 @@ def test_garbled_mixed_printable():
     """Gemischter Text mit wenigen Control-Chars ist OK."""
     text = "Normal text with\na newline and\ttab."
     assert is_garbled(text) is False
+
+
+# ── _validate_url_scheme untested paths ──────────────────────────────────
+
+import pytest
+
+
+def test_validate_url_scheme_file_raises():
+    from config.local_llm_runtime import _validate_url_scheme
+
+    with pytest.raises(ValueError, match="Unsupported URL scheme"):
+        _validate_url_scheme("file:///etc/passwd")
+
+
+def test_validate_url_scheme_no_scheme_raises():
+    from config.local_llm_runtime import _validate_url_scheme
+
+    with pytest.raises(ValueError, match="Unsupported URL scheme"):
+        _validate_url_scheme("127.0.0.1:8080")
+
+
+# ── check_endpoint_local cloud-pattern path ──────────────────────────────
+
+
+def test_endpoint_local_cloud_pattern_in_path():
+    from config.local_llm_runtime import check_endpoint_local
+
+    assert (
+        check_endpoint_local("http://127.0.0.1:11434/proxy/api.openai.com/chat")
+        is False
+    )
+
+
+# ── check_model_present JSON parsing ─────────────────────────────────────
+
+_MOCK_MODELS_JSON = b'{"object":"list","data":[{"id":"qwen3.5-uncensored","object":"model"},{"id":"nomic-embed-text","object":"model"}]}'
+
+
+def test_check_model_present_found():
+    from unittest.mock import MagicMock, patch
+    from config.local_llm_runtime import check_model_present
+
+    mock = MagicMock()
+    mock.__enter__.return_value.read.return_value = _MOCK_MODELS_JSON
+    with patch("urllib.request.urlopen", return_value=mock):
+        ok, err = check_model_present(
+            "http://127.0.0.1:8080", "qwen3.5-uncensored", timeout=1.0
+        )
+    assert ok is True
+
+
+def test_check_model_present_not_found():
+    from unittest.mock import MagicMock, patch
+    from config.local_llm_runtime import check_model_present
+
+    mock = MagicMock()
+    mock.__enter__.return_value.read.return_value = _MOCK_MODELS_JSON
+    with patch("urllib.request.urlopen", return_value=mock):
+        ok, err = check_model_present("http://127.0.0.1:8080", "gpt-4", timeout=1.0)
+    assert ok is False
+    assert "gpt-4" in err
+
+
+# ── check_generation ─────────────────────────────────────────────────────
+
+_MOCK_CHAT_OK = b'{"id":"c1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}'
+_MOCK_CHAT_GARBLED = b'{"id":"c2","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"aaaaaaaaaaaaaaaaaaaaa"},"finish_reason":"stop"}]}'
+
+
+def test_check_generation_success():
+    from unittest.mock import MagicMock, patch
+    from config.local_llm_runtime import check_generation
+
+    mock = MagicMock()
+    mock.__enter__.return_value.read.return_value = _MOCK_CHAT_OK
+    with patch("urllib.request.urlopen", return_value=mock):
+        ok, output, err, lat = check_generation(
+            "http://127.0.0.1:8080", "qwen3.5", timeout=1.0
+        )
+    assert ok is True
+    assert "OK" in output
+
+
+def test_check_generation_garbled():
+    from unittest.mock import MagicMock, patch
+    from config.local_llm_runtime import check_generation
+
+    mock = MagicMock()
+    mock.__enter__.return_value.read.return_value = _MOCK_CHAT_GARBLED
+    with patch("urllib.request.urlopen", return_value=mock):
+        ok, output, err, lat = check_generation(
+            "http://127.0.0.1:8080", "qwen3.5", timeout=1.0
+        )
+    assert ok is False
+    assert err == "garbled output detected"
+
+
+# ── run_guard generation branches ────────────────────────────────────────
+
+
+def test_run_guard_generation_timeout():
+    from unittest.mock import patch
+    from config.local_llm_runtime import RuntimeStatus, run_guard
+
+    with (
+        patch("config.local_llm_runtime.check_model_present", return_value=(True, "")),
+        patch(
+            "config.local_llm_runtime.check_generation",
+            return_value=(False, "", "timed out", 10001.0),
+        ),
+    ):
+        result = run_guard(
+            "http://127.0.0.1:8080", "qwen3.5", test_generation=True, timeout=10.0
+        )
+    assert result.status == RuntimeStatus.MODEL_TIMEOUT
+
+
+def test_run_guard_generation_garbled():
+    from unittest.mock import patch
+    from config.local_llm_runtime import RuntimeStatus, run_guard
+
+    with (
+        patch("config.local_llm_runtime.check_model_present", return_value=(True, "")),
+        patch(
+            "config.local_llm_runtime.check_generation",
+            return_value=(
+                False,
+                "aaaaaaaaaaaaaaaaaaaaa",
+                "garbled output detected",
+                500.0,
+            ),
+        ),
+    ):
+        result = run_guard(
+            "http://127.0.0.1:8080", "qwen3.5", test_generation=True, timeout=10.0
+        )
+    assert result.status == RuntimeStatus.MODEL_GARBLED
+
+
+def test_run_guard_generation_crash():
+    from unittest.mock import patch
+    from config.local_llm_runtime import RuntimeStatus, run_guard
+
+    with (
+        patch("config.local_llm_runtime.check_model_present", return_value=(True, "")),
+        patch(
+            "config.local_llm_runtime.check_generation",
+            return_value=(False, "Normal output but error", "Internal failure", 500.0),
+        ),
+    ):
+        result = run_guard(
+            "http://127.0.0.1:8080", "qwen3.5", test_generation=True, timeout=10.0
+        )
+    assert result.status == RuntimeStatus.MODEL_CRASH
+
+
+def test_run_guard_generation_ok():
+    from unittest.mock import patch
+    from config.local_llm_runtime import RuntimeStatus, run_guard
+
+    with (
+        patch("config.local_llm_runtime.check_model_present", return_value=(True, "")),
+        patch(
+            "config.local_llm_runtime.check_generation",
+            return_value=(True, "OK", "", 500.0),
+        ),
+    ):
+        result = run_guard(
+            "http://127.0.0.1:8080", "qwen3.5", test_generation=True, timeout=10.0
+        )
+    assert result.status == RuntimeStatus.LOCAL_LLM_READY
