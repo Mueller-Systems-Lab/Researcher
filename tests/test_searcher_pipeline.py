@@ -528,3 +528,138 @@ def test_wait_if_needed_custom_delay():
         mock_time.return_value = 1001.0
         wait_if_needed("slow.example.com")
         mock_sleep.assert_called_once_with(4.0)
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Robots: _check_path — untested pure-logic paths
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_robots_check_path_empty_disallowed():
+    """_check_path: Leeres disallowed → True."""
+    assert _check_path("/anything", []) is True
+
+
+def test_robots_check_path_multiple_patterns_match_second():
+    """_check_path: Erstes Pattern matcht nicht, zweites matcht → False."""
+    assert _check_path("/admin/secret", ["/public", "/admin"]) is False
+
+
+def test_robots_check_path_multiple_patterns_none_match():
+    """_check_path: Kein Pattern matcht → True."""
+    assert _check_path("/public/page", ["/private", "/admin"]) is True
+
+
+def test_robots_check_path_root_with_nonroot_pattern():
+    """_check_path: Pfad '/' erlaubt wenn nur Unterpfade geblockt."""
+    assert _check_path("/", ["/private"]) is True
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Robots: _parse_robots_content — untested pure-logic paths
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_robots_parse_comment_skipped():
+    """Kommentarzeilen (#) werden ignoriert."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "# Comment\nUser-agent: *\n# Another\nDisallow: /private"
+    policy = _parse_robots_content("test.com", content)
+    assert "/private" in policy.disallowed_paths
+    assert len(policy.disallowed_paths) == 1
+
+
+def test_robots_parse_empty_content():
+    """Leeres robots.txt → keine Disallows, default TTL."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    policy = _parse_robots_content("test.com", "")
+    assert policy.disallowed_paths == []
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_researcher_agent_matches():
+    """User-agent mit 'researcher' collected Disallows."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: Researcher/1.0\nDisallow: /admin"
+    policy = _parse_robots_content("test.com", content)
+    assert "/admin" in policy.disallowed_paths
+
+
+def test_robots_parse_non_wildcard_agent_skipped():
+    """Nicht-wildcard Agent: Disallows werden ignoriert."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: googlebot\nDisallow: /search"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.disallowed_paths == []
+
+
+def test_robots_parse_disallow_empty_value_skipped():
+    """Disallow mit leerem Wert wird nicht hinzugefuegt."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nDisallow: \nDisallow: /valid"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.disallowed_paths == ["/valid"]
+
+
+def test_robots_parse_crawl_delay_non_numeric_ignored():
+    """Nicht-numerischer Crawl-Delay → TTL bleibt default."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: abc"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_crawl_delay_smaller_than_default():
+    """Crawl-Delay < default TTL: max() behaelt 3600."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: 10"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 3600
+
+
+def test_robots_parse_crawl_delay_larger_than_default():
+    """Crawl-Delay > default TTL: max() erhoeht TTL."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "User-agent: *\nCrawl-delay: 7200"
+    policy = _parse_robots_content("test.com", content)
+    assert policy.ttl == 7200
+
+
+def test_robots_parse_multiple_user_agent_blocks():
+    """Nur Disallows fuer * oder researcher werden gesammelt."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = (
+        "User-agent: googlebot\nDisallow: /google-search\n"
+        "User-agent: *\nDisallow: /general"
+    )
+    policy = _parse_robots_content("test.com", content)
+    assert "/google-search" not in policy.disallowed_paths
+    assert "/general" in policy.disallowed_paths
+
+
+def test_robots_parse_case_insensitive_keys():
+    """Schluesselwoerter sind case-insensitive."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "USER-AGENT: *\nDISALLOW: /private\nCRAWL-DELAY: 9000"
+    policy = _parse_robots_content("test.com", content)
+    assert "/private" in policy.disallowed_paths
+    assert policy.ttl == 9000
+
+
+def test_robots_parse_line_without_colon_ignored():
+    """Zeilen ohne ':' sind no-ops."""
+    from searcher_pipeline.robots_policy import _parse_robots_content
+
+    content = "just random text\nUser-agent: *\nDisallow: /x"
+    policy = _parse_robots_content("test.com", content)
+    assert "/x" in policy.disallowed_paths

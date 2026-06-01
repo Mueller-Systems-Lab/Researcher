@@ -307,6 +307,119 @@ def test_review_queue_priority():
         assert "high" in next_item.url  # Höchstes Risiko zuerst
 
 
+# ─── Human Review Queue (additional pure-logic paths) ──────────────────────
+
+
+def test_review_queue_add_duplicate():
+    """add() returns False when item_id already exists."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        assert rq.add("id1", "http://test.onion") is True
+        assert rq.add("id1", "http://test.onion") is False
+        assert rq.pending_count == 1
+
+
+def test_review_queue_get_next_pending_empty():
+    """get_next_pending() returns None when queue is empty."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        assert rq.get_next_pending() is None
+
+
+def test_review_queue_get_pending_items_order():
+    """get_pending_items() returns oldest-first."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        rq.add("first", "http://first.onion")
+        rq.add("second", "http://second.onion")
+
+        items = rq.get_pending_items()
+        assert len(items) == 2
+        assert items[0].id == "first"
+        assert items[1].id == "second"
+
+
+def test_review_queue_get_pending_items_limit():
+    """get_pending_items() respects limit."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        for i in range(10):
+            rq.add(f"id{i}", f"http://url{i}.onion")
+
+        items = rq.get_pending_items(limit=3)
+        assert len(items) == 3
+
+
+def test_review_queue_approve_nonexistent():
+    """approve() returns False for nonexistent id."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        assert rq.approve("nonexistent", reviewer="tester") is False
+
+
+def test_review_queue_reject_nonexistent():
+    """reject() returns False for nonexistent id."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        assert rq.reject("nonexistent", reviewer="tester") is False
+
+
+def test_review_queue_get_stats():
+    """get_stats() returns correct counts."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        rq.add("a", "http://a.onion")
+        rq.add("b", "http://b.onion")
+        rq.add("c", "http://c.onion")
+
+        rq.approve("a", reviewer="tester")
+        rq.reject("b", reviewer="tester", reason="nope")
+
+        stats = rq.get_stats()
+        assert stats["pending"] == 1
+        assert stats["approved"] == 1
+        assert stats["rejected"] == 1
+
+
+def test_review_queue_pending_count_property():
+    """pending_count returns correct count."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        assert rq.pending_count == 0
+
+        rq.add("a", "http://a.onion")
+        assert rq.pending_count == 1
+        rq.approve("a", reviewer="tester")
+        assert rq.pending_count == 0
+
+
+def test_review_queue_content_truncation():
+    """add() truncates content to 500 chars."""
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rq = ReviewQueue(queue_file=f"{tmpdir}/reviews.json")
+        long_content = "x" * 1000
+        rq.add("id1", "http://test.onion", content=long_content)
+        assert len(rq._items["id1"].content_preview) == 500
+
+
 # ─── Discovery Pipeline ───────────────────────────────────────────────────────
 
 
