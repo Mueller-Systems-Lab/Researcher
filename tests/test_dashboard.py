@@ -622,22 +622,65 @@ def test_gpu_monitor_generic_exception(mock_run):
 def test_gpu_processes_nonzero_return(mock_run):
     """_get_processes: returncode != 0 → returns [] (Line 128)."""
     from dashboard.gpu_monitor import GPUMonitor
+    from unittest.mock import MagicMock
 
-    # First call (nvidia-smi query): success with valid data
-    # Second call (nvidia-smi process query): returncode 1
-    call_responses = [
-        MagicMock(
-            returncode=0, stdout="0, GPU Test, 50, 4096, 8192, 50, 65", stderr=""
-        ),
-        MagicMock(returncode=1, stdout="", stderr="No processes"),
-    ]
-    mock_run.side_effect = call_responses
+    # Configure subprocess.run to return different results for different calls
+    call_count = [0]
 
-    # Need to mock two subprocess calls
-    with patch.object(GPUMonitor, "_get_processes", return_value=[]):
-        monitor = GPUMonitor()
-        data = monitor.collect()
-        assert data.error == ""  # Should succeed with empty processes
+    def _mock_run_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # First call: main GPU query (success)
+            return MagicMock(
+                returncode=0, stdout="0, GPU Test, 50, 4096, 8192, 50, 65", stderr=""
+            )
+        else:
+            # Second call: process query (failure)
+            return MagicMock(returncode=1, stdout="", stderr="No processes")
+
+    mock_run.side_effect = _mock_run_side_effect
+
+    monitor = GPUMonitor()
+    data = monitor.collect()
+    assert data.error == ""  # Should succeed with empty processes
+    assert data.processes == []
+
+
+@patch("dashboard.gpu_monitor.subprocess.run")
+def test_gpu_get_processes_exception(mock_run):
+    """_get_processes: subprocess.run wirft Exception → returns [] (Lines 147-148)."""
+    from dashboard.gpu_monitor import GPUMonitor
+    from unittest.mock import MagicMock
+
+    # First call for main GPU query: success
+    # Second call for process query: exception
+    call_count = [0]
+
+    def _mock_run_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return MagicMock(
+                returncode=0, stdout="0, GPU Test, 50, 4096, 8192, 50, 65", stderr=""
+            )
+        else:
+            raise RuntimeError("process query failed")
+
+    mock_run.side_effect = _mock_run_side_effect
+
+    monitor = GPUMonitor()
+    data = monitor.collect()
+    # _get_processes should catch the exception and return []
+    assert data.processes == []
+
+
+@patch("dashboard.gpu_monitor.subprocess.run")
+def test_gpu_is_available_exception(mock_run):
+    """is_available: subprocess.run exception → returns False (Lines 186-188)."""
+    from dashboard.gpu_monitor import GPUMonitor
+
+    mock_run.side_effect = RuntimeError("which failed")
+    result = GPUMonitor.is_available()
+    assert result is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
