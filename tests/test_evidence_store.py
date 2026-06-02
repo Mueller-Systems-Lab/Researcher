@@ -537,3 +537,148 @@ def test_make_quote_safe_truncation():
     result = _make_quote_safe(long_text)
     assert len(result) <= 2000
     assert result.endswith("...")
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: evidence_store missed lines
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_citation_empty_segment_id_raises():
+    """Citation: empty/whitespace segment_id raises ValueError (Line 83)."""
+    from evidence_store.models import Citation
+
+    with pytest.raises(ValueError, match="segment_id must not be empty"):
+        Citation(segment_id="", label="")
+
+
+def test_citation_whitespace_segment_id_raises():
+    """Citation: whitespace-only segment_id raises ValueError (Line 83)."""
+    from evidence_store.models import Citation
+
+    with pytest.raises(ValueError, match="segment_id must not be empty"):
+        Citation(segment_id="   ", label="S1")
+
+
+def test_load_sources_skips_empty_lines():
+    """load_sources: JSONL with empty lines → skipped (Line 70)."""
+    import json
+    from evidence_store.models import EvidenceSource
+    from evidence_store.store import EVIDENCE_DIR, load_sources
+
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    sources_path = EVIDENCE_DIR / "sources.jsonl"
+    src1 = EvidenceSource(
+        url="https://a.com", title="A", retrieved_at="2026-01-01T00:00:00Z"
+    )
+    src2 = EvidenceSource(
+        url="https://b.com", title="B", retrieved_at="2026-01-01T00:00:00Z"
+    )
+    lines = [
+        json.dumps(
+            {
+                "source_id": src1.source_id,
+                "url": src1.url,
+                "canonical_url": src1.canonical_url,
+                "title": src1.title,
+                "content_hash": src1.content_hash,
+                "retrieved_at": src1.retrieved_at,
+                "content_type": "",
+            }
+        ),
+        "",  # empty line
+        "   ",  # whitespace-only line
+        json.dumps(
+            {
+                "source_id": src2.source_id,
+                "url": src2.url,
+                "canonical_url": src2.canonical_url,
+                "title": src2.title,
+                "content_hash": src2.content_hash,
+                "retrieved_at": src2.retrieved_at,
+                "content_type": "",
+            }
+        ),
+    ]
+    sources_path.write_text("\n".join(lines), encoding="utf-8")
+
+    result = load_sources()
+    assert len(result) == 2
+
+
+def test_load_segments_skips_empty_lines():
+    """load_segments: JSONL with empty lines → skipped (Line 134)."""
+    import json
+    from evidence_store.models import EvidenceSegment
+    from evidence_store.store import EVIDENCE_DIR, load_segments
+
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    seg_path = EVIDENCE_DIR / "segments.jsonl"
+    seg1 = EvidenceSegment(source_id="s1", text="Segment 1")
+    seg2 = EvidenceSegment(source_id="s2", text="Segment 2")
+    lines = [
+        json.dumps(
+            {
+                "segment_id": seg1.segment_id,
+                "source_id": seg1.source_id,
+                "text": seg1.text,
+                "normalized_text": seg1.normalized_text,
+                "quote_safe_text": seg1.quote_safe_text,
+                "injection_flags": [],
+            }
+        ),
+        "",  # empty line
+        json.dumps(
+            {
+                "segment_id": seg2.segment_id,
+                "source_id": seg2.source_id,
+                "text": seg2.text,
+                "normalized_text": seg2.normalized_text,
+                "quote_safe_text": seg2.quote_safe_text,
+                "injection_flags": [],
+            }
+        ),
+    ]
+    seg_path.write_text("\n".join(lines), encoding="utf-8")
+
+    result = load_segments()
+    assert len(result) == 2
+
+
+def test_load_citations_skips_empty_lines():
+    """load_citations: JSONL with empty lines → skipped (Line 186)."""
+    import json
+    from evidence_store.models import Citation
+    from evidence_store.store import EVIDENCE_DIR, load_citations
+
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    cit_path = EVIDENCE_DIR / "citations.jsonl"
+    cit1 = Citation(segment_id="seg-a", label="[A1]")
+    cit2 = Citation(segment_id="seg-b", label="[B1]")
+    lines = [
+        json.dumps(
+            {
+                "citation_id": cit1.citation_id,
+                "segment_id": cit1.segment_id,
+                "label": cit1.label,
+                "quote": cit1.quote,
+                "url": cit1.url,
+                "retrieved_at": cit1.retrieved_at,
+            }
+        ),
+        "",  # empty line
+        json.dumps(
+            {
+                "citation_id": cit2.citation_id,
+                "segment_id": cit2.segment_id,
+                "label": cit2.label,
+                "quote": cit2.quote,
+                "url": cit2.url,
+                "retrieved_at": cit2.retrieved_at,
+            }
+        ),
+    ]
+    cit_path.write_text("\n".join(lines), encoding="utf-8")
+
+    result = load_citations()
+    assert len(result) == 2

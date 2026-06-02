@@ -35,6 +35,34 @@ class TestSQLiteFTS5Adapter:
         assert adapter.db_path.endswith("test.sqlite3")
         assert adapter.doc_count >= 0
 
+    def test_init_db_exception_raised(self):
+        """_init_db: sqlite3.Error caught, logged, re-raised (Lines 80-82)."""
+        import sqlite3
+        from unittest.mock import patch
+        from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
+            adapter.db_path = f"{tmpdir}/bad.sqlite3"
+            adapter._lock = MagicMock()  # mock the lock to be a no-op
+
+            # Mock _get_conn to return a connection whose execute fails on CREATE
+            mock_conn = MagicMock()
+
+            # Succeed on PRAGMA calls, fail on CREATE/table statements
+            def mock_execute(stmt):
+                if "PRAGMA" in stmt.upper():
+                    return MagicMock()  # pragma succeeds
+                raise sqlite3.Error("Corrupt DB during CREATE")
+
+            mock_conn.execute.side_effect = mock_execute
+            adapter._get_conn = MagicMock(return_value=mock_conn)
+
+            with pytest.raises(sqlite3.Error, match="Corrupt DB"):
+                adapter._init_db()
+            # Verify conn.close() was still called (finally block)
+            mock_conn.close.assert_called_once()
+
     # ── Index ────────────────────────────────────────────────────────
 
     def test_index_insert(self, adapter):
@@ -452,3 +480,52 @@ class TestWhooshIndexAdapter:
         adapter._ix = mock_ix
 
         assert adapter.doc_count == 0
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: whoosh timestamp None branch
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_whoosh_search_none_timestamp():
+    """whoosh search: None timestamp → empty string (Lines 72-73)."""
+    from unittest.mock import MagicMock
+    from search.adapters.whoosh_index_adapter import WhooshIndexAdapter
+
+    adapter = WhooshIndexAdapter.__new__(WhooshIndexAdapter)
+    adapter._dir = "mock_dir"
+    adapter._open = False
+
+    mock_ix = MagicMock()
+    # Use MagicMock to support both dict-like access and .score attribute
+    mock_hit = MagicMock()
+    mock_hit.get.side_effect = lambda key, default=None: {
+        "url": "http://none-ts.onion",
+        "author": "test_author",
+        "title": "Test",
+        "timestamp": None,
+        "content": "Some content",
+    }.get(key, default)
+    mock_hit.score = 0.95
+
+    mock_searcher = MagicMock()
+    mock_searcher.search.return_value = [mock_hit]
+    mock_searcher.__enter__ = MagicMock(return_value=mock_searcher)
+    mock_searcher.__exit__ = MagicMock(return_value=False)
+    mock_ix.searcher.return_value = mock_searcher
+    adapter._ix = mock_ix
+
+    from whoosh.fields import Schema, ID, TEXT, DATETIME
+
+    adapter._schema = Schema(
+        url=ID(stored=True),
+        author=TEXT(stored=True),
+        title=TEXT(stored=True),
+        timestamp=DATETIME(stored=True),
+        content=TEXT(stored=True),
+    )
+
+    results = adapter.search("test query")
+    assert len(results) > 0
+    # Verify timestamp got converted from None to ""
+    assert results[0]["timestamp"] == ""

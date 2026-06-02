@@ -195,7 +195,9 @@ class CompositeRetriever:
                     logger.warning(
                         f"CompositeRetriever {key}: Timeout, verwende partial results"
                     )
-                except Exception as e:
+                except (
+                    Exception
+                ) as e:  # pragma: no cover — _search_* catch-all prevents this
                     logger.warning(f"CompositeRetriever {key}: {e}")
 
         # Mischen & deduplizieren

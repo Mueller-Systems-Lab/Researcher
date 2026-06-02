@@ -750,3 +750,49 @@ def test_start_run_no_ready_nodes_deadlock():
         result = start_run(state, worker=lambda nid, q, ctx: (True, []))
 
     assert result.status == RunStatus.FAILED
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: storage.py missed lines
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_load_events_nonexistent_file():
+    """load_events: file not found → returns empty list (Line 125)."""
+    import tempfile
+    from pathlib import Path
+    from research_orchestrator.storage import load_events
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        import research_orchestrator.storage as storage_mod
+
+        original = storage_mod.RUNS_DIR
+        try:
+            storage_mod.RUNS_DIR = Path(tmpdir)
+            result = load_events("nonexistent_run")
+            assert result == []
+        finally:
+            storage_mod.RUNS_DIR = original
+
+
+def test_atomic_write_exception_cleanup():
+    """_atomic_write: Exception during replace → tmp file cleaned up (Lines 30-32)."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = Path(tmpdir) / "test_output.json"
+
+        # Patch Path.replace to raise, forcing cleanup path
+        with patch.object(Path, "replace", side_effect=OSError("Replace failed")):
+            try:
+                from research_orchestrator.storage import _atomic_write
+
+                _atomic_write(dest, '{"key": "value"}')
+            except OSError:
+                pass  # Expected
+
+        # Verify no tmp files left behind (cleanup happened in except block)
+        tmp_files = list(Path(tmpdir).glob("*.tmp"))
+        assert len(tmp_files) == 0

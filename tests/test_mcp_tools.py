@@ -261,7 +261,46 @@ def test_web_fetch_ssl_error_fallback_redirect_ssrf(
     mock_ssl_fallback.assert_called_once()
 
 
-# ─── EvidenceStore ────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — MCPToolBase ABC abstract method bodies (Lines 49, 55, 61, 73)
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_mcp_tool_base_abstract_methods():
+    """MCPToolBase: abstract method bodies execute and return None (Ellipsis body)."""
+    from mcp_tools.base import MCPToolBase
+
+    # Temporarily make the ABC concrete so we can instantiate and call methods
+    original_abstract = MCPToolBase.__abstractmethods__
+    try:
+        MCPToolBase.__abstractmethods__ = frozenset()
+        tool = MCPToolBase()
+
+        # Lines 49, 55, 61 — property getters with Ellipsis body
+        assert tool.name is None  # '...' returns None (no explicit return)
+        assert tool.description is None
+        assert tool.parameters is None
+
+        # Line 73 — run() method with Ellipsis body
+        assert tool.run({}) is None
+
+        # get_manifest should work
+        manifest = tool.get_manifest()
+        assert "name" in manifest
+        assert "description" in manifest
+    finally:
+        MCPToolBase.__abstractmethods__ = original_abstract
+
+
+def test_mcp_tool_base_cannot_instantiate():
+    """MCPToolBase: direct instantiation raises TypeError."""
+    from mcp_tools.base import MCPToolBase
+
+    try:
+        MCPToolBase()
+        assert False, "Expected TypeError was not raised"
+    except TypeError:
+        pass  # Expected
 
 
 def test_evidence_store_no_action():
@@ -1445,6 +1484,32 @@ def test_evidence_store_store_extra_metadata():
     assert kwargs["metadata"]["topic"] == "testing"
 
 
+def test_evidence_store_search_success():
+    """_search_evidence: query returns results → success with data (Lines 158-165)."""
+    from mcp_tools.evidence_store import EvidenceStore
+
+    mock_results = [
+        {"id": "doc1", "metadata": {"claim": "Test claim 1"}, "score": 0.95},
+        {"id": "doc2", "metadata": {"claim": "Test claim 2"}, "score": 0.87},
+    ]
+    mock_store = MagicMock()
+    mock_store.query.return_value = mock_results
+
+    tool = EvidenceStore(vector_store=mock_store)
+    result = tool.run(
+        {
+            "action": "search",
+            "query_embedding": [0.1, 0.2, 0.3],
+            "n_results": 5,
+        }
+    )
+
+    assert result["success"] is True
+    assert result["data"]["count"] == 2
+    assert len(result["data"]["results"]) == 2
+    assert result["data"]["results"][0]["score"] == 0.95
+
+
 # ════════════════════════════════════════════════════════════════════════
 # R3 Branch-Coverage — registry.py (91% → 100%)
 # Missing lines: 75-77
@@ -1509,7 +1574,32 @@ def test_audit_log_stats_empty_line_skip():
         tool = AuditLog(log_file=log_file)
         result = tool._get_stats()
         assert result["success"] is True
-        assert result["data"]["total_entries"] == 2
+        assert result["data"]["total_entries"] == 2  # not-json line skipped
+    finally:
+        import os
+
+        os.unlink(log_file)
+
+
+def test_audit_log_stats_exception_handled():
+    """AuditLog._get_stats: Exception during open → caught, returns empty stats (Lines 212-213)."""
+    import json as _json
+    import tempfile
+    from unittest.mock import patch
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write(_json.dumps({"event": "search"}) + "\n")
+        log_file = f.name
+
+    try:
+        tool = AuditLog(log_file=log_file)
+        # Patch open to raise after exists check passes but during actual open
+        with patch("builtins.open", side_effect=OSError("I/O error")):
+            result = tool._get_stats()
+        # Should not crash — exception caught, returns success with 0 entries
+        assert result["success"] is True
+        assert result["data"]["total_entries"] == 0
     finally:
         import os
 

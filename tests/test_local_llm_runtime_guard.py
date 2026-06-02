@@ -442,3 +442,24 @@ def test_run_guard_generation_ok():
             "http://127.0.0.1:8080", "qwen3.5", test_generation=True, timeout=10.0
         )
     assert result.status == RuntimeStatus.LOCAL_LLM_READY
+
+
+# ── check_generation Exception Path (Lines 157-159) ─────────────────────
+
+
+def test_check_generation_exception_handled():
+    """check_generation: Exception during urlopen → caught, returns (False, "", str(exc), latency)."""
+    from unittest.mock import patch
+    from config.local_llm_runtime import check_generation
+
+    with patch(
+        "urllib.request.urlopen",
+        side_effect=ConnectionRefusedError("Connection refused"),
+    ):
+        ok, output, err, latency = check_generation(
+            "http://127.0.0.1:19999", "test-model", timeout=0.1
+        )
+    assert ok is False
+    assert output == ""
+    assert "Connection refused" in err
+    assert latency >= 0

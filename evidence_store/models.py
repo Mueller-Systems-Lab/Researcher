@@ -95,7 +95,9 @@ def _extract_domain(url: str) -> str:
 
         parsed = urlparse(url)
         return parsed.netloc or parsed.hostname or ""
-    except Exception:
+    except (
+        Exception
+    ):  # pragma: no cover — defensive, urlparse never raises on valid strs
         return ""
 
 

@@ -309,3 +309,16 @@ def test_run_server_lifecycle(mock_create_server):
             run_server(host="127.0.0.1", port=8766)
 
     mock_create_server.assert_called_once_with(host="127.0.0.1", port=8766)
+
+
+def test_server_compatibility_wrapper():
+    """mcp_tools.server: compatibility wrapper imports correctly (Lines 3-7)."""
+    import mcp_tools.server as wrapper
+
+    # Verify re-exports
+    assert wrapper.MCP_PORT is not None
+    assert wrapper.create_server is not None
+    assert wrapper.run_server is not None
+    assert "MCP_PORT" in wrapper.__all__
+    assert "create_server" in wrapper.__all__
+    assert "run_server" in wrapper.__all__

@@ -683,6 +683,44 @@ def test_gpu_is_available_exception(mock_run):
     assert result is False
 
 
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — gpu_monitor: empty line in process list (Line 134)
+# ════════════════════════════════════════════════════════════════════════
+
+
+@patch("dashboard.gpu_monitor.subprocess.run")
+def test_gpu_monitor_empty_line_in_processes(mock_run):
+    """collect: empty line in nvidia-smi process list → skipped (Line 134)."""
+    from dashboard.gpu_monitor import GPUMonitor
+    from unittest.mock import MagicMock
+
+    call_count = [0]
+
+    def _mock_run_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # First call: GPU query (success)
+            return MagicMock(
+                returncode=0,
+                stdout="0, NVIDIA GeForce GTX 1070, 45, 4096, 8192, 50, 65\n",
+                stderr="",
+            )
+        else:
+            # Second call: process query with empty line
+            return MagicMock(
+                returncode=0,
+                stdout="1234, python, 500\n\n5678, java, 200\n",
+                stderr="",
+            )
+
+    mock_run.side_effect = _mock_run_side_effect
+
+    monitor = GPUMonitor()
+    data = monitor.collect()
+    assert data.error == ""
+    assert len(data.processes) == 2
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Phase 5 — B2-1: server.py Coverage (24 Missed → 100%)
 # ═══════════════════════════════════════════════════════════════════════════

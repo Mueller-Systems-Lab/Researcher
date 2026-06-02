@@ -1020,3 +1020,109 @@ def test_classifier_high_risk_single_keyword():
         content="Discussion about drug policies and regulations.",
     )
     assert result.risk_level in ("high", "critical")
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: seed_queue save exception
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_seed_queue_save_exception_handled():
+    """SeedQueue._save: OSError during save → logged, not raised (Lines 73-74)."""
+    import tempfile
+    from unittest.mock import patch
+    from onion_discovery.seed_queue import SeedQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        seed_file = f"{tmpdir}/seeds.json"
+        sq = SeedQueue(seed_file=seed_file)
+        sq.add_seed("http://test.onion", source="manual")
+
+        # Patch open to raise, simulating disk error on save
+        with patch("builtins.open", side_effect=OSError("Permission denied")):
+            # Should not raise — caught internally
+            sq._save()
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: link_extractor regex fallback + engine index
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_link_extractor_regex_fallback():
+    """LinkExtractor: regex fallback finds valid .onion URLs in raw text (Lines 96-99)."""
+    from onion_discovery.link_extractor import LinkExtractor
+
+    # Valid v3 onion (only base32 chars: a-z, 2-7)
+    valid_onion = "http://abcdefghijklmnop234567abcdefghijklmnop234567.onion"
+    # No <a> tags — only raw text
+    html = f"Plain text with a link to {valid_onion} in the middle."
+    extractor = LinkExtractor()
+    links = extractor.extract("http://source.onion", html)
+    onion_links = [link for link in links if ".onion" in link["url"]]
+    assert len(onion_links) >= 1
+    # Verify it was extracted via raw_text (not a_href)
+    assert onion_links[0]["extracted_from"] == "raw_text"
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Phase 7 — Final Cleanup: engine index error + human_review save
+# ════════════════════════════════════════════════════════════════════════
+
+
+@patch("onion_discovery.engine.requests.Session.get")
+@patch("onion_discovery.engine.DiscoveryPipeline.enabled")
+def test_pipeline_index_error_handled(mock_enabled, mock_get):
+    """Pipeline: WhooshIndex.add_post raises → logged, errors incremented (Lines 271-273)."""
+    from unittest.mock import MagicMock, patch as m_patch
+    from onion_discovery.engine import DiscoveryPipeline
+
+    mock_enabled.return_value = True
+
+    # Use content that classifier will mark as risk_level=low, indexable=True
+    mock_response = MagicMock()
+    mock_response.text = """<html><head><title>Technology Wiki</title></head>
+    <body><p>Discussion about privacy and security in open source software development.</p></body></html>"""
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline = DiscoveryPipeline(max_pages_per_run=1)
+        pipeline.seed_queue.seed_file = f"{tmpdir}/seeds.json"
+        pipeline.review_queue.queue_file = f"{tmpdir}/reviews.json"
+        pipeline.add_seed("http://techwiki.onion")
+
+        # Mock WhooshIndex to raise during add_post
+        with m_patch("darknet_search.index.WhooshIndex") as mock_whoosh:
+            mock_idx = MagicMock()
+            mock_idx.add_post.side_effect = RuntimeError("Index unavailable")
+            mock_whoosh.return_value = mock_idx
+
+            stats = pipeline.run_once()
+
+        assert stats["seeds_processed"] >= 1
+        assert stats["errors"] >= 1  # Index error counted
+
+
+def test_review_queue_save_exception_cleanup():
+    """ReviewQueue._save: Exception during save → tmp unlinked, re-raised (Lines 83-85)."""
+    from unittest.mock import patch
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        rq.add("id1", "http://test.onion", "Test", risk_level="high")
+
+        # Patch os.replace to simulate failure after file write
+        with patch("os.replace", side_effect=OSError("Disk error")):
+            try:
+                rq._save()
+            except OSError:
+                pass  # Expected — exception is re-raised
+
+        # Verify no tmp files left behind
+        import glob
+
+        tmp_files = glob.glob(f"{tmpdir}/*.tmp")
+        assert len(tmp_files) == 0
