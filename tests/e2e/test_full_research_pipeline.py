@@ -60,13 +60,20 @@ def temp_index_dir():
     """Temporäres Verzeichnis für den Suchindex."""
     with tempfile.TemporaryDirectory() as tmpdir:
         old_path = os.environ.get("DARKNET_INDEX_PATH")
+        old_backend = os.environ.get("SEARCH_INDEX_BACKEND")
         os.environ["DARKNET_INDEX_PATH"] = tmpdir
         os.environ["SEARCH_INDEX_BACKEND"] = "sqlite_fts5"
         yield tmpdir
+        # Restore DARKNET_INDEX_PATH
         if old_path:
             os.environ["DARKNET_INDEX_PATH"] = old_path
         else:
             os.environ.pop("DARKNET_INDEX_PATH", None)
+        # Restore SEARCH_INDEX_BACKEND (fix flaky env var leak)
+        if old_backend:
+            os.environ["SEARCH_INDEX_BACKEND"] = old_backend
+        else:
+            os.environ.pop("SEARCH_INDEX_BACKEND", None)
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +92,7 @@ def test_full_pipeline_searxng_mock(mock_searxng_response, temp_index_dir):
     mock_response.headers = {"Content-Type": "application/json"}
     mock_session.get.return_value = mock_response
 
-    with patch("scrapers.http_session.create_session", return_value=mock_session):
+    with patch("search.composite.create_session", return_value=mock_session):
         # 2. Retriever (CompositeRetriever)
         from search.composite import CompositeRetriever
 

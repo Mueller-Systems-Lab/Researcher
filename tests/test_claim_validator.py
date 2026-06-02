@@ -287,6 +287,7 @@ def test_write_results_to_index_none_backend_whoosh(monkeypatch):
 
     from mcp_tools.claim_index_writer import write_results_to_index
 
+    monkeypatch.delenv("SEARCH_INDEX_BACKEND", raising=False)
     monkeypatch.setenv("DARKNET_INDEX_PATH", "/tmp/test_whoosh_idx")
 
     mock_adapter_cls = MagicMock()
@@ -334,6 +335,7 @@ def test_write_results_to_index_none_backend_default_path(monkeypatch):
     """index_backend=None, DARKNET_INDEX_PATH nicht gesetzt -> default ./darknet_index."""
     from mcp_tools.claim_index_writer import write_results_to_index
 
+    monkeypatch.delenv("SEARCH_INDEX_BACKEND", raising=False)
     monkeypatch.delenv("DARKNET_INDEX_PATH", raising=False)
 
     mock_adapter_cls = MagicMock()
