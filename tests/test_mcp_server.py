@@ -236,3 +236,76 @@ def test_root_info_handler():
     response = asyncio.run(root_handler(mock_request))
     body = json.loads(response.body)
     assert body["server"] == "researcher-mcp"
+
+
+# ── Health endpoint ───────────────────────────────────────────────────────
+
+
+def test_health_handler():
+    """Health handler returns {'status': 'ok'}."""
+    server = create_server()
+    app = server.streamable_http_app()
+    health_handler = None
+    for route in app.routes:
+        if hasattr(route, "path") and route.path == "/health":
+            health_handler = route.endpoint
+            break
+    assert health_handler is not None, "/health route should be registered"
+    mock_request = MagicMock()
+    response = asyncio.run(health_handler(mock_request))
+    body = json.loads(response.body)
+    assert body == {"status": "ok"}
+
+
+# ── human-review-request tool handler ─────────────────────────────────────
+
+
+@patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)
+def test_human_review_request_tool_handler(mock_run_sync):
+    """human-review-request tool wrapper passes args via call_tool."""
+    mock_run_sync.return_value = {
+        "success": True,
+        "data": {"request_id": "req-1"},
+    }
+    server = create_server()
+    asyncio.run(
+        server.call_tool(
+            "human-review-request",
+            {
+                "action": "request",
+                "url": "http://onion.site/page",
+                "title": "Review Me",
+                "reason": "manual check needed",
+            },
+        )
+    )
+    mock_run_sync.assert_awaited_once()
+    assert mock_run_sync.call_args.args[1] == "human-review-request"
+
+
+# ── run_server function ───────────────────────────────────────────────────
+
+
+@patch("mcp_tools.fastmcp_server.create_server")
+def test_run_server_lifecycle(mock_create_server):
+    """run_server creates server, lists tools, and starts it."""
+    from mcp_tools.fastmcp_server import run_server
+
+    mock_server = MagicMock()
+    mock_create_server.return_value = mock_server
+
+    # Mock anyio.run to avoid blocking
+    with patch(
+        "mcp_tools.fastmcp_server.anyio.run",
+        return_value=[
+            MagicMock(name="web-fetch"),
+            MagicMock(name="evidence-store"),
+        ],
+    ):
+        # Mock server.run to avoid blocking — but it will still try,
+        # so we need to make server.run raise SystemExit or similar
+        mock_server.run.side_effect = SystemExit(0)
+        with pytest.raises(SystemExit):
+            run_server(host="127.0.0.1", port=8766)
+
+    mock_create_server.assert_called_once_with(host="127.0.0.1", port=8766)

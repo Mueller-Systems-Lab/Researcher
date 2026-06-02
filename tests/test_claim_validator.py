@@ -114,6 +114,68 @@ def test_claim_validator_invalid_search_mode(mock_fulltext, mock_composite):
     mock_fulltext.assert_called_once()
 
 
+@patch("mcp_tools.claim_validator.retrieve_composite")
+@patch("mcp_tools.claim_validator.retrieve_fulltext")
+def test_claim_validator_composite_errors(mock_fulltext, mock_composite):
+    """retrieve_composite returns errors → warnings appended."""
+    from mcp_tools.claim_validator import ClaimValidator
+
+    mock_composite.return_value = {
+        "results": [],
+        "errors": {"whoosh": "Index corrupt", "sqlite": None},
+        "total": 0,
+    }
+    mock_fulltext.return_value = {"results": [], "errors": {}, "total": 0}
+    result = ClaimValidator().run({"claim": "test", "search_mode": "composite"})
+    assert result["success"] is True
+    assert "retriever_errors" in result["data"]
+    assert result["data"]["retriever_errors"]["composite"]["whoosh"] == "Index corrupt"
+    assert "CompositeRetriever" in result.get("warnings", [""])[0]
+
+
+@patch("mcp_tools.claim_validator.retrieve_composite")
+@patch("mcp_tools.claim_validator.retrieve_fulltext")
+def test_claim_validator_fulltext_errors(mock_fulltext, mock_composite):
+    """retrieve_fulltext returns errors → warnings appended."""
+    from mcp_tools.claim_validator import ClaimValidator
+
+    mock_composite.return_value = {"results": [], "errors": {}, "total": 0}
+    mock_fulltext.return_value = {
+        "results": [],
+        "errors": {"whoosh": "No index found"},
+        "total": 0,
+    }
+    result = ClaimValidator().run({"claim": "test", "search_mode": "fulltext"})
+    assert result["success"] is True
+    assert "retriever_errors" in result["data"]
+    assert result["data"]["retriever_errors"]["fulltext"]["whoosh"] == "No index found"
+    assert "Volltextsuche" in result.get("warnings", [""])[0]
+
+
+@patch("mcp_tools.claim_validator.retrieve_composite")
+@patch("mcp_tools.claim_validator.retrieve_fulltext")
+def test_claim_validator_both_retrievers_have_errors(mock_fulltext, mock_composite):
+    """Both retrievers return errors → both in warnings and retriever_errors."""
+    from mcp_tools.claim_validator import ClaimValidator
+
+    mock_composite.return_value = {
+        "results": [],
+        "errors": {"whoosh": "Err1"},
+        "total": 0,
+    }
+    mock_fulltext.return_value = {
+        "results": [],
+        "errors": {"whoosh": "Err2"},
+        "total": 0,
+    }
+    result = ClaimValidator().run({"claim": "test", "search_mode": "all"})
+    assert result["success"] is True
+    assert len(result.get("warnings", [])) >= 2
+    assert "retriever_errors" in result["data"]
+    assert "composite" in result["data"]["retriever_errors"]
+    assert "fulltext" in result["data"]["retriever_errors"]
+
+
 def test_claim_validator_unicode_claim():
     """Claim mit Unicode/Sonderzeichen → korrekt verarbeitet."""
     claim = "Äpfel schmecken gut mit 日本語 и кириллица 🎉"

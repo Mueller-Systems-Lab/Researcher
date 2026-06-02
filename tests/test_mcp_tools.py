@@ -112,6 +112,155 @@ def test_web_fetch_connection_error(mock_get):
     assert result["success"] is False
 
 
+# ─── WebFetch SSRF validation (lines 117-118, 232-234) ────────────────────
+
+
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+def test_web_fetch_validate_url_invalid_ip(mock_getaddrinfo):
+    """_validate_url_target handles ValueError from ip_address (line 117-118)."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_getaddrinfo.return_value = [
+        (2, 1, 0, "", ("not-a-valid-ip", 80)),
+        (2, 1, 0, "", ("127.0.0.1", 80)),
+    ]
+
+    tool = WebFetchTool()
+    # The first address ("not-a-valid-ip") should trigger ValueError → continue
+    # The second address ("127.0.0.1") is private and should be blocked
+    error = tool._validate_url_target("http://example.com")
+    assert error is not None
+    assert "127.0.0.1" in error or "blockiert" in error
+    mock_getaddrinfo.assert_called_once()
+
+
+def test_web_fetch_validate_redirect_chain_ssrf_final_url():
+    """Redirect to private IP → SSRF blocked (line 232-234)."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.history = []  # no redirect chain
+    mock_response.url = "http://127.0.0.1/admin"  # final URL is private
+
+    error = tool._validate_redirect_chain(mock_response, "http://safe.com")
+    assert error is not None
+    assert "SSRF" in error or "blockiert" in error
+
+
+def test_web_fetch_validate_redirect_chain_ssrf_in_chain():
+    """Redirect chain contains a blocked URL → SSRF blocked."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    # Redirect step with private URL
+    redirect_resp = MagicMock()
+    redirect_resp.url = "http://10.0.0.1/secret"
+
+    mock_response = MagicMock()
+    mock_response.history = [redirect_resp]
+    mock_response.url = "http://safe-destination.com"
+
+    error = tool._validate_redirect_chain(mock_response, "http://safe.com")
+    assert error is not None
+    assert "10.0.0.1" in error or "SSRF" in error
+
+
+def test_web_fetch_validate_redirect_chain_safe():
+    """All redirects safe → no error."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    tool = WebFetchTool()
+
+    mock_response = MagicMock()
+    mock_response.history = []
+    mock_response.url = "http://safe-destination.com"
+
+    error = tool._validate_redirect_chain(mock_response, "http://safe-destination.com")
+    # Same URL → no SSRF check on final (line 231: final_url != original_url)
+    assert error is None
+
+
+# ─── WebFetch JS detection (line 260) ─────────────────────────────────────
+
+
+@patch("mcp_tools.web_fetch.detect_js_only")
+@patch("mcp_tools.web_fetch.requests.Session.get")
+def test_web_fetch_js_only_low_confidence(mock_get, mock_detect):
+    """Low-confidence JS detection → warning logged, fetch continues (line 260)."""
+    from mcp_tools.web_fetch import WebFetchTool
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "<html><body><p>Text</p></body></html>"
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    mock_detect.return_value = {
+        "js_required": True,
+        "confidence": "medium",
+        "reason": "only div tags found",
+    }
+
+    tool = WebFetchTool()
+    result = tool.run({"url": "http://example.com"})
+    # JS is detected but confidence is not "high" → warning only, still succeeds
+    assert result["success"] is True
+    mock_detect.assert_called_once()
+
+
+# ─── WebFetch SSL fallback redirect SSRF (line 381) ───────────────────────
+
+
+@patch("mcp_tools.web_fetch.ssl_fallback_fetch")
+@patch("mcp_tools.web_fetch.socket.getaddrinfo")
+@patch("mcp_tools.web_fetch.requests.Session.get")
+def test_web_fetch_ssl_error_fallback_redirect_ssrf(
+    mock_get, mock_getaddrinfo, mock_ssl_fallback
+):
+    """SSL error → fallback succeeds → redirect to private IP → SSRF blocked (line 381)."""
+    from requests.exceptions import SSLError
+
+    from mcp_tools.web_fetch import WebFetchTool
+
+    # SSRF pre-check: target URL resolves to a safe address
+    mock_getaddrinfo.return_value = [
+        (2, 1, 0, "", ("93.184.216.34", 443)),
+    ]
+
+    # Original request fails with SSLError
+    mock_get.side_effect = SSLError("certificate verify failed")
+
+    # Fallback succeeds but redirects to private IP
+    mock_fallback_response = MagicMock()
+    mock_fallback_response.history = []
+    mock_fallback_response.url = "http://10.0.0.1/private"
+    mock_fallback_response.raise_for_status.return_value = None
+    mock_ssl_fallback.return_value = mock_fallback_response
+
+    tool = WebFetchTool()
+
+    # Patch _validate_url_target to block the redirect URL but not the original
+    original_validate = tool._validate_url_target
+
+    def selective_validate(url):
+        if "10.0.0.1" in url:
+            return "SSRF blockiert: private IP"
+        if "safe.example.com" in url:
+            return None
+        return original_validate(url)
+
+    with patch.object(tool, "_validate_url_target", side_effect=selective_validate):
+        result = tool.run({"url": "https://safe.example.com"})
+
+    assert result["success"] is False
+    assert "SSRF" in result.get("error", "") or "blockiert" in result.get("error", "")
+    mock_ssl_fallback.assert_called_once()
+
+
 # ─── EvidenceStore ────────────────────────────────────────────────────────────
 
 

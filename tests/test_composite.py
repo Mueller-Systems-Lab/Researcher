@@ -248,3 +248,104 @@ def test_composite_total_limit(mock_create):
     results = r.search(max_results=5)
 
     assert len(results) <= 5, f"Max 5 Ergebnisse erlaubt, aber {len(results)}"
+
+
+# ── Missing-Line Coverage (lines 92, 136-143, 198-199) ───────────────────
+
+
+@patch("search.composite.create_session")
+def test_composite_searxng_result_without_url(mock_create):
+    """SearXNG result without URL is skipped (line 92 continue)."""
+    from search.composite import CompositeRetriever
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "results": [
+            {
+                "url": "",
+                "title": "No URL",
+                "content": "body",
+                "engine": "g",
+                "score": 0.8,
+            },
+            {
+                "url": "http://example.com/valid",
+                "title": "OK",
+                "content": "body",
+                "engine": "g",
+                "score": 0.9,
+            },
+        ]
+    }
+    mock_response.raise_for_status.return_value = None
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
+
+    r = CompositeRetriever("test", searx_url="http://localhost:8080")
+    r.darknet_enabled = False
+    results = r.search(max_results=10)
+
+    # Only the valid URL should be returned
+    assert len(results) == 1
+    assert results[0]["url"] == "http://example.com/valid"
+
+
+@patch("search.composite.DarknetRetriever")
+@patch("search.composite.create_session")
+def test_composite_darknet_search_exception(mock_create, mock_darknet_cls):
+    """Darknet search raises exception → caught gracefully (lines 136-143)."""
+    from search.composite import CompositeRetriever
+
+    # SearXNG returns empty
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"results": []}
+    mock_response.raise_for_status.return_value = None
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+    mock_create.return_value = mock_session
+
+    # DarknetRetriever raises exception
+    mock_darknet = MagicMock()
+    mock_darknet.search.side_effect = RuntimeError("Index corrupted")
+    mock_darknet_cls.return_value = mock_darknet
+
+    r = CompositeRetriever(
+        "test",
+        searx_url="http://localhost:8080",
+    )
+    r.darknet_enabled = True
+    results = r.search(max_results=10)
+
+    # Should not crash; darknet results are empty
+    assert isinstance(results, list)
+    assert r.last_errors.get("darknet") is not None
+
+
+@patch("search.composite.DarknetRetriever")
+@patch("search.composite.create_session")
+def test_composite_future_exception(mock_create, mock_darknet_cls):
+    """Concurrent future raises non-TimeoutError → caught (lines 198-199)."""
+    from search.composite import CompositeRetriever
+
+    # SearXNG raises ConnectionError during execution (caught by _search_searxng)
+    mock_session = MagicMock()
+    from requests.exceptions import ConnectionError
+
+    mock_session.get.side_effect = ConnectionError("Down")
+    mock_create.return_value = mock_session
+
+    # Darknet also raises exception to trigger the except block
+    mock_darknet = MagicMock()
+    mock_darknet.search.side_effect = RuntimeError("Index unavailable")
+    mock_darknet_cls.return_value = mock_darknet
+
+    r = CompositeRetriever(
+        "test",
+        searx_url="http://localhost:8080",
+    )
+    r.darknet_enabled = True
+    results = r.search(max_results=10)
+
+    # Should not crash
+    assert isinstance(results, list)
