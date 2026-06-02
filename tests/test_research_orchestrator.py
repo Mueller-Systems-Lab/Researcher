@@ -548,6 +548,7 @@ def test_compute_ready_multiple_deps_one_failed_blocks():
     assert n3.node_id not in ready
     assert state.node_states[n3.node_id].status == NodeRunStatus.BLOCKED
 
+
 def test_emit_event_with_payload():
     """emit_event serializes payload."""
     from research_orchestrator.events import EventType, emit_event
@@ -590,3 +591,162 @@ def test_compute_ready_dep_not_in_state():
     ready = compute_ready_nodes(plan, state)
     assert n1.node_id in ready
     assert n2.node_id not in ready
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B2-2: orchestrator.py Edge Cases (10 Missed → 0)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_worker_exception_caught():
+    """start_run: worker wirft Exception → caught, node fails (lines 220-223)."""
+    from unittest.mock import MagicMock, patch
+    from research_planner.approval import approve_plan
+    from research_planner.models import ResearchNode, ResearchPlan
+    from research_orchestrator.orchestrator import start_run
+    from research_orchestrator.state import NodeRunStatus, RunStatus
+
+    plan = ResearchPlan(query="Worker crash")
+    n1 = ResearchNode(title="Node 1", question="Q1")
+    plan.add_node(n1)
+    approve_plan(plan)
+
+    state = create_run(plan)
+    # Create a crashing worker
+    crash_worker = MagicMock(side_effect=RuntimeError("worker explosion"))
+
+    with (
+        patch("research_orchestrator.orchestrator.save_state", return_value=None),
+        patch("research_orchestrator.orchestrator.append_events", return_value=None),
+    ):
+        result = start_run(state, worker=crash_worker)
+
+    assert result.status == RunStatus.FAILED
+
+
+def test_resume_terminal_run():
+    """resume_run: terminal state → logged and returned (lines 274-275)."""
+    from unittest.mock import patch
+    from research_orchestrator.orchestrator import create_run, resume_run
+    from research_orchestrator.state import RunStatus
+    from research_planner.approval import approve_plan
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Terminal")
+    plan.add_node(ResearchNode(title="N", question="Q"))
+    approve_plan(plan)
+
+    state = create_run(plan)
+    state.status = RunStatus.COMPLETED
+
+    with patch("research_orchestrator.orchestrator.load_state", return_value=state):
+        result = resume_run("some_run_id")
+        assert result is not None
+        assert result.status == RunStatus.COMPLETED
+
+
+def test_deps_satisfied_dep_not_in_state():
+    """_deps_satisfied: dep_id not in node_states → returns False (line 288)."""
+    from research_orchestrator.orchestrator import _deps_satisfied
+    from research_orchestrator.state import NodeRunStatus, NodeState, RunState
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Missing dep state")
+    n1 = ResearchNode(title="N1", question="Q1")
+    plan.add_node(n1)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_deps[n1.node_id] = ["nonexistent_dep"]
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.PENDING
+    )
+    # "nonexistent_dep" is not in node_states
+
+    result = _deps_satisfied(n1.node_id, state)
+    assert result is False
+
+
+def test_deps_satisfied_dep_failed_blocks_node():
+    """_deps_satisfied: dep FAILED → node BLOCKED + returns False (lines 291-292)."""
+    from research_orchestrator.orchestrator import _deps_satisfied
+    from research_orchestrator.state import NodeRunStatus, NodeState, RunState
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Dep failed")
+    n1 = ResearchNode(title="N1", question="Q1")
+    n2 = ResearchNode(title="N2", question="Q2")
+    plan.add_node(n1)
+    plan.add_node(n2)
+    plan.approved = True
+
+    state = RunState(run_id="r", plan_id=plan.plan_id)
+    state.node_deps[n2.node_id] = [n1.node_id]
+    state.node_states[n1.node_id] = NodeState(
+        node_id=n1.node_id, status=NodeRunStatus.FAILED
+    )
+    state.node_states[n2.node_id] = NodeState(
+        node_id=n2.node_id, status=NodeRunStatus.PENDING
+    )
+
+    result = _deps_satisfied(n2.node_id, state)
+    assert result is False
+    assert state.node_states[n2.node_id].status == NodeRunStatus.BLOCKED
+
+
+def test_start_run_ghost_node_in_topo_order():
+    """start_run: node_id in topo_order not in node_states → continue (line 169)."""
+    from unittest.mock import patch
+    from research_orchestrator.orchestrator import create_run, start_run
+    from research_orchestrator.state import RunStatus
+    from research_planner.approval import approve_plan
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Ghost")
+    n1 = ResearchNode(title="N1", question="Q1")
+    plan.add_node(n1)
+    approve_plan(plan)
+
+    state = create_run(plan)
+    # Add a fake node_id that doesn't exist in node_states
+    state.topo_order.append("ghost_node")
+
+    with (
+        patch("research_orchestrator.orchestrator.save_state", return_value=None),
+        patch("research_orchestrator.orchestrator.append_events", return_value=None),
+    ):
+        result = start_run(state, worker=lambda nid, q, ctx: (True, []))
+
+    # The ghost node should be skipped via continue (line 169)
+    # The real node should execute successfully
+    assert result.status == RunStatus.COMPLETED
+
+
+def test_start_run_no_ready_nodes_deadlock():
+    """start_run: PENDING node with dep removed from state → deadlock → FAILED."""
+    from unittest.mock import patch
+    from research_orchestrator.orchestrator import create_run, start_run
+    from research_orchestrator.state import RunStatus
+    from research_planner.approval import approve_plan
+    from research_planner.models import ResearchNode, ResearchPlan
+
+    plan = ResearchPlan(query="Deadlock")
+    n1 = ResearchNode(title="N1", question="Q1")
+    n2 = ResearchNode(title="N2", question="Q2")
+    plan.add_node(n1)
+    plan.add_node(n2)
+    n1.depends_on.append(n2.node_id)  # n1 depends on n2
+    approve_plan(plan)
+
+    state = create_run(plan)
+    # Remove n2 from node_states → n1's dependency can't be satisfied
+    del state.node_states[n2.node_id]
+    # Also keep n2 in topo_order but remove from node_states
+
+    with (
+        patch("research_orchestrator.orchestrator.save_state", return_value=None),
+        patch("research_orchestrator.orchestrator.append_events", return_value=None),
+    ):
+        result = start_run(state, worker=lambda nid, q, ctx: (True, []))
+
+    assert result.status == RunStatus.FAILED

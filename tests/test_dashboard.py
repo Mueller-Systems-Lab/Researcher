@@ -638,3 +638,259 @@ def test_gpu_processes_nonzero_return(mock_run):
         monitor = GPUMonitor()
         data = monitor.collect()
         assert data.error == ""  # Should succeed with empty processes
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B2-1: server.py Coverage (24 Missed → 100%)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_serve_static_png_content_type():
+    """_serve_static: .png file gets image/png content type (lines 62-63)."""
+    import os
+
+    handler = _make_handler("/image.png")
+    safe_path = "/tmp/test.png"
+    handler._resolve_static = MagicMock(return_value=safe_path)
+
+    with patch.object(os.path, "exists", return_value=True):
+        with patch("builtins.open", MagicMock()) as mock_open:
+            mock_open.return_value.__enter__.return_value.read.return_value = b"\x89PNG"
+            handler._serve_static("test.png", "image/png")
+
+    handler.send_response.assert_called_with(200)
+    handler.send_header.assert_any_call("Content-Type", "image/png")
+
+
+def test_serve_static_exception_returns_500():
+    """_serve_static: IOError → 500 response (lines 130-133)."""
+    import os
+
+    handler = _make_handler("/")
+    safe_path = "/tmp/test.html"
+    handler._resolve_static = MagicMock(return_value=safe_path)
+
+    with patch.object(os.path, "exists", return_value=True):
+        with patch("builtins.open", side_effect=IOError("Disk full")):
+            handler._serve_static("index.html", "text/html")
+
+    handler.send_response.assert_called_with(500)
+
+
+def test_serve_static_js_content_type():
+    """_serve_static: .js file gets application/javascript."""
+    import os
+
+    handler = _make_handler("/script.js")
+    safe_path = "/tmp/script.js"
+    handler._resolve_static = MagicMock(return_value=safe_path)
+
+    with patch.object(os.path, "exists", return_value=True):
+        with patch("builtins.open", MagicMock()) as mock_open:
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                b"console.log(1)"
+            )
+            handler._serve_static("script.js", "application/javascript")
+
+    handler.send_response.assert_called_with(200)
+
+
+def test_sse_outer_exception_caught():
+    """_serve_gpu_sse: Exception in outer try → caught (line 173-174)."""
+    import time
+    from unittest.mock import patch
+
+    handler = _make_handler("/api/gpu/stream")
+
+    handler.monitor.collect_dict.side_effect = RuntimeError("unexpected crash")
+
+    with patch.object(time, "sleep", side_effect=RuntimeError("unexpected crash")):
+        # Outer exception should be caught without propagating
+        try:
+            handler._serve_gpu_sse()
+        except RuntimeError:
+            pytest.fail("Outer exception should be caught inside _serve_gpu_sse")
+
+    # Should not raise — just exits silently
+
+
+def test_sse_inner_broken_pipe_after_error():
+    """_serve_gpu_sse: BrokenPipeError during error event write → break (lines 167-169)."""
+    import time
+    from unittest.mock import patch
+
+    handler = _make_handler("/api/gpu/stream")
+
+    # First collect_dict call throws, then wfile.write raises BrokenPipeError
+    handler.monitor.collect_dict.side_effect = RuntimeError("collection error")
+    # Replace wfile with a mock that supports side_effect
+    handler.wfile = MagicMock()
+    handler.wfile.write.side_effect = BrokenPipeError("client gone")
+    handler.wfile.flush = MagicMock()
+
+    def _sleep_and_break(*args):
+        raise ConnectionResetError("exit")
+
+    with patch.object(time, "sleep", side_effect=_sleep_and_break):
+        handler._serve_gpu_sse()
+
+    # Should exit gracefully
+
+
+def test_run_server_basic():
+    """run_server: creates HTTPServer and calls serve_forever (lines 204-213)."""
+    from unittest.mock import MagicMock, patch
+
+    with patch("dashboard.server.HTTPServer") as mock_http:
+        mock_server = MagicMock()
+        mock_http.return_value = mock_server
+
+        # Make serve_forever raise to exit the infinite loop
+        mock_server.serve_forever.side_effect = KeyboardInterrupt()
+
+        from dashboard.server import run_server
+
+        run_server(host="127.0.0.1", port=9999)
+
+        mock_http.assert_called_once()
+        # Verify host and port were passed (first arg is (host, port) tuple)
+        call_args = mock_http.call_args[0]
+        assert call_args[0] == ("127.0.0.1", 9999)
+        assert call_args[1].__name__ == "DashboardHandler"
+
+        # serve_forever was called
+        mock_server.serve_forever.assert_called_once()
+        # server_close was called after KeyboardInterrupt
+        mock_server.server_close.assert_called_once()
+
+
+def test_run_server_default_port():
+    """run_server: uses DASHBOARD_PORT default when no port specified."""
+    from unittest.mock import MagicMock, patch
+
+    with patch("dashboard.server.HTTPServer") as mock_http:
+        mock_server = MagicMock()
+        mock_http.return_value = mock_server
+        mock_server.serve_forever.side_effect = KeyboardInterrupt()
+
+        from dashboard.server import run_server
+
+        run_server()
+
+        # First arg is (host, port) tuple
+        call_args = mock_http.call_args[0]
+        assert call_args[0][1] == 8888  # DASHBOARD_PORT default
+        assert call_args[0][0] == "127.0.0.1"  # default host
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B2-1 continued: do_GET + _resolve_static paths
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_do_get_png_content_type():
+    """do_GET: .png file → content_type image/png (lines 62-63)."""
+    import os
+    from dashboard.server import STATIC_DIR
+
+    handler = _make_handler("/test.png")
+    # Create a real file in STATIC_DIR so the path is found
+    png_path = os.path.join(STATIC_DIR, "test.png")
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    try:
+        with open(png_path, "w") as f:
+            f.write("fake png")
+        safe_path = os.path.realpath(png_path)
+        handler._resolve_static = MagicMock(return_value=safe_path)
+
+        with patch.object(os.path, "exists", return_value=True):
+            with patch("builtins.open", MagicMock()) as mock_open:
+                mock_open.return_value.__enter__.return_value.read.return_value = (
+                    b"pngdata"
+                )
+                handler.do_GET()
+    finally:
+        if os.path.exists(png_path):
+            os.remove(png_path)
+
+    # Should have served with image/png
+    content_type_calls = [
+        c[0][1] for c in handler.send_header.call_args_list if c[0][0] == "Content-Type"
+    ]
+    assert "image/png" in content_type_calls
+
+
+def test_resolve_static_traversal_dots():
+    """_resolve_static: '..' in filename → returns None (lines 96-97 → 103)."""
+    handler = _make_handler("/")
+    # Call _resolve_static directly with traversal path
+    result = handler._resolve_static("../etc/passwd")
+    assert result is None
+
+
+def test_send_cors_no_headers_attribute():
+    """_send_cors_header: headers missing → silent return (lines 75-77)."""
+    handler = _make_handler("/")
+    # Simulate a handler without headers attribute
+    del handler.headers
+    # Should not raise
+    handler._send_cors_header()
+    # Test passes if no exception
+
+
+def test_log_message_sse_filter_coverage():
+    """log_message: SSE stream args filter coverage (lines 190-191)."""
+    from dashboard.server import DashboardHandler
+
+    # Create handler WITHOUT overriding log_message
+    import types
+
+    handler = _make_handler("/api/gpu/stream")
+    # Restore the real log_message method (bound to this instance)
+    handler.log_message = types.MethodType(DashboardHandler.log_message, handler)
+
+    # These should not raise and should hit lines 190-191
+    handler.log_message("GET %s %s", "/api/gpu/stream", "200")
+    handler.log_message("GET %s %s", "/api/gpu", "200")
+
+
+def test_resolve_static_symlink_traversal():
+    """_resolve_static: path resolves outside STATIC_DIR → returns None (line 103)."""
+    import os
+    from unittest.mock import patch
+    from dashboard.server import STATIC_DIR
+
+    handler = _make_handler("/")
+    static_real_actual = os.path.realpath(STATIC_DIR)
+
+    # Mock os.path.realpath: only transform the joined path, keep STATIC_DIR real
+    called = [0]
+
+    def mock_realpath(path):
+        called[0] += 1
+        # First call: joined path (filename + STATIC_DIR) → pretend outside
+        if called[0] == 1:
+            return "/etc/passwd"
+        # Second call: STATIC_DIR → real path
+        return static_real_actual
+
+    with patch.object(os.path, "realpath", side_effect=mock_realpath):
+        result = handler._resolve_static("linked_file")
+        assert result is None
+
+
+@patch("dashboard.gpu_monitor.subprocess.run")
+def test_gpu_monitor_collect_empty_output(mock_run):
+    """collect: empty nvidia-smi stdout → error (Line 81-82)."""
+    from dashboard.gpu_monitor import GPUMonitor
+    from unittest.mock import MagicMock
+
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "\n"  # empty line
+    mock_result.stderr = ""
+    mock_run.return_value = mock_result
+
+    monitor = GPUMonitor()
+    data = monitor.collect()
+    assert data.error != ""
