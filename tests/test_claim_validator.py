@@ -275,6 +275,39 @@ def test_retrieve_fulltext_handles_error():
     assert "runtime" in result.get("errors", {})
 
 
+def test_retrieve_composite_runtime_error():
+    """CompositeRetriever raises RuntimeError → runtime error captured (line 64-66)."""
+    from mcp_tools.claim_retriever import retrieve_composite
+
+    composite_mod = types.ModuleType("search.composite")
+    mock_retriever = MagicMock()
+    mock_retriever.search.side_effect = RuntimeError("connection lost")
+    composite_mod.CompositeRetriever = MagicMock(return_value=mock_retriever)
+
+    search_pkg = types.ModuleType("search")
+    search_pkg.__path__ = []
+
+    with patch.dict(
+        sys.modules, {"search": search_pkg, "search.composite": composite_mod}
+    ):
+        result = retrieve_composite("test")
+
+    assert isinstance(result, dict)
+    assert "runtime" in result.get("errors", {})
+
+
+def test_retrieve_fulltext_import_error():
+    """WhooshIndex import fails → import error captured (line 102-103)."""
+    from mcp_tools.claim_retriever import retrieve_fulltext
+
+    with patch.dict(sys.modules, {"darknet_search.index": None}):
+        result = retrieve_fulltext("test")
+
+    assert isinstance(result, dict)
+    assert result["results"] == []
+    assert "import" in result.get("errors", {})
+
+
 def test_retrieve_fulltext_maps_results_without_index():
     """Whoosh-Ergebnisse werden ohne echten Index korrekt gemappt."""
     from mcp_tools.claim_retriever import retrieve_fulltext

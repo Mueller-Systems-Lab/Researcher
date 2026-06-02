@@ -461,3 +461,93 @@ def test_crawler_post_parse_exception_continue():
         posts = crawler.crawl_thread_page("http://forum.onion/thread/1")
         # Should return empty or handle gracefully — exception caught
         assert isinstance(posts, list)
+
+
+# ── Missing-Line Coverage: 134, 157, 191-193 ─────────────────────────────
+
+
+@patch("crawlers.darknet_crawler.requests.Session.post")
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_login_failed_not_redirected(mock_get, mock_post):
+    """Login returns response still on login page → logged_in=False (line 134)."""
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    crawler = DarknetCrawler()
+    crawler.config.forum_base_url = "http://forum.onion"
+    crawler.config.login_url = "http://forum.onion/login"
+    crawler.config.username = "user"
+    crawler.config.password = "pass"
+
+    # Login page response
+    login_page = MagicMock()
+    login_page.text = '<input name="csrf_token" value="token123">'
+    login_page.raise_for_status.return_value = None
+
+    # Login POST response — URL still contains "login"
+    login_response = MagicMock()
+    login_response.url = "http://forum.onion/login?error=1"
+    login_response.raise_for_status.return_value = None
+
+    mock_get.return_value = login_page
+    mock_post.return_value = login_response
+
+    result = crawler.login()
+    assert result is False
+    assert crawler.logged_in is False
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_crawl_thread_page_pagination_delay(mock_get):
+    """crawl_thread_page with page>1 triggers crawl_delay sleep (line 157)."""
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    crawler = DarknetCrawler()
+    crawler.config.crawl_delay = 0.001  # minimal delay for test
+
+    mock_response = MagicMock()
+    mock_response.text = "<html><body></body></html>"
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    with patch("crawlers.darknet_crawler.time.sleep") as mock_sleep:
+        posts = crawler.crawl_thread_page("http://forum.onion/thread/1", page=2)
+
+    assert isinstance(posts, list)
+    mock_sleep.assert_called_once_with(0.001)
+
+
+@patch("crawlers.darknet_crawler.requests.Session.get")
+def test_crawler_post_parse_exception_continue(mock_get):
+    """Post parsing exception → logged and continue (lines 191-193)."""
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    crawler = DarknetCrawler()
+    mock_response = MagicMock()
+    mock_response.text = "<html><body></body></html>"
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    with patch("crawlers.darknet_crawler.BeautifulSoup") as mock_bs:
+        mock_soup = MagicMock()
+        # First element causes exception, second element works
+        mock_element_bad = MagicMock()
+        mock_element_good = MagicMock()
+        mock_soup.select.return_value = [mock_element_bad, mock_element_good]
+        mock_soup.select_one.return_value = MagicMock()
+
+        # Bad element: all extractors raise
+        mock_element_bad.select_one.side_effect = RuntimeError("parse error")
+        # Good element: normal extraction
+        mock_element_good.select_one.return_value = MagicMock()
+        mock_element_good.select_one.return_value.get_text.return_value = (
+            "Valid content"
+        )
+
+        mock_bs.return_value = mock_soup
+
+        with patch.object(
+            crawler, "_extract_text", side_effect=RuntimeError("parse error")
+        ):
+            posts = crawler.crawl_thread_page("http://forum.onion/thread/1")
+
+    assert isinstance(posts, list)

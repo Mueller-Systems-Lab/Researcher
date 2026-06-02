@@ -535,6 +535,81 @@ def test_human_review_reject_no_id():
     assert result["success"] is False
 
 
+# ─── HumanReview: Missing-Line Coverage (103, 148, 154-165) ───────────────
+
+
+def test_human_review_list_pending_empty():
+    """list_pending with no items returns empty result (line 103, 154-163)."""
+    from mcp_tools.human_review import HumanReviewTool
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        tool = HumanReviewTool(review_queue=rq)
+        result = tool.run({"action": "list_pending"})
+        assert result["success"] is True
+        assert result["data"]["pending"] == 0
+        assert result["data"]["next_item"] is None
+
+
+def test_human_review_list_pending_with_items():
+    """list_pending with items returns next pending item (lines 165-178)."""
+    from mcp_tools.human_review import HumanReviewTool
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        tool = HumanReviewTool(review_queue=rq)
+
+        # Add a request so list_pending has something
+        tool.run(
+            {
+                "action": "request",
+                "url": "http://pending.onion",
+                "risk_level": "medium",
+            }
+        )
+        result = tool.run({"action": "list_pending"})
+        assert result["success"] is True
+        assert result["data"]["pending"] >= 1
+        assert result["data"]["next_item"] is not None
+        assert "url" in result["data"]["next_item"]
+
+
+def test_human_review_duplicate_request():
+    """Duplicate review request → error (line 148)."""
+    from mcp_tools.human_review import HumanReviewTool
+    from onion_discovery.human_review import ReviewQueue
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        queue_file = f"{tmpdir}/reviews.json"
+        rq = ReviewQueue(queue_file=queue_file)
+        tool = HumanReviewTool(review_queue=rq)
+
+        # First request
+        result1 = tool.run(
+            {
+                "action": "request",
+                "url": "http://duplicate.onion",
+                "risk_level": "low",
+            }
+        )
+        assert result1["success"] is True
+
+        # Second request with same URL → duplicate
+        result2 = tool.run(
+            {
+                "action": "request",
+                "url": "http://duplicate.onion",
+                "risk_level": "low",
+            }
+        )
+        assert result2["success"] is False
+        assert "existiert bereits" in result2.get("error", "")
+
+
 # ─── SSRF-Schutz (T-019) ──────────────────────────────────────────────────────
 
 from unittest.mock import patch  # noqa: E402
