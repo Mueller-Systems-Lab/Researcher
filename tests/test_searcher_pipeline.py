@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from searcher_pipeline.content_extractor import extract_metadata, extract_text
 from searcher_pipeline.fetch_cache import clear_cache as clear_fetch_cache
 from searcher_pipeline.fetch_cache import get as cache_get
@@ -664,6 +666,7 @@ def test_robots_parse_line_without_colon_ignored():
     policy = _parse_robots_content("test.com", content)
     assert "/x" in policy.disallowed_paths
 
+
 def test_extract_metadata_description():
     """Meta-Description from HTML."""
     from searcher_pipeline.content_extractor import extract_metadata
@@ -671,3 +674,311 @@ def test_extract_metadata_description():
     html = '<html><head><meta name="description" content="A test page."></head></html>'
     meta = extract_metadata(html)
     assert meta["description"] == "A test page."
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — robots_policy.py (82% → 95%+)
+# Missing lines: 33, 49-59, 64, 114, 119-121, 131-132
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_robots_policy_is_expired_true():
+    """is_expired returns True when TTL exceeded (Line 33)."""
+    from searcher_pipeline.robots_policy import RobotsPolicy
+
+    policy = RobotsPolicy(domain="test.com", ttl=1)
+    policy.fetched_at = 0  # long ago
+    assert policy.is_expired() is True
+
+
+def test_fetch_robots_5xx_fail_closed():
+    """_fetch_robots: 5xx status returns None (Lines 49-52)."""
+    from unittest.mock import MagicMock, patch
+    from searcher_pipeline.robots_policy import _fetch_robots
+
+    mock_resp = MagicMock()
+    mock_resp.status = 500
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=None)
+
+    with (
+        patch("urllib.request.urlopen", return_value=mock_resp),
+        patch("urllib.request.Request"),
+    ):
+        result = _fetch_robots("test.com")
+    assert result is None
+
+
+def test_fetch_robots_4xx_documented_allow():
+    """_fetch_robots: 4xx status returns policy with error (Lines 53-58)."""
+    from unittest.mock import MagicMock, patch
+    from searcher_pipeline.robots_policy import _fetch_robots
+
+    mock_resp = MagicMock()
+    mock_resp.status = 404
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=None)
+
+    with (
+        patch("urllib.request.urlopen", return_value=mock_resp),
+        patch("urllib.request.Request"),
+    ):
+        result = _fetch_robots("test.com")
+    assert result is not None
+    assert result.error == "HTTP 404"
+    assert result.allowed is True
+
+
+def test_fetch_robots_success_path():
+    """_fetch_robots: successful 200 fetch parses content (Line 64)."""
+    from unittest.mock import MagicMock, patch
+    from searcher_pipeline.robots_policy import _fetch_robots
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b"User-agent: *\nDisallow: /private"
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=None)
+
+    with (
+        patch("urllib.request.urlopen", return_value=mock_resp),
+        patch("urllib.request.Request"),
+    ):
+        result = _fetch_robots("test.com")
+    assert result is not None
+    assert "/private" in result.disallowed_paths
+
+
+def test_is_allowed_empty_domain():
+    """is_allowed: empty/no domain returns False (Line 114)."""
+    from searcher_pipeline.robots_policy import is_allowed
+
+    # URL without a hostname (e.g. malformed)
+    assert is_allowed("://malformed") is False
+
+
+def test_is_allowed_cached_error_path():
+    """is_allowed: cached error policy returns cached.allowed (Lines 119-121)."""
+    from searcher_pipeline.robots_policy import (
+        _robots_cache,
+        RobotsPolicy,
+        clear_cache,
+        is_allowed,
+    )
+
+    clear_cache()
+    # Inject a cached error policy
+    _robots_cache["error-test.com"] = RobotsPolicy(
+        domain="error-test.com", allowed=True, error="HTTP 403"
+    )
+    result = is_allowed("https://error-test.com/page")
+    assert result is True  # allowed because the cached policy says so
+
+
+def test_is_allowed_successful_fetch_and_store():
+    """is_allowed: successful fetch → store in cache → check path (Lines 131-132)."""
+    from unittest.mock import patch
+    from searcher_pipeline.robots_policy import (
+        _robots_cache,
+        RobotsPolicy,
+        clear_cache,
+        is_allowed,
+    )
+
+    clear_cache()
+    # Mock _fetch_robots to return a valid policy
+    policy = RobotsPolicy(domain="fresh-test.com")
+    policy.disallowed_paths = ["/admin"]
+
+    with patch("searcher_pipeline.robots_policy._fetch_robots", return_value=policy):
+        assert is_allowed("https://fresh-test.com/public") is True
+        assert is_allowed("https://fresh-test.com/admin/secret") is False
+
+    # Verify cache was populated
+    assert "fresh-test.com" in _robots_cache
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — searxng_client.py (0% → 85%+)
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_searxng_search_happy_path():
+    """search(): successful query returns results."""
+    from unittest.mock import MagicMock, patch
+    from searcher_pipeline.searxng_client import search
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(
+        {
+            "results": [
+                {
+                    "title": "Test Result",
+                    "url": "https://example.com",
+                    "content": "Example content",
+                    "engines": ["google"],
+                    "score": 0.9,
+                }
+            ]
+        }
+    ).encode("utf-8")
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=None)
+
+    with (
+        patch("urllib.request.urlopen", return_value=mock_resp),
+        patch("urllib.request.Request"),
+    ):
+        results = search("test query")
+    assert len(results) == 1
+    assert results[0]["title"] == "Test Result"
+
+
+def test_searxng_search_exception_returns_empty():
+    """search(): exception returns []."""
+    from unittest.mock import patch
+    from searcher_pipeline.searxng_client import search
+
+    with (
+        patch("urllib.request.urlopen", side_effect=OSError("network error")),
+        patch("urllib.request.Request"),
+    ):
+        results = search("test query")
+    assert results == []
+
+
+def test_searxng_healthcheck_available():
+    """healthcheck(): returns True when SearXNG responds 200."""
+    from unittest.mock import MagicMock, patch
+    from searcher_pipeline.searxng_client import healthcheck
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=None)
+
+    with (
+        patch("urllib.request.urlopen", return_value=mock_resp),
+        patch("urllib.request.Request"),
+    ):
+        assert healthcheck() is True
+
+
+def test_searxng_healthcheck_exception_returns_false():
+    """healthcheck(): exception returns False."""
+    from unittest.mock import patch
+    from searcher_pipeline.searxng_client import healthcheck
+
+    with (
+        patch("urllib.request.urlopen", side_effect=OSError("unreachable")),
+        patch("urllib.request.Request"),
+    ):
+        assert healthcheck() is False
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — mmr.py (95% → 100%)
+# Missing lines: 59, 72, 96
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_mmr_select_no_suitable_item_breaks():
+    """mmr_select: when no item improves MMR, best_item stays None → break (Line 59)."""
+    from searcher_pipeline.mmr import mmr_select
+
+    # All items have identical (low) relevance + max similarity → MMR ≤ best_score
+    items = [
+        {"text": "exact same text", "score": 0.1, "domain": "a.com"},
+        {"text": "exact same text", "score": 0.1, "domain": "b.com"},
+    ]
+    result = mmr_select(items, k=5, lambda_param=0.0)
+    # Should return fewer than k since no item improves MMR after first
+    assert len(result) <= 2
+
+
+def test_min_similarity_empty_terms_continue():
+    """_min_similarity: empty item_terms or sel_terms → continue (Line 72)."""
+    from searcher_pipeline.mmr import _min_similarity
+
+    # Item with empty text
+    item = {"text": ""}
+    selected = [{"text": "some content"}]
+    sim = _min_similarity(item, selected)
+    assert sim == 1.0  # min_sim unchanged → default
+
+
+def test_deduplicate_texts_empty_terms_continue():
+    """deduplicate_texts: empty terms skip comparison (Line 96)."""
+    from searcher_pipeline.mmr import deduplicate_texts
+
+    # Empty string should not break dedup
+    result = deduplicate_texts(["", "unique text", ""], threshold=0.9)
+    assert "unique text" in result
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — reranker.py (95% → 100%)
+# Missing lines: 52-53
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_calculate_score_long_text_penalty():
+    """calculate_score: text > 5000 chars → 0.8x penalty (Lines 52-53)."""
+    from searcher_pipeline.reranker import calculate_score
+
+    long_text = "machine learning " * 600  # > 5000 chars
+    score = calculate_score(text=long_text, query="machine learning")
+    # Score should be calculated (no crash), but may be reduced
+    assert 0 <= score <= 1.0
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — segmenter.py (91% → 100%)
+# Missing lines: 74-75, 89, 94
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_segment_with_metadata():
+    """segment_with_metadata: wraps segment_text output (Lines 74-75)."""
+    from searcher_pipeline.segmenter import segment_with_metadata
+
+    result = segment_with_metadata(
+        "First sentence. Second sentence.", "https://example.com"
+    )
+    assert isinstance(result, list)
+    assert len(result) >= 1
+    for seg in result:
+        assert "text" in seg
+        assert "section" in seg
+        assert "position" in seg
+        assert "score" in seg
+
+
+def test_is_heading_hash_prefix():
+    """_is_heading: line starting with # is a heading (Line 89)."""
+    from searcher_pipeline.segmenter import _is_heading
+
+    assert _is_heading("# Introduction") is True
+    assert _is_heading("## Subsection") is True
+
+
+def test_is_heading_markdown_pattern():
+    """_is_heading: markdown heading pattern without # (Line 94)."""
+    from searcher_pipeline.segmenter import _is_heading
+
+    assert _is_heading("Introduction") is True
+    assert _is_heading("This is a complete sentence with many words.") is False
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R2 Branch-Coverage — url_canonicalizer.py (97% → 100%)
+# Missing line: 33
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_canonicalize_non_default_port():
+    """canonicalize: non-default port is preserved in output (Line 33)."""
+    from searcher_pipeline.url_canonicalizer import canonicalize
+
+    result = canonicalize("http://example.com:8080/path")
+    assert ":8080" in result

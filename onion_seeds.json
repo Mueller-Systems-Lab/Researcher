@@ -1,0 +1,26 @@
+[
+  {
+    "url": "http://a.onion",
+    "source": "manual",
+    "priority": 10,
+    "status": "pending",
+    "added_at": "2026-06-01T19:26:19.468600",
+    "fetched_at": null,
+    "reviewed_at": null,
+    "error": null,
+    "tags": [],
+    "notes": ""
+  },
+  {
+    "url": "http://b.onion",
+    "source": "manual",
+    "priority": 10,
+    "status": "pending",
+    "added_at": "2026-06-01T19:26:19.468613",
+    "fetched_at": null,
+    "reviewed_at": null,
+    "error": null,
+    "tags": [],
+    "notes": ""
+  }
+]

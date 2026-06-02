@@ -1131,6 +1131,7 @@ def test_web_fetch_unexpected_exception():
     assert result["success"] is False
     assert "Interner Fehler" in result["error"]
 
+
 # ─── EvidenceStore: _store_evidence coverage gaps ────────────────────────
 
 
@@ -1142,12 +1143,14 @@ def test_evidence_store_store_success():
     mock_store.add_one.return_value = True
 
     tool = EvidenceStore(vector_store=mock_store)
-    result = tool.run({
-        "action": "store",
-        "claim": "Python is a programming language",
-        "embedding": [0.1, 0.2, 0.3],
-        "source": "https://example.com",
-    })
+    result = tool.run(
+        {
+            "action": "store",
+            "claim": "Python is a programming language",
+            "embedding": [0.1, 0.2, 0.3],
+            "source": "https://example.com",
+        }
+    )
 
     assert result["success"] is True
     assert result["data"]["claim"] == "Python is a programming language"
@@ -1162,11 +1165,13 @@ def test_evidence_store_store_chromadb_unavailable():
     mock_store.add_one.return_value = False
 
     tool = EvidenceStore(vector_store=mock_store)
-    result = tool.run({
-        "action": "store",
-        "claim": "Test claim",
-        "embedding": [0.1, 0.2, 0.3],
-    })
+    result = tool.run(
+        {
+            "action": "store",
+            "claim": "Test claim",
+            "embedding": [0.1, 0.2, 0.3],
+        }
+    )
 
     assert result["success"] is False
     assert "ChromaDB" in result["error"]
@@ -1181,11 +1186,13 @@ def test_evidence_store_store_source_defaults_to_unknown():
     mock_store.add_one.return_value = True
 
     tool = EvidenceStore(vector_store=mock_store)
-    result = tool.run({
-        "action": "store",
-        "claim": "Something interesting",
-        "embedding": [0.5, 0.6],
-    })
+    result = tool.run(
+        {
+            "action": "store",
+            "claim": "Something interesting",
+            "embedding": [0.5, 0.6],
+        }
+    )
 
     assert result["success"] is True
     assert result["data"]["source"] == "unknown"
@@ -1199,14 +1206,131 @@ def test_evidence_store_store_extra_metadata():
     mock_store.add_one.return_value = True
 
     tool = EvidenceStore(vector_store=mock_store)
-    tool.run({
-        "action": "store",
-        "claim": "Claim with metadata",
-        "embedding": [0.7, 0.8],
-        "source": "https://x.com",
-        "metadata": {"author": "Alice", "topic": "testing"},
-    })
+    tool.run(
+        {
+            "action": "store",
+            "claim": "Claim with metadata",
+            "embedding": [0.7, 0.8],
+            "source": "https://x.com",
+            "metadata": {"author": "Alice", "topic": "testing"},
+        }
+    )
 
     _, kwargs = mock_store.add_one.call_args
     assert kwargs["metadata"]["author"] == "Alice"
     assert kwargs["metadata"]["topic"] == "testing"
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R3 Branch-Coverage — registry.py (91% → 100%)
+# Missing lines: 75-77
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_registry_run_tool_exception():
+    """run_tool: tool.run() raises Exception → returns error dict (Lines 75-77)."""
+    from unittest.mock import MagicMock
+    from mcp_tools.registry import _TOOLS, run_tool
+    from mcp_tools.base import MCPToolBase
+
+    # Register a tool that raises on run()
+    mock_tool = MagicMock(spec=MCPToolBase)
+    mock_tool.name = "crashy-tool"
+    mock_tool.run.side_effect = RuntimeError("tool crashed")
+    _TOOLS["crashy-tool"] = mock_tool
+
+    try:
+        result = run_tool("crashy-tool", {"param": "value"})
+        assert result["success"] is False
+        assert "Interner Fehler" in result["error"]
+    finally:
+        _TOOLS.pop("crashy-tool", None)
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R3 Branch-Coverage — audit_log.py (92% → 97%+)
+# Missing lines: 189-191, 204, 210-213
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_audit_log_read_exception():
+    """AuditLog._read: Exception caught → error result (Lines 189-191)."""
+    from unittest.mock import patch
+    from mcp_tools.audit_log import AuditLog
+
+    tool = AuditLog()
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("builtins.open", side_effect=OSError("Permission denied")),
+    ):
+        result = tool.run({"action": "read", "limit": 10})
+    assert result["success"] is False
+    assert "Kann nicht lesen" in result["error"]
+
+
+def test_audit_log_stats_empty_line_skip():
+    """AuditLog._get_stats: empty lines skipped (Line 204)."""
+    import json as _json
+    import tempfile
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write(_json.dumps({"event": "search", "query": "test"}) + "\n")
+        f.write("\n")  # empty line
+        f.write(_json.dumps({"event": "fetch", "url": "http://x.com"}) + "\n")
+        f.write("   \n")  # whitespace-only line
+        log_file = f.name
+
+    try:
+        tool = AuditLog(log_file=log_file)
+        result = tool._get_stats()
+        assert result["success"] is True
+        assert result["data"]["total_entries"] == 2
+    finally:
+        import os
+
+        os.unlink(log_file)
+
+
+def test_audit_log_stats_json_decode_error():
+    """AuditLog._get_stats: JSONDecodeError skipped, count continues (Lines 210-211)."""
+    import tempfile
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"event": "valid"}\n')
+        f.write("this is not json\n")
+        f.write('{"event": "also valid"}\n')
+        log_file = f.name
+
+    try:
+        tool = AuditLog(log_file=log_file)
+        result = tool._get_stats()
+        assert result["success"] is True
+        assert result["data"]["total_entries"] == 2  # not-json line skipped
+    finally:
+        import os
+
+        os.unlink(log_file)
+
+
+def test_audit_log_stats_json_decode_error():
+    """AuditLog._get_stats: JSONDecodeError skipped, count continues (Lines 210-211)."""
+    import tempfile
+    from mcp_tools.audit_log import AuditLog
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"event": "valid"}\n')
+        f.write("this is not json\n")
+        f.write('{"event": "also valid"}\n')
+        log_file = f.name
+
+    try:
+        tool = AuditLog(log_file=log_file)
+        result = tool._get_stats()
+        assert result["success"] is True
+        assert result["data"]["total_entries"] == 2  # not-json line skipped
+    finally:
+        import os
+
+        os.unlink(log_file)

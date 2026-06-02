@@ -384,3 +384,80 @@ def test_crawler_crawl_multi_page(mock_sleep):
     assert posts[1].author == "User2"
     assert posts[2].author == "User3"
     assert call_count["count"] == 3
+
+
+# ════════════════════════════════════════════════════════════════════════
+# R3 Branch-Coverage — darknet_crawler.py (94% → 97%+)
+# Missing lines: 134, 157, 191-193, 221-222
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_crawler_login_failure_logged_in_false():
+    """login(): when URL still contains 'login' after POST → logged_in=False (Line 134)."""
+    from unittest.mock import MagicMock, patch
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    config = MagicMock()
+    config.forum_base_url = "http://forum.onion"
+    config.forum_login_url = "http://forum.onion/login"
+    config.forum_username = "testuser"
+    config.forum_password = "testpass"
+
+    crawler = DarknetCrawler(config)
+    mock_session = MagicMock()
+    mock_response = MagicMock()
+    mock_response.url = "http://forum.onion/login?error=1"
+    mock_response.raise_for_status.return_value = None
+    mock_session.post.return_value = mock_response
+    crawler.session = mock_session
+
+    result = crawler.login()
+    assert result is False
+    assert crawler.logged_in is False
+
+
+def test_crawler_no_forum_base_url():
+    """crawl(): empty forum_base_url → returns [] (Lines 221-222)."""
+    from unittest.mock import MagicMock, patch
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    config = MagicMock()
+    config.forum_base_url = ""
+
+    crawler = DarknetCrawler(config)
+    crawler.logged_in = True  # skip login check
+
+    result = crawler.crawl()
+    assert result == []
+
+
+def test_crawler_post_parse_exception_continue():
+    """crawl_thread_page: parse exception caught, continues to next post (Lines 191-193)."""
+    from unittest.mock import MagicMock, patch
+    from crawlers.darknet_crawler import DarknetCrawler
+
+    config = MagicMock()
+    config.forum_base_url = "http://forum.onion"
+    config.crawl_delay = 0
+    crawler = DarknetCrawler(config)
+
+    mock_session = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "<html><body></body></html>"
+    mock_response.raise_for_status.return_value = None
+    mock_session.get.return_value = mock_response
+    crawler.session = mock_session
+
+    # Mock BeautifulSoup to have elements that cause extraction errors
+    with patch("crawlers.darknet_crawler.BeautifulSoup") as mock_bs:
+        mock_soup = MagicMock()
+        mock_element = MagicMock()
+        # Two elements: first raises AttributeError, second returns nothing
+        mock_soup.select.return_value = [mock_element]
+        # Make text extraction raise an exception
+        mock_element.get_text.side_effect = AttributeError("no text")
+        mock_bs.return_value = mock_soup
+
+        posts = crawler.crawl_thread_page("http://forum.onion/thread/1")
+        # Should return empty or handle gracefully — exception caught
+        assert isinstance(posts, list)

@@ -140,6 +140,7 @@ def test_darknet_uri_format():
     assert "forum1" in uri, "Sollte forum_id enthalten"
     assert len(uri) > len("darknet://forum1/post/"), "Sollte Hash enthalten"
 
+
 def test_darknet_retriever_duplicate_deduplication():
     """Duplicate URIs are silently skipped."""
     from unittest.mock import patch
@@ -209,13 +210,160 @@ def test_clear_index_happy_path():
         assert results == []
 
         # Can re-add after clear
-        idx.add_post({
-            "url": "http://forum.onion/after-clear",
-            "author": "newuser",
-            "title": "After Clear",
-            "timestamp": datetime.now(),
-            "content": "New post after clearing the index.",
-            "forum_id": "f2",
-        })
+        idx.add_post(
+            {
+                "url": "http://forum.onion/after-clear",
+                "author": "newuser",
+                "title": "After Clear",
+                "timestamp": datetime.now(),
+                "content": "New post after clearing the index.",
+                "forum_id": "f2",
+            }
+        )
         assert idx.doc_count == 1
 
+
+# ---------------------------------------------------------------------------
+# R2 Branch-Coverage Tests — darknet_search/index.py (84% → 95%)
+# Missing lines: 104-109, 174-176, 180-188, 196-198, 206-209
+# ---------------------------------------------------------------------------
+
+
+def test_add_post_lock_error():
+    """add_post: Whoosh LockError caught, returns False (Lines 104-106)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+    from whoosh.index import LockError
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.AsyncWriter") as mock_writer:
+        mock_writer.side_effect = LockError("index locked")
+        result = idx.add_post({"url": "http://x.onion/test", "content": "test"})
+        assert result is False
+
+
+def test_add_post_generic_exception():
+    """add_post: generic Exception caught, returns False (Lines 107-109)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.AsyncWriter") as mock_writer:
+        mock_writer.side_effect = RuntimeError("unexpected writer failure")
+        result = idx.add_post({"url": "http://x.onion/test", "content": "test"})
+        assert result is False
+
+
+def test_search_generic_exception():
+    """search(): generic Exception caught, returns [] (Lines 174-176)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    mock_searcher = MagicMock()
+    mock_searcher.search.side_effect = RuntimeError("search crash")
+    mock_ix.searcher.return_value.__enter__.return_value = mock_searcher
+    idx._ix = mock_ix
+
+    results = idx.search("test query")
+    assert results == []
+
+
+def test_optimize_happy_path():
+    """optimize(): happy path — calls AsyncWriter.commit(optimize=True) (Lines 180-184)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    mock_writer = MagicMock()
+    with patch("darknet_search.index.AsyncWriter", return_value=mock_writer):
+        idx.optimize()
+
+    mock_writer.commit.assert_called_once_with(optimize=True)
+
+
+def test_optimize_lock_error():
+    """optimize(): Whoosh LockError caught, no re-raise (Lines 185-186)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+    from whoosh.index import LockError
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.AsyncWriter") as mock_writer:
+        mock_writer.side_effect = LockError("optimize locked")
+        # Should not raise
+        idx.optimize()
+
+
+def test_optimize_generic_exception():
+    """optimize(): generic Exception caught, no re-raise (Lines 187-188)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.AsyncWriter") as mock_writer:
+        mock_writer.side_effect = RuntimeError("optimize crash")
+        # Should not raise
+        idx.optimize()
+
+
+def test_doc_count_generic_exception():
+    """doc_count: generic Exception caught, returns 0 (Lines 196-198)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    mock_searcher = MagicMock()
+    mock_searcher.doc_count.side_effect = RuntimeError("doc_count crash")
+    mock_ix.searcher.return_value.__enter__.return_value = mock_searcher
+    idx._ix = mock_ix
+
+    assert idx.doc_count == 0
+
+
+def test_clear_lock_error():
+    """clear(): Whoosh LockError caught, no re-raise (Lines 206-207)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+    from whoosh.index import LockError
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.create_in") as mock_create:
+        mock_create.side_effect = LockError("clear locked")
+        # Should not raise
+        idx.clear()
+
+
+def test_clear_generic_exception():
+    """clear(): generic Exception caught, no re-raise (Lines 208-209)."""
+    from unittest.mock import MagicMock, patch
+    from darknet_search.index import WhooshIndex
+
+    idx = WhooshIndex("/tmp/fake_idx")
+    mock_ix = MagicMock()
+    idx._ix = mock_ix
+
+    with patch("darknet_search.index.create_in") as mock_create:
+        mock_create.side_effect = RuntimeError("clear crash")
+        # Should not raise
+        idx.clear()

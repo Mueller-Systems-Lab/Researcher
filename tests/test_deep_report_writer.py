@@ -314,6 +314,7 @@ def test_write_report_empty_sources():
     assert "Research Question" in report
     assert "*No sources" in report
 
+
 def test_insert_citations_fuzzy_match():
     """Citations via fuzzy (non-exact) match."""
     from deep_report.citation_inserter import insert_citations
@@ -336,6 +337,7 @@ def test_generate_gap_queries_with_node_questions():
         node_questions=["How fast?", "What cost?"],
     )
     assert any("verifiable citation" in g for g in gaps)
+
 
 # ── Outline: untested branches (pure logic) ─────────────────────────────
 
@@ -394,7 +396,8 @@ def test_outline_fully_populated():
         node_titles=["Node A", "Node B"],
         node_results={
             "node_a": {
-                "title": "Node A", "status": "completed",
+                "title": "Node A",
+                "status": "completed",
                 "artifacts": ['{"findings": "Result A"}'],
             },
         },
@@ -443,9 +446,11 @@ def test_extract_sources_from_artifacts_normal():
     node_results = {
         "n1": {
             "status": "completed",
-            "artifacts": [_json.dumps({
-                "search_results": [{"url": "https://a.com", "title": "A"}]
-            })],
+            "artifacts": [
+                _json.dumps(
+                    {"search_results": [{"url": "https://a.com", "title": "A"}]}
+                )
+            ],
         },
     }
     sources = _extract_sources_from_artifacts(node_results)
@@ -503,3 +508,14 @@ def test_merge_sources_both_empty():
 def test_extract_domain_with_path():
     """Domain extraction strips path."""
     assert _extract_domain("https://example.com/path") == "example.com"
+
+
+# ── Citation Inserter Edge Cases ─────────────────────────────────────────
+
+
+def test_fuzzy_contains_whitespace_quote():
+    """_fuzzy_contains mit Whitespace-Quote → quote_words empty → False (line 92)."""
+    from deep_report.citation_inserter import _fuzzy_contains
+
+    assert _fuzzy_contains("some text content", "   ") is False
+    assert _fuzzy_contains("anything", "\t\n") is False

@@ -480,3 +480,380 @@ def test_deterministic_plan_sequential_deps():
     plan = _deterministic_plan("A; B; C")
     assert len(plan.nodes) == 3
     assert len(plan.dependencies) == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B1-3: Serialization — plan_to_markdown Edge Cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_markdown_export_with_assumptions():
+    """plan_to_markdown mit assumptions → Assumptions-Sektion (lines 144-147)."""
+    plan = generate_plan("Q")
+    plan.assumptions = ["Assume X", "Assume Y"]
+    md = plan_to_markdown(plan)
+    assert "## Assumptions" in md
+    assert "- Assume X" in md
+    assert "- Assume Y" in md
+
+
+def test_markdown_export_with_constraints():
+    """plan_to_markdown mit constraints → Constraints-Sektion (lines 150-153)."""
+    plan = generate_plan("Q")
+    plan.constraints = ["Local only", "No cloud"]
+    md = plan_to_markdown(plan)
+    assert "## Constraints" in md
+    assert "- Local only" in md
+
+
+def test_markdown_export_with_approved_info():
+    """plan_to_markdown mit approved_at → Approved-Zeile (line 140)."""
+    plan = generate_plan("Q")
+    plan.approved_at = "2024-01-01T00:00:00"
+    plan.approved_by = "tester"
+    md = plan_to_markdown(plan)
+    assert "**Approved:** 2024-01-01T00:00:00 by tester" in md
+
+
+def test_markdown_export_node_not_in_order():
+    """plan_to_markdown: node_id in order aber nicht in nodes_by_id → continue (line 167)."""
+    from unittest.mock import patch
+
+    plan = generate_plan("Q")
+    # Mock get_topological_order (imported from validation into serialization's scope)
+    # to return a list with a non-existent ID
+    with patch(
+        "research_planner.validation.get_topological_order",
+        return_value=["fake_id_999", plan.nodes[0].node_id],
+    ):
+        md = plan_to_markdown(plan)
+        assert plan.nodes[0].title in md
+        assert "fake_id_999" not in md  # skipped via continue
+
+
+def test_markdown_export_with_expected_sources():
+    """plan_to_markdown: node hat expected_sources (line 179)."""
+    plan = generate_plan("Q")
+    plan.nodes[0].expected_sources = ["arxiv.org", "ieee.org"]
+    md = plan_to_markdown(plan)
+    assert "**Expected sources:**" in md
+    assert "arxiv.org" in md
+
+
+def test_markdown_export_empty_assumptions_and_constraints():
+    """plan_to_markdown mit leeren Listen → keine Assumptions/Constraints-Sektion."""
+    plan = generate_plan("Q")
+    plan.assumptions = []
+    plan.constraints = []
+    md = plan_to_markdown(plan)
+    assert "## Assumptions" not in md
+    assert "## Constraints" not in md
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B1-4: models.py + validation.py + approval.py Edge Cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_research_node_empty_node_id_raises():
+    """ResearchNode mit leerem/whitespace node_id → ValueError (line 53)."""
+    with pytest.raises(ValueError, match="node_id must not be empty"):
+        ResearchNode(node_id="   ", title="T", question="Q")
+
+
+def test_plan_get_node_found():
+    """get_node gibt Node zurück wenn ID existiert (lines 118-121)."""
+    plan = generate_plan("Q")
+    node = plan.get_node(plan.nodes[0].node_id)
+    assert node is not None
+    assert node.node_id == plan.nodes[0].node_id
+
+
+def test_plan_get_node_not_found():
+    """get_node gibt None zurück wenn ID nicht existiert (lines 118-121)."""
+    plan = generate_plan("Q")
+    node = plan.get_node("nonexistent_id")
+    assert node is None
+
+
+def test_dag_dependency_to_node_missing():
+    """Dependency to_node nicht im Plan → DAGValidationError (lines 42-43)."""
+    plan = ResearchPlan(query="Test")
+    n = ResearchNode(title="A", question="Q")
+    plan.add_node(n)
+    plan.add_dependency(n.node_id, "nonexistent")
+
+    with pytest.raises(DAGValidationError, match="to_node"):
+        validate_plan(plan)
+
+
+def test_node_depends_on_nonexistent():
+    """Node depends_on nicht-existente ID → DAGValidationError (lines 51-53)."""
+    plan = ResearchPlan(query="Test")
+    n = ResearchNode(title="A", question="Q", depends_on=["nonexistent"])
+    plan.add_node(n)
+
+    with pytest.raises(DAGValidationError, match="depends_on non-existent"):
+        validate_plan(plan)
+
+
+def test_node_depends_on_self():
+    """Node depends_on auf sich selbst → DAGValidationError (lines 55-57)."""
+    plan = ResearchPlan(query="Test")
+    n = ResearchNode(title="A", question="Q")
+    plan.add_node(n)
+    # Add the depends_on directly (not via add_dependency which checks differently)
+    n.depends_on.append(n.node_id)
+
+    with pytest.raises(DAGValidationError, match="cannot depend on itself"):
+        validate_plan(plan)
+
+
+def test_approve_plan_idempotent():
+    """approve_plan auf bereits approved Plan → idempotent return (line 23)."""
+    plan = generate_plan("Q")
+    approve_plan(plan, approved_by="tester")
+    first_approved_at = plan.approved_at
+    # Second call should be idempotent — no state change
+    approve_plan(plan, approved_by="another")
+    assert plan.approved_at == first_approved_at
+    assert plan.approved_by == "tester"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — B1-1: LLM-API-Pfade (_llm_plan + generate_plan LLM)
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTE: requests is imported lazily inside _llm_plan(), so we patch
+# requests.post globally, NOT research_planner.planner.requests.
+
+
+def test_llm_plan_successful_call_returns_research_plan():
+    """LLM-Call erfolgreich → valides JSON → ResearchPlan."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"nodes": [{"title": "T", "question": "Q", '
+                    '"rationale": "r", "risk_level": "low"}], '
+                    '"dependencies": []}'
+                }
+            }
+        ]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        plan = generate_plan("Test query", use_llm=True, llm_base_url="http://x:1/v1")
+        assert plan is not None
+        assert len(plan.nodes) >= 1
+        assert plan.status == ResearchPlanStatus.DRAFT
+
+
+def test_llm_plan_timeout_returns_none():
+    """LLM-Call Timeout → _llm_plan returns None → fallback deterministic."""
+    from unittest.mock import patch
+
+    import requests as real_requests
+
+    with patch(
+        "requests.post",
+        side_effect=real_requests.exceptions.Timeout("timed out"),
+    ):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None
+        assert len(plan.nodes) >= 1  # deterministic fallback
+
+
+def test_llm_plan_connection_error_returns_none():
+    """LLM-Call ConnectionError → _llm_plan returns None."""
+    from unittest.mock import patch
+
+    import requests as real_requests
+
+    with patch(
+        "requests.post",
+        side_effect=real_requests.exceptions.ConnectionError("refused"),
+    ):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # fallback works
+
+
+def test_llm_plan_http_error_returns_none():
+    """LLM-Call HTTP-Error (raise_for_status) → _llm_plan returns None."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = Exception("HTTP 500")
+
+    with patch("requests.post", return_value=mock_resp):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # fallback to deterministic
+
+
+def test_llm_plan_malformed_json_returns_none():
+    """LLM-Antwort mit ungültigem JSON → _llm_plan returns None."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "not valid json {{"}}]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # fallback works
+
+
+def test_llm_plan_missing_choices_key_returns_none():
+    """LLM-Antwort ohne choices-Key → KeyError → returns None."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"unexpected": "format"}
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # fallback
+
+
+def test_llm_plan_requests_not_importable():
+    """requests-Import schlägt fehl → _llm_plan returns None."""
+    from unittest.mock import patch
+
+    import builtins
+
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "requests":
+            raise ImportError("No requests module")
+        return real_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=mock_import):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # deterministic fallback
+
+
+def test_llm_plan_generic_exception_returns_none():
+    """LLM-Call wirft generische Exception → _llm_plan returns None."""
+    from unittest.mock import patch
+
+    with patch("requests.post", side_effect=RuntimeError("Unexpected error")):
+        plan = generate_plan(
+            "Test", use_llm=True, llm_base_url="http://x:1/v1", llm_timeout=0.1
+        )
+        assert plan is not None  # fallback
+
+
+def test_generate_plan_llm_success_path():
+    """generate_plan mit use_llm=True und erfolgreichem LLM-Call."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"nodes": ['
+                    '{"title": "Step 1", "question": "Q1", '
+                    '"rationale": "r1", "risk_level": "low"}, '
+                    '{"title": "Step 2", "question": "Q2", '
+                    '"rationale": "r2", "risk_level": "medium"}'
+                    "], "
+                    '"dependencies": [{"from": 0, "to": 1}]}'
+                }
+            }
+        ]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        plan = generate_plan(
+            "LLM test query",
+            use_llm=True,
+            llm_base_url="http://x:1/v1",
+            language="de",
+            assumptions=["A"],
+            constraints=["C"],
+        )
+        assert plan is not None
+        assert len(plan.nodes) == 2
+        assert plan.language == "de"
+        assert plan.assumptions == ["A"]
+        assert plan.constraints == ["C"]
+
+
+def test_llm_plan_parse_output_exception_returns_none():
+    """_parse_llm_output wirft Exception → except-Block → returns None."""
+    from unittest.mock import MagicMock, patch
+
+    from research_planner.planner import _llm_plan
+
+    mock_resp = MagicMock()
+    # This content will parse as valid JSON but "nodes" is a string, not a list,
+    # causing len() to return string length, but iterating over it will iterate
+    # over characters, causing ResearchNode creation to fail
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": '{"nodes": "not_a_list"}'}}]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        result = _llm_plan("Q", base_url="http://x:1/v1", timeout=0.1)
+        # _parse_llm_output fails on iterating string characters → Exception
+        assert result is None
+
+
+def test_llm_plan_uses_default_base_url():
+    """_llm_plan ohne base_url → verwendet LLAMA_SERVER_URL default (line 132)."""
+    from unittest.mock import MagicMock, patch
+
+    from research_planner.planner import _llm_plan
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"nodes": [{"title": "T", "question": "Q", '
+                    '"rationale": "r", "risk_level": "low"}], '
+                    '"dependencies": []}'
+                }
+            }
+        ]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("requests.post", return_value=mock_resp):
+        # empty base_url triggers line 132: base_url = LLAMA_SERVER_URL
+        result = _llm_plan("Q", base_url="", timeout=0.1)
+        assert result is not None
+        assert len(result.nodes) == 1
+
+
+def test_llm_plan_second_importerror_handler():
+    """_llm_plan: ImportError nach erfolgreichem requests-Import (line 173)."""
+    from unittest.mock import patch
+
+    from research_planner.planner import _llm_plan
+
+    with patch("requests.post", side_effect=ImportError("delayed import failure")):
+        result = _llm_plan("Q", base_url="http://x:1/v1", timeout=0.1)
+        assert result is None  # line 173 caught

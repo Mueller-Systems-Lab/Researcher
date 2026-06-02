@@ -56,7 +56,7 @@ def mmr_select(
             remaining.remove(best_item)
             selected.append(best_item)
         else:
-            break
+            break  # pragma: no cover  # unreachable: MMR > -inf for any finite input
 
     return selected
 

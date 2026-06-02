@@ -308,3 +308,169 @@ def test_query_collection_unavailable():
         results = store.query(query_embedding=[0.1] * 768)
 
     assert results == []
+
+
+# ---------------------------------------------------------------------------
+# R2 Branch-Coverage Tests — vectordb/store.py (82% → 95%)
+# Targeting missing lines: 54, 98-101, 116, 171-178, 255-262, 277-280, 286, 292-293
+# ---------------------------------------------------------------------------
+
+
+def test_available_when_collection_none():
+    """available property: returns False when _get_collection returns None (Line 54)."""
+    from unittest.mock import patch
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    with patch.object(store, "_get_collection", return_value=None):
+        assert store.available is False
+
+
+def test_get_collection_generic_exception():
+    """_get_collection: generic Exception sets last_error and returns None (Lines 98-101)."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_client = MagicMock()
+    mock_client.get_or_create_collection.side_effect = Exception(
+        "simulated collection failure"
+    )
+    store._client = mock_client
+    store._collection = None  # trigger lazy init
+
+    result = store._get_collection()
+    assert result is None
+    assert "Collection-Fehler" in (store.last_error or "")
+
+
+def test_execute_with_retry_non_locked_error():
+    """_execute_with_retry: immediately re-raises non-locked OperationalError (Line 116)."""
+    import sqlite3
+    import pytest
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    call_count = [0]
+
+    def _disk_io_error(*_args, **_kwargs):
+        call_count[0] += 1
+        raise sqlite3.OperationalError("disk I/O error")
+
+    with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
+        store._execute_with_retry("test", _disk_io_error)
+
+    assert call_count[0] == 1  # re-raised immediately, no retry
+
+
+def test_add_retry_exhaustion_returns_false():
+    """add(): retry exhaustion after MAX_RETRIES returns False (Lines 171-175)."""
+    import sqlite3
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+
+    def _raise_locked(*_args, **_kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    mock_collection.add.side_effect = _raise_locked
+    store._collection = mock_collection
+
+    result = store.add(
+        documents=["test"],
+        embeddings=[[0.1] * 768],
+    )
+    assert result is False
+
+
+def test_add_generic_exception_returns_false():
+    """add(): non-sqlite3 Exception returns False (Lines 176-178)."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+    mock_collection.add.side_effect = RuntimeError("generic add failure")
+    store._collection = mock_collection
+
+    result = store.add(
+        documents=["test"],
+        embeddings=[[0.1] * 768],
+    )
+    assert result is False
+
+
+def test_query_retry_exhaustion_returns_empty():
+    """query(): retry exhaustion returns [] and sets last_error (Lines 255-258)."""
+    import sqlite3
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+    mock_collection.query.side_effect = sqlite3.OperationalError("database is locked")
+    store._collection = mock_collection
+
+    results = store.query(query_embedding=[0.1] * 768)
+    assert results == []
+    assert "ChromaDB-Query nach Retries fehlgeschlagen" in (store.last_error or "")
+
+
+def test_query_generic_exception_returns_empty():
+    """query(): non-sqlite3 Exception returns [] and sets last_error (Lines 259-262)."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+    mock_collection.query.side_effect = RuntimeError("generic query failure")
+    store._collection = mock_collection
+
+    results = store.query(query_embedding=[0.1] * 768)
+    assert results == []
+    assert "ChromaDB-Query-Fehler" in (store.last_error or "")
+
+
+def test_count_generic_exception_returns_zero():
+    """count property: generic Exception returns 0 and sets last_error (Lines 277-280)."""
+    from unittest.mock import MagicMock
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_collection = MagicMock()
+    mock_collection.count.side_effect = RuntimeError("count failed")
+    store._collection = mock_collection
+
+    assert store.count == 0
+    assert "ChromaDB-Count-Fehler" in (store.last_error or "")
+
+
+def test_delete_collection_client_none():
+    """delete_collection: _get_client returns None → early return, no error (Line 286)."""
+    from unittest.mock import patch
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    with patch.object(store, "_get_client", return_value=None):
+        # Should not raise
+        store.delete_collection()
+    # If we reach here, the early return path was exercised
+    assert True
+
+
+def test_delete_collection_generic_exception():
+    """delete_collection: Exception during delete is caught, no re-raise (Lines 292-293)."""
+    from unittest.mock import MagicMock, patch
+    from vectordb.store import VectorStore
+
+    store = VectorStore()
+    mock_client = MagicMock()
+    mock_client.delete_collection.side_effect = RuntimeError("delete failed")
+
+    with patch.object(store, "_get_client", return_value=mock_client):
+        # Should not raise — exception caught in try/except
+        store.delete_collection()
+
+    mock_client.delete_collection.assert_called_once()
