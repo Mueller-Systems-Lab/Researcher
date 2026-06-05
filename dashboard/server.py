@@ -55,7 +55,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             file_path = request_path.lstrip("/")
             if os.path.exists(os.path.join(STATIC_DIR, file_path)):
                 content_type = "text/plain"
-                if file_path.endswith(".css"):
+                if file_path.endswith(".html"):
+                    content_type = "text/html"
+                elif file_path.endswith(".css"):
                     content_type = "text/css"
                 elif file_path.endswith(".js"):
                     content_type = "application/javascript"

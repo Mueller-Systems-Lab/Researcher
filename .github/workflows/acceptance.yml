@@ -27,10 +27,13 @@ on:
 
 jobs:
   acceptance:
-    # Skip the labeled trigger unless the right label is present
+    # Manual/local-infrastructure gate: requires Ollama, llama-server, and Docker.
+    # PRs should use acceptance-services-only; full acceptance runs via workflow_dispatch
+    # or labeled pull_request_target when explicitly requested.
     if: |
-      github.event_name != 'pull_request_target' ||
-      contains(github.event.pull_request.labels.*.name, 'run-acceptance')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' &&
+       contains(github.event.pull_request.labels.*.name, 'run-acceptance'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -38,6 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.ref }}
           submodules: recursive
 
       - name: Set up Python 3.11

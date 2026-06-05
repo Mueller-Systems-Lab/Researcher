@@ -164,7 +164,7 @@ def submit_research_query(query: str, timeout: int = DEFAULT_TIMEOUT) -> str | N
         return None
 
 
-def check_reports() -> dict:
+def check_reports(task_id: str | None = None) -> dict:
     """Check for report files and analyze quality metrics."""
     import re
 
@@ -181,9 +181,19 @@ def check_reports() -> dict:
     }
 
     if REPORT_DIR.exists():
+        stable_prefix = None
+        if task_id:
+            segments = task_id.split("_")
+            if len(segments) >= 6:
+                stable_prefix = "_".join(segments[:6])
+            else:
+                stable_prefix = task_id[:50]
+
         for f in sorted(
             REPORT_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True
         ):
+            if stable_prefix and not f.name.startswith(stable_prefix):
+                continue
             if f.suffix in (".md", ".docx", ".pdf", ".json"):
                 result["reports_found"].append(str(f.name))
                 size = f.stat().st_size
@@ -267,6 +277,7 @@ def main():
     print(f"\n  Services: {len(passed)}/{len(SERVICES)} online\n")
 
     # ── Stage 2: Research Pipeline ───────────────────────────────────────
+    task_id = None
     if not args.skip_research:
         print("=" * 60)
         print(" STAGE 2: Research Pipeline Test")
@@ -292,7 +303,7 @@ def main():
     print(" STAGE 3: Report Quality Analysis")
     print("=" * 60)
 
-    report_data = check_reports()
+    report_data = check_reports(task_id=task_id)
     results["reports"] = {
         "files": report_data["reports_found"],
         "total_size_kb": round(report_data["total_size_kb"], 1),
@@ -373,18 +384,22 @@ def main():
     # Gate 4: Sources ≥3 (report URLs + SearXNG direct query)
     report_sources = len(report_data["source_urls"])
     searxng_sources = len(searxng_urls)
-    total_sources = max(report_sources, searxng_sources)
+    total_sources = len(report_data["source_urls"] | searxng_urls)
     sources_ok = total_sources >= 3
     gates.append(
         (
-            f"Sources >=3 (report: {report_sources}, SearXNG: {searxng_sources})",
+            (
+                f"Sources >=3 (report: {report_sources}, "
+                f"SearXNG: {searxng_sources}, union: {total_sources})"
+            ),
             sources_ok,
         )
     )
     src_icon = "✅" if sources_ok else "❌"
     print(
         f"  {src_icon} Gate 4: Sources >=3 "
-        f"(report: {report_sources}, SearXNG: {searxng_sources})"
+        f"(report: {report_sources}, SearXNG: {searxng_sources}, "
+        f"union: {total_sources})"
     )
 
     # Gate 5: Claims ≥5

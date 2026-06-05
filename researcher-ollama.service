@@ -36,7 +36,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/var/log/researcher
+ReadWritePaths=/var/log/researcher /var/lib/ollama
 ReadOnlyPaths=/usr/local/bin/ollama
 
 # Timeouts

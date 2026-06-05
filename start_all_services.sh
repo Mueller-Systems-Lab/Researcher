@@ -16,7 +16,11 @@
 set -euo pipefail
 
 # ── Configuration ────────────────────────────────────────────────────────────
-LOG_DIR="${LOG_DIR:-/var/log/researcher}"
+if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+    LOG_DIR="${LOG_DIR:-${RUNNER_TEMP:-/tmp}/researcher-logs}"
+else
+    LOG_DIR="${LOG_DIR:-/var/log/researcher}"
+fi
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 
@@ -100,7 +104,8 @@ start_llama_server() {
     fi
     if [ -f "$REPO_DIR/serve_qwen3.5_uncensored.sh" ]; then
         bash "$REPO_DIR/serve_qwen3.5_uncensored.sh" > "$LOG_DIR/llama_server.log" 2>&1 &
-        log_info "  llama-server started (PID $!)"
+        echo $! > /tmp/researcher-llama.pid
+        log_info "  llama-server started (PID $(cat /tmp/researcher-llama.pid))"
     else
         log_error "  serve_qwen3.5_uncensored.sh not found in $REPO_DIR"
         return 1
@@ -146,7 +151,6 @@ start_gpt_researcher() {
         log_info "  Starting GPT Researcher via Docker..."
         docker run -d \
             --name gpt-researcher \
-            --network host \
             -e RETRIEVER="${RETRIEVER:-searx}" \
             -e SEARX_URL="${SEARX_URL:-http://127.0.0.1:8090}" \
             -e FAST_LLM="${FAST_LLM:-openai:qwen3.5-uncensored}" \
@@ -170,8 +174,9 @@ start_gpt_researcher() {
         cd "$REPO_DIR/gpt_researcher"
         python3 -m uvicorn main:app --host 127.0.0.1 --port "$PORT_GPTR" \
             > "$LOG_DIR/gpt_researcher.log" 2>&1 &
+        echo $! > /tmp/researcher-gptr.pid
         cd "$REPO_DIR"
-        log_info "  GPT Researcher started (PID $!)"
+        log_info "  GPT Researcher started (PID $(cat /tmp/researcher-gptr.pid))"
     fi
     healthcheck "GPT Researcher" "$PORT_GPTR" "/docs" || return 1
 }
@@ -184,7 +189,8 @@ start_dashboard() {
     fi
     cd "$REPO_DIR"
     python3 -m dashboard.server > "$LOG_DIR/dashboard.log" 2>&1 &
-    log_info "  Dashboard started (PID $!)"
+    echo $! > /tmp/researcher-dashboard.pid
+    log_info "  Dashboard started (PID $(cat /tmp/researcher-dashboard.pid))"
     healthcheck "Dashboard" "$PORT_DASHBOARD" "/health" || return 1
 }
 
@@ -214,10 +220,13 @@ check_service() {
 stop_services() {
     log_info "Stopping all Researcher services..."
 
-    # Stop Python services
-    pkill -f "dashboard.server" 2>/dev/null || log_info "  Dashboard not running"
-    pkill -f "uvicorn main:app" 2>/dev/null || log_info "  GPT Researcher not running"
-    pkill -f "llama-server" 2>/dev/null || log_info "  llama-server not running"
+    # Stop Python services via PID files
+    for pidfile in /tmp/researcher-dashboard.pid /tmp/researcher-gptr.pid /tmp/researcher-llama.pid; do
+        if [ -f "$pidfile" ]; then
+            kill $(cat "$pidfile") 2>/dev/null && log_info "  Stopped $(basename $pidfile .pid | sed 's/researcher-//')" || true
+            rm -f "$pidfile"
+        fi
+    done
 
     # Stop Docker containers
     docker stop gpt-researcher 2>/dev/null || true
