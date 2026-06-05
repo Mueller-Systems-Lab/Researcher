@@ -194,8 +194,9 @@ def check_reports(task_id: str | None = None) -> dict:
     recursively scans for report artifacts and extracts quality metrics.
     """
     import re
+    from typing import Any
 
-    result = {
+    result: dict[str, Any] = {
         "reports_found": [],
         "total_size_kb": 0,
         "report_lines": 0,

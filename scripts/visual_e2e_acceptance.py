@@ -6,22 +6,24 @@ Visible Chromium, 15+ screenshots
 Avoids networkidle on SSE pages (known issue).
 """
 
-import json, os, time, sys
+import json
+import time
 from pathlib import Path
+
 from playwright.sync_api import sync_playwright
 
 REPORT_DIR = Path("/home/xxammaxx/Schreibtisch/Researcher/reports/visual-e2e")
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-SCREENSHOTS = []
-PAGE_LOGS = []
+SCREENSHOTS: list[dict[str, str]] = []
+PAGE_LOGS: list[str] = []
 
 
 def snap(page, name, full_page=False):
     path = str(REPORT_DIR / f"{len(SCREENSHOTS):02d}_{name}.png")
     try:
         page.screenshot(path=path, full_page=full_page, timeout=15000)
-    except Exception as e:
+    except Exception:
         # Fallback: viewport-only screenshot
         try:
             page.screenshot(path=path, full_page=False, timeout=10000)
@@ -38,10 +40,10 @@ def safe_goto(page, url, timeout=10000):
     """Navigate avoiding networkidle for SSE pages."""
     try:
         page.goto(url, wait_until="load", timeout=timeout)
-    except:
+    except Exception:
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=timeout)
-        except:
+        except Exception:
             pass
     page.wait_for_timeout(1000)
 
@@ -127,7 +129,8 @@ def run():
         snap(page, "research_start_page")
 
         # Trigger a background research
-        import urllib.request, urllib.error
+        import urllib.error
+        import urllib.request
 
         research_query = "aktuelle Entwicklungen Open Source LLM lokal 2025"
         print(f"  Triggering: '{research_query}'")
@@ -156,7 +159,10 @@ def run():
                 print(f"  Research ID: {research_id}")
         except Exception as e:
             print(f"  Trigger error: {e}")
-            research_id = "task_20260603_174636_015414_b7be6c5e_Analyse_der_aktuellen_Entwicklungen_im_B"
+            research_id = (
+                "task_20260603_174636_015414_b7be6c5e_"
+                "Analyse_der_aktuellen_Entwicklungen_im_B"
+            )
 
         # Monitor progress with screenshots
         for i in range(6):
@@ -169,7 +175,7 @@ def run():
                 safe_goto(
                     page, f"http://127.0.0.1:28202/report/{research_id}", timeout=10000
                 )
-            except:
+            except Exception:
                 safe_goto(page, "http://127.0.0.1:28202/api/reports", timeout=10000)
             snap(page, f"research_progress_{(i + 1) * 8}s")
 
@@ -212,7 +218,7 @@ def run():
                             timeout=15000,
                         )
                         snap(page, "latest_research_report")
-        except:
+        except Exception:
             pass
 
         # ============================================================
