@@ -196,6 +196,19 @@ coverage-full:
 	@echo ""
 	@echo "Coverage-Report: coverage_html/index.html"
 
+# ── CI Acceptance Test (Phase 8: Quality Hardening) ───────────────────────────
+
+acceptance:
+	@echo "=== Researcher CI Acceptance Test ==="
+	@echo ""
+	python3 scripts/ci_acceptance.py
+
+acceptance-services:
+	python3 scripts/ci_acceptance.py --skip-research
+
+acceptance-json:
+	python3 scripts/ci_acceptance.py --json-output
+
 # ── Legacy / Backward Compatible ──────────────────────────────────────────────
 
 test:

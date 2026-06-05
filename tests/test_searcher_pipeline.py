@@ -694,6 +694,7 @@ def test_robots_policy_is_expired_true():
 def test_fetch_robots_5xx_fail_closed():
     """_fetch_robots: 5xx status returns None (Lines 49-52)."""
     from unittest.mock import MagicMock, patch
+
     from searcher_pipeline.robots_policy import _fetch_robots
 
     mock_resp = MagicMock()
@@ -712,6 +713,7 @@ def test_fetch_robots_5xx_fail_closed():
 def test_fetch_robots_4xx_documented_allow():
     """_fetch_robots: 4xx status returns policy with error (Lines 53-58)."""
     from unittest.mock import MagicMock, patch
+
     from searcher_pipeline.robots_policy import _fetch_robots
 
     mock_resp = MagicMock()
@@ -732,6 +734,7 @@ def test_fetch_robots_4xx_documented_allow():
 def test_fetch_robots_success_path():
     """_fetch_robots: successful 200 fetch parses content (Line 64)."""
     from unittest.mock import MagicMock, patch
+
     from searcher_pipeline.robots_policy import _fetch_robots
 
     mock_resp = MagicMock()
@@ -760,8 +763,8 @@ def test_is_allowed_empty_domain():
 def test_is_allowed_cached_error_path():
     """is_allowed: cached error policy returns cached.allowed (Lines 119-121)."""
     from searcher_pipeline.robots_policy import (
-        _robots_cache,
         RobotsPolicy,
+        _robots_cache,
         clear_cache,
         is_allowed,
     )
@@ -778,9 +781,10 @@ def test_is_allowed_cached_error_path():
 def test_is_allowed_successful_fetch_and_store():
     """is_allowed: successful fetch → store in cache → check path (Lines 131-132)."""
     from unittest.mock import patch
+
     from searcher_pipeline.robots_policy import (
-        _robots_cache,
         RobotsPolicy,
+        _robots_cache,
         clear_cache,
         is_allowed,
     )
@@ -806,6 +810,7 @@ def test_is_allowed_successful_fetch_and_store():
 def test_searxng_search_happy_path():
     """search(): successful query returns results."""
     from unittest.mock import MagicMock, patch
+
     from searcher_pipeline.searxng_client import search
 
     mock_resp = MagicMock()
@@ -837,6 +842,7 @@ def test_searxng_search_happy_path():
 def test_searxng_search_exception_returns_empty():
     """search(): exception returns []."""
     from unittest.mock import patch
+
     from searcher_pipeline.searxng_client import search
 
     with (
@@ -850,6 +856,7 @@ def test_searxng_search_exception_returns_empty():
 def test_searxng_healthcheck_available():
     """healthcheck(): returns True when SearXNG responds 200."""
     from unittest.mock import MagicMock, patch
+
     from searcher_pipeline.searxng_client import healthcheck
 
     mock_resp = MagicMock()
@@ -867,6 +874,7 @@ def test_searxng_healthcheck_available():
 def test_searxng_healthcheck_exception_returns_false():
     """healthcheck(): exception returns False."""
     from unittest.mock import patch
+
     from searcher_pipeline.searxng_client import healthcheck
 
     with (

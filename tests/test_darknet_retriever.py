@@ -144,6 +144,7 @@ def test_darknet_uri_format():
 def test_darknet_retriever_duplicate_deduplication():
     """Duplicate URIs are silently skipped."""
     from unittest.mock import patch
+
     from darknet_search.retriever import DarknetRetriever
 
     retriever = DarknetRetriever("test", index_dir="/tmp/fake")
@@ -161,8 +162,8 @@ def test_darknet_retriever_duplicate_deduplication():
 
 def test_add_post_invalid_timestamp_fallback():
     """Ungültiger Timestamp-String → Fallback auf datetime.now()."""
+
     from darknet_search.index import WhooshIndex
-    from datetime import datetime
 
     with tempfile.TemporaryDirectory() as tmpdir:
         idx = WhooshIndex(tmpdir)
@@ -183,8 +184,9 @@ def test_add_post_invalid_timestamp_fallback():
 
 def test_clear_index_happy_path():
     """Index leeren (clear) — Happy Path."""
-    from darknet_search.index import WhooshIndex
     from datetime import datetime
+
+    from darknet_search.index import WhooshIndex
 
     with tempfile.TemporaryDirectory() as tmpdir:
         idx = WhooshIndex(tmpdir)
@@ -232,8 +234,10 @@ def test_clear_index_happy_path():
 def test_add_post_lock_error():
     """add_post: Whoosh LockError caught, returns False (Lines 104-106)."""
     from unittest.mock import MagicMock, patch
-    from darknet_search.index import WhooshIndex
+
     from whoosh.index import LockError
+
+    from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
     mock_ix = MagicMock()
@@ -248,6 +252,7 @@ def test_add_post_lock_error():
 def test_add_post_generic_exception():
     """add_post: generic Exception caught, returns False (Lines 107-109)."""
     from unittest.mock import MagicMock, patch
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
@@ -262,7 +267,8 @@ def test_add_post_generic_exception():
 
 def test_search_generic_exception():
     """search(): generic Exception caught, returns [] (Lines 174-176)."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
@@ -279,6 +285,7 @@ def test_search_generic_exception():
 def test_optimize_happy_path():
     """optimize(): happy path — calls AsyncWriter.commit(optimize=True) (Lines 180-184)."""
     from unittest.mock import MagicMock, patch
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
@@ -295,8 +302,10 @@ def test_optimize_happy_path():
 def test_optimize_lock_error():
     """optimize(): Whoosh LockError caught, no re-raise (Lines 185-186)."""
     from unittest.mock import MagicMock, patch
-    from darknet_search.index import WhooshIndex
+
     from whoosh.index import LockError
+
+    from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
     mock_ix = MagicMock()
@@ -311,6 +320,7 @@ def test_optimize_lock_error():
 def test_optimize_generic_exception():
     """optimize(): generic Exception caught, no re-raise (Lines 187-188)."""
     from unittest.mock import MagicMock, patch
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
@@ -325,7 +335,8 @@ def test_optimize_generic_exception():
 
 def test_doc_count_generic_exception():
     """doc_count: generic Exception caught, returns 0 (Lines 196-198)."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
@@ -341,8 +352,10 @@ def test_doc_count_generic_exception():
 def test_clear_lock_error():
     """clear(): Whoosh LockError caught, no re-raise (Lines 206-207)."""
     from unittest.mock import MagicMock, patch
-    from darknet_search.index import WhooshIndex
+
     from whoosh.index import LockError
+
+    from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")
     mock_ix = MagicMock()
@@ -357,6 +370,7 @@ def test_clear_lock_error():
 def test_clear_generic_exception():
     """clear(): generic Exception caught, no re-raise (Lines 208-209)."""
     from unittest.mock import MagicMock, patch
+
     from darknet_search.index import WhooshIndex
 
     idx = WhooshIndex("/tmp/fake_idx")

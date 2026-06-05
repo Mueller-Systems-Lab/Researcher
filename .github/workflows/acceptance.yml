@@ -1,0 +1,100 @@
+# =============================================================================
+# acceptance.yml — Researcher CI Acceptance Gate
+# =============================================================================
+# Runs the automated acceptance test suite on every PR targeting main.
+# Verifies:
+#   1. Service healthchecks (all 5 services)
+#   2. Research pipeline (Query → Report)
+#   3. Report quality (length, sources, claims)
+#
+# Phase 8: Quality Hardening (Issue #143)
+# =============================================================================
+name: Acceptance Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request_target:
+    branches: [main]
+    types: [labeled]
+    # Only run when the 'run-acceptance' label is applied
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    # Skip the labeled trigger unless the right label is present
+    if: |
+      github.event_name != 'pull_request_target' ||
+      contains(github.event.pull_request.labels.*.name, 'run-acceptance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -e .[dev,test] 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true
+          pip install playwright
+          playwright install chromium --with-deps 2>/dev/null || true
+
+      - name: Start Research Infrastructure
+        run: |
+          echo "=== Starting Researcher Infrastructure ==="
+          # Start in dependency order: Ollama → llama-server → SearXNG → GPT Researcher → Dashboard
+          bash start_all_services.sh
+        timeout-minutes: 10
+
+      - name: Run Acceptance Tests
+        run: |
+          echo "=== Running CI Acceptance Tests ==="
+          python3 scripts/ci_acceptance.py --timeout 600
+        timeout-minutes: 20
+
+      - name: Upload Acceptance Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-report
+          path: |
+            /var/log/researcher/startup_*.log
+            gpt_researcher/outputs/
+          retention-days: 7
+
+  acceptance-services-only:
+    # Quick pre-check: just verify services respond (runs on every PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate Acceptance Script Syntax
+        run: |
+          python3 -m py_compile scripts/ci_acceptance.py
+          echo "✅ ci_acceptance.py compiles cleanly"
+
+      - name: Verify start_all_services.sh
+        run: |
+          bash -n start_all_services.sh
+          echo "✅ start_all_services.sh syntax OK"

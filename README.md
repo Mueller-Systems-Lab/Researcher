@@ -5,8 +5,8 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![Positron-tested](https://img.shields.io/badge/positron-tested-7B2FF5?logo=github)]()
 
-> **Current Status:** [v0.1.0-local-alpha](docs/release/v0.1.0-local-alpha.md)  
-> **Release:** [Changelog](CHANGELOG.md) · [Release Notes](docs/release/v0.1.0-local-alpha.md) · [Known Limitations](docs/release/known-limitations.md)
+> **Current Status:** v0.2.4 — Release Candidate
+> **Release:** [Changelog](CHANGELOG.md) · [Release Notes](RELEASE_NOTES.md) · [Known Limitations](docs/release/known-limitations.md)
 
 Researcher ist ein vollständig lokales Research-System auf Basis von GPT Researcher. Es nutzt ein lokales LLM, lokale Websuche, einen Darknet-Crawler und einen lokalen Vektorspeicher — ohne externe API-Aufrufe.
 

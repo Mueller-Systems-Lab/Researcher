@@ -192,7 +192,9 @@ def test_embedding_is_available_mocked():
 def test_embed_batch_connection_error_propagates():
     """ConnectionError in batch embedding is re-raised."""
     from unittest.mock import patch
+
     import requests
+
     from vectordb.embedding import EmbeddingService
 
     svc = EmbeddingService(base_url="http://localhost:11434")

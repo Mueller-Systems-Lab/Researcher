@@ -485,13 +485,13 @@ def test_execute_queries_per_query_exception():
     failing_retriever = MagicMock()
     failing_retriever.search.side_effect = RuntimeError("SearXNG timeout")
 
-    MockComposite = MagicMock(return_value=failing_retriever)
+    mock_composite = MagicMock(return_value=failing_retriever)
 
-    with patch("search.composite.CompositeRetriever", MockComposite):
+    with patch("search.composite.CompositeRetriever", mock_composite):
         result = _execute_queries(["failing query"], run_id="test-exc")
 
     assert result == []
-    MockComposite.assert_called_once_with("failing query")
+    mock_composite.assert_called_once_with("failing query")
 
 
 def test_execute_queries_deduplication():
@@ -526,13 +526,13 @@ def test_execute_queries_safety_limit():
     mock_retriever = MagicMock()
     mock_retriever.search.side_effect = lambda **kw: [all_results.pop(0)]
 
-    MockComposite = MagicMock(return_value=mock_retriever)
+    mock_composite = MagicMock(return_value=mock_retriever)
 
     five_queries = ["q1", "q2", "q3", "q4", "q5"]
-    with patch("search.composite.CompositeRetriever", MockComposite):
+    with patch("search.composite.CompositeRetriever", mock_composite):
         result = _execute_queries(five_queries, run_id="test-safety")
 
-    assert MockComposite.call_count == 3
+    assert mock_composite.call_count == 3
     assert len(result) == 3
 
 
@@ -559,16 +559,16 @@ def test_store_sources_valueerror_skip():
     good_source = MagicMock()
     good_source.source_id = "src-good"
 
-    MockEvidenceSource = MagicMock(side_effect=[bad_source, good_source])
+    mock_evidence_source = MagicMock(side_effect=[bad_source, good_source])
 
     def _save_side_effect(source):
         if source is bad_source:
             raise ValueError("url must not be empty")
 
-    MockSaveSource = MagicMock(side_effect=_save_side_effect)
+    mock_save_source = MagicMock(side_effect=_save_side_effect)
 
-    with patch("evidence_store.models.EvidenceSource", MockEvidenceSource):
-        with patch("evidence_store.store.save_source", MockSaveSource):
+    with patch("evidence_store.models.EvidenceSource", mock_evidence_source):
+        with patch("evidence_store.store.save_source", mock_save_source):
             result = _store_sources(search_results, run_id="test-valerr")
 
     assert result == ["src-good"]
@@ -586,16 +586,16 @@ def test_store_sources_oserror_caught():
     ok_source = MagicMock()
     ok_source.source_id = "src-ok"
 
-    MockEvidenceSource = MagicMock(side_effect=[fail_source, ok_source])
+    mock_evidence_source = MagicMock(side_effect=[fail_source, ok_source])
 
     def _save_side_effect(source):
         if source is fail_source:
             raise OSError("Disk full")
 
-    MockSaveSource = MagicMock(side_effect=_save_side_effect)
+    mock_save_source = MagicMock(side_effect=_save_side_effect)
 
-    with patch("evidence_store.models.EvidenceSource", MockEvidenceSource):
-        with patch("evidence_store.store.save_source", MockSaveSource):
+    with patch("evidence_store.models.EvidenceSource", mock_evidence_source):
+        with patch("evidence_store.store.save_source", mock_save_source):
             result = _store_sources(search_results, run_id="test-oserr")
 
     assert result == ["src-ok"]
@@ -690,7 +690,7 @@ def test_extract_key_entities_empty_fallback():
     from research_workers.query_decomposer import _extract_key_entities
 
     # Pass text with only common short words that won't match entity patterns
-    result = _extract_key_entities("the cat is on the mat")
+    assert isinstance(_extract_key_entities("the cat is on the mat"), list)
 
     # Fallback: words > 3 chars. "cat" (3) no, "mat" (3) no, "the" no.
     # Actually the function extracts proper nouns, capitalized words, etc.

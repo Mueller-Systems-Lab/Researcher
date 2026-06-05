@@ -17,27 +17,19 @@ import os
 import sys
 import threading
 import urllib.request
+from collections.abc import Iterable
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from typing import cast
 
 import pytest
 
-
-def _is_playwright_available():
-    try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
-
+PlaywrightError: type[Exception] = Exception
 try:
-    from playwright.sync_api import Error as PlaywrightError
+    from playwright.sync_api import Error as PlaywrightError  # type: ignore[assignment]
     from playwright.sync_api import sync_playwright
 except ImportError:  # pragma: no cover - exercised only without Playwright
-    PlaywrightError = Exception
-    sync_playwright = None
+    sync_playwright = None  # type: ignore[assignment]
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -183,7 +175,8 @@ def _assert_or_create_visual_baseline(screenshot: bytes) -> None:
     assert actual_image.size == expected_image.size
 
     diff = ImageChops.difference(expected_image, actual_image)
-    changed_pixels = sum(1 for pixel in diff.getdata() if pixel != (0, 0, 0, 0))
+    pixels = cast("Iterable[tuple[int, int, int, int]]", diff.getdata())
+    changed_pixels = sum(1 for pixel in pixels if pixel != (0, 0, 0, 0))
     total_pixels = actual_image.size[0] * actual_image.size[1]
     diff_ratio = changed_pixels / total_pixels
     assert diff_ratio <= 0.001, f"Dashboard visual diff too high: {diff_ratio:.4%}"

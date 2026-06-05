@@ -601,10 +601,11 @@ def test_compute_ready_dep_not_in_state():
 def test_worker_exception_caught():
     """start_run: worker wirft Exception → caught, node fails (lines 220-223)."""
     from unittest.mock import MagicMock, patch
+
+    from research_orchestrator.orchestrator import start_run
+    from research_orchestrator.state import RunStatus
     from research_planner.approval import approve_plan
     from research_planner.models import ResearchNode, ResearchPlan
-    from research_orchestrator.orchestrator import start_run
-    from research_orchestrator.state import NodeRunStatus, RunStatus
 
     plan = ResearchPlan(query="Worker crash")
     n1 = ResearchNode(title="Node 1", question="Q1")
@@ -627,6 +628,7 @@ def test_worker_exception_caught():
 def test_resume_terminal_run():
     """resume_run: terminal state → logged and returned (lines 274-275)."""
     from unittest.mock import patch
+
     from research_orchestrator.orchestrator import create_run, resume_run
     from research_orchestrator.state import RunStatus
     from research_planner.approval import approve_plan
@@ -697,6 +699,7 @@ def test_deps_satisfied_dep_failed_blocks_node():
 def test_start_run_ghost_node_in_topo_order():
     """start_run: node_id in topo_order not in node_states → continue (line 169)."""
     from unittest.mock import patch
+
     from research_orchestrator.orchestrator import create_run, start_run
     from research_orchestrator.state import RunStatus
     from research_planner.approval import approve_plan
@@ -725,6 +728,7 @@ def test_start_run_ghost_node_in_topo_order():
 def test_start_run_no_ready_nodes_deadlock():
     """start_run: PENDING node with dep removed from state → deadlock → FAILED."""
     from unittest.mock import patch
+
     from research_orchestrator.orchestrator import create_run, start_run
     from research_orchestrator.state import RunStatus
     from research_planner.approval import approve_plan
@@ -761,6 +765,7 @@ def test_load_events_nonexistent_file():
     """load_events: file not found → returns empty list (Line 125)."""
     import tempfile
     from pathlib import Path
+
     from research_orchestrator.storage import load_events
 
     with tempfile.TemporaryDirectory() as tmpdir:

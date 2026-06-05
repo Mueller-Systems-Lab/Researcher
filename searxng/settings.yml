@@ -1,27 +1,58 @@
 # SearXNG settings.yml — Lokale Research-Umgebung
-# Validierte Konfiguration basierend auf docs.searxng.org
+# Quality Hardening (Phase 8): Zusätzliche Engines für ≥10 Quellen pro Query
+# Validierte Konfiguration basierend auf docs.searxng.org (2026.6.3+5bae05514)
 use_default_settings:
   engines:
     keep_only:
+      # Default-enabled (no API key required)
       - duckduckgo
+      - google
+      - brave
+      - startpage
+      # Explicitly enabled (disabled by default, no API key)
+      - bing
+      - qwant
+      - mojeek
+      - yahoo
+      - mwmbl
+      - yacy
+      - presearch
       - wikipedia
       - wikidata
 
 server:
   bind_address: "0.0.0.0"  # Sicherheit durch Docker-Port-Binding (127.0.0.1)
   port: 8080
-  base_url: "http://localhost:8080/"
+  base_url: "http://localhost:8090/"
   secret_key: "62OOXOZCuYGDnDYgSCjCUx5Hy2L5yJPYOLWfDhGWris="
   limiter: false  # Kein Rate-Limiting für lokalen Betrieb (kein Valkey nötig)
 
 search:
   safe_search: 0     # Keine Filter für Research-Zwecke
+  max_page: 10       # Max pages per query (engine caps override: google=50, brave=10, qwant=5, startpage=18)
   formats:
     - html
     - json          # JSON-API für GPT Researcher
 
 ui:
   static_use_hash: true
+
+# Explicitly enable engines that are disabled by default in SearXNG
+engines:
+  - name: bing
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: mwmbl
+    disabled: false
+  - name: yacy
+    disabled: false
+  - name: presearch
+    disabled: false
 
 # Keine zusätzlichen Plugins aktiviert
 plugins: {}

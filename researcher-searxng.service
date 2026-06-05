@@ -1,0 +1,38 @@
+# =============================================================================
+# researcher-searxng.service — SearXNG Metasearch (Docker)
+# =============================================================================
+# Port: 8090 (mapped from container 8080 to host 127.0.0.1:8090)
+#
+# Install:
+#   sudo cp researcher-searxng.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable researcher-searxng.service
+#   sudo systemctl start researcher-searxng.service
+#
+# Requires: Docker installed, searxng/searxng:latest image pulled
+# =============================================================================
+[Unit]
+Description=Researcher — SearXNG Metasearch Engine
+Documentation=https://github.com/xxammaxx/Researcher
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xxammaxx/Schreibtisch/Researcher/searxng
+ExecStartPre=/usr/local/bin/docker compose -f /home/xxammaxx/Schreibtisch/Researcher/searxng/docker-compose.yml down
+ExecStart=/usr/local/bin/docker compose -f /home/xxammaxx/Schreibtisch/Researcher/searxng/docker-compose.yml up
+ExecStop=/usr/local/bin/docker compose -f /home/xxammaxx/Schreibtisch/Researcher/searxng/docker-compose.yml down
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/researcher/searxng.log
+StandardError=append:/var/log/researcher/searxng-error.log
+
+# Timeouts
+TimeoutStartSec=60
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,50 @@
 # Changelog
 
+## [v0.2.5] — 2026-06-04
+### Added
+- **SearXNG Quality Hardening**: 10+ Suchmaschinen aktiviert (google, brave, startpage, bing, qwant, mojeek, yahoo, mwmbl, yacy, presearch) für ≥10 Quellen pro Query (#143)
+- **Automated Acceptance Test**: `scripts/ci_acceptance.py` prüft 5 Services, Research-Pipeline, Report-Qualität (#143)
+- **Infrastructure Autostart**: `start_all_services.sh` + 5 systemd Service-Dateien (ollama, llama, searxng, gptr, dashboard) (#143)
+- **CI/CD Acceptance Workflow**: `.github/workflows/acceptance.yml` für PR-Gate (#143)
+- **Dashboard Static Fallback**: `static-fallback.html` löst SSE/Playwright-Font-Timeout (#143)
+
+### Changed
+- **GPT Researcher Config**: TOTAL_WORDS 1200→3000, MAX_SUBTOPICS 3→5, Token-Limits erhöht (#143)
+- **.env**: SEARX_URL korrigiert auf Port 8090, LLM-Modell auf qwen3.5-uncensored aktualisiert (#143)
+- **SearXNG Port**: docker-compose.yml auf 8090 (Konfliktfrei mit anderen Diensten) (#143)
+
+### Fixed
+- **Dashboard Screenshot**: SSE-Blocking durch statischen Fallback behoben (#143)
+- **SearXNG Quellenanzahl**: Von 5 auf 10+ Quellen erhöht (#143)
+
+### Documentation
+- `docs/development/dashboard-screenshot-fix.md` — SSE-Problem und Lösung
+- `docs/development/local-runbook.md` — Ports, Dienste, statischer Fallback aktualisiert
+
+## [v0.2.4] — 2026-06-03
+### Changed
+- **pyproject.toml**: 0.2.2 → **0.2.4** (Version-Nachzug für v0.2.3 + Stabilization)
+- **README.md**: Version-Status von v0.1.0-local-alpha auf v0.2.4 aktualisiert
+
+### Fixed
+- **mypy: 40 Typfehler behoben** — Duplicate-Module (cli, tests), Union-Attribute (BeautifulSoup), Arg-Type, No-Redef, Method-Assign, Override-Signatur, Misc
+- **ruff: 149 Linting-Fehler behoben** — Import-Sorting (130), E402 (5), E741 (2), N806 (7), F821 (1), F841 (1)
+- **Playwright: 3 Browser-Test-Fehler behoben**
+  - `test_gpu_sse_stream`: `HTTPServer` → `ThreadingHTTPServer` für SSE-Parallelität
+  - `test_dashboard_xss_query_parameter_escaped`: Assertion an Query-Display-Präfix angepasst
+  - `test_dashboard_visual_regression_screenshot`: Veraltete Baseline erneuert
+- **test_mcp_tools.py**: Doppelten Test `test_audit_log_stats_json_decode_error` entfernt
+- **test_deep_report_outline.py**: Doppelte Testnamen umbenannt/entfernt
+- **test_crawlers.py**: Doppelten Test umbenannt
+
+### Quality Gates
+- `pytest`: **1271 passed**, 26 skipped
+- `mypy`: **0 errors**
+- `ruff`: **0 errors**
+- `make security-project`: **0 Medium/High** Findings
+- `coverage`: **88%** (≥78% threshold)
+- `playwright`: **29 passed**
+
 ## [v0.2.3] — 2026-05-29
 ### Added
 - **Submodul-Update: gpt_researcher v3.5.0** (#134): 45 neue Commits, Anthropic Tracking, max_tokens 200k, JSON-Repair, MCP env fix, OpenAlex, ModelsLab, uvm.

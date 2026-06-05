@@ -378,7 +378,6 @@ def test_write_results_to_index_partial_failure():
 
 def test_write_results_to_index_none_backend_whoosh(monkeypatch):
     """index_backend=None, kein SEARCH_INDEX_BACKEND gesetzt -> whoosh default."""
-    import os as _os
 
     from mcp_tools.claim_index_writer import write_results_to_index
 

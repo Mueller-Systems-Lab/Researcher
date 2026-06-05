@@ -1,0 +1,47 @@
+# =============================================================================
+# researcher-ollama.service — Ollama Embedding Service
+# =============================================================================
+# Install:
+#   mkdir -p ~/.config/systemd/user/
+#   cp researcher-ollama.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable researcher-ollama.service
+#   systemctl --user start researcher-ollama.service
+#   loginctl enable-linger $USER  # Keep running after logout
+#
+# Requires: Ollama installed at /usr/local/bin/ollama
+# =============================================================================
+[Unit]
+Description=Researcher — Ollama Embedding Service
+Documentation=https://github.com/xxammaxx/Researcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ollama serve
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+Environment=OLLAMA_HOST=127.0.0.1
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_KEEP_ALIVE=24h
+
+# Logging
+StandardOutput=append:/var/log/researcher/ollama.log
+StandardError=append:/var/log/researcher/ollama-error.log
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/researcher
+ReadOnlyPaths=/usr/local/bin/ollama
+
+# Timeouts
+TimeoutStartSec=60
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

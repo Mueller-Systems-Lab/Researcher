@@ -68,7 +68,8 @@ class LinkExtractor:
         # 1. Links aus <a href="...">-Tags
         if soup:
             for a_tag in soup.find_all("a", href=True):
-                href = a_tag.get("href", "").strip()
+                href_raw = a_tag.get("href", "")
+                href = href_raw.strip() if isinstance(href_raw, str) else ""
                 if not href:
                     continue
                 absolute_url = urljoin(base_url, href)

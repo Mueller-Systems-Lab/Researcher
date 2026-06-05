@@ -36,7 +36,7 @@ class TestHandler(BaseHTTPRequestHandler):
         self.client_address = ("127.0.0.1", 0)
         self.command = "GET"
 
-    def send_response(self, status: int) -> None:
+    def send_response(self, status: int, message: str | None = None) -> None:
         self.response_status = status
 
     def send_header(self, key: str, value: str) -> None:
@@ -49,7 +49,7 @@ class TestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def json_body() -> dict:
+def json_body() -> io.BytesIO:
     """Extract JSON body from test handler response."""
     body_bytes = io.BytesIO()
     return body_bytes

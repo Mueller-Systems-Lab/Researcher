@@ -8,7 +8,7 @@ import asyncio
 import json
 import os
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -18,9 +18,10 @@ from mcp_tools.fastmcp_server import (  # noqa: E402
     MCP_HTTP_PATH,
     _call_tool_json,
     create_server,
+)
+from mcp_tools.fastmcp_server import (
     run_tool as fastmcp_run_tool,
 )
-
 
 EXPECTED_TOOLS = {
     "web-fetch",
@@ -141,8 +142,6 @@ def test_mcp_server_call_tool_returns_error_no_message(mock_run_sync):
 
 
 # ── Tool wrapper coverage (server.call_tool paths) ───────────────────────
-
-from unittest.mock import MagicMock
 
 
 @patch("mcp_tools.fastmcp_server.anyio.to_thread.run_sync", new_callable=AsyncMock)

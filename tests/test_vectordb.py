@@ -206,6 +206,7 @@ def test_get_client_import_error():
     """_get_client: ImportError branch — sets last_error and returns None."""
     import builtins
     import sys
+
     from vectordb.store import VectorStore
 
     chromadb_saved = sys.modules.pop("chromadb", None)
@@ -231,6 +232,7 @@ def test_get_client_import_error():
 def test_get_client_double_check_lock():
     """_get_client: inner double-check returns client — simulates thread race."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore(persist_directory="/tmp/test_vdb")
@@ -254,7 +256,9 @@ def test_get_client_double_check_lock():
 def test_execute_with_retry_exhausted():
     """_execute_with_retry: raises last_error after all retries exhausted."""
     import sqlite3
+
     import pytest
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -274,6 +278,7 @@ def test_execute_with_retry_exhausted():
 def test_add_fallback_ids_and_metadatas():
     """add(): generates UUIDs and empty metadatas when None is passed."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -299,6 +304,7 @@ def test_add_fallback_ids_and_metadatas():
 def test_query_collection_unavailable():
     """query(): returns [] when _get_collection returns None."""
     from unittest.mock import patch
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -319,6 +325,7 @@ def test_query_collection_unavailable():
 def test_available_when_collection_none():
     """available property: returns False when _get_collection returns None (Line 54)."""
     from unittest.mock import patch
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -329,6 +336,7 @@ def test_available_when_collection_none():
 def test_get_collection_generic_exception():
     """_get_collection: generic Exception sets last_error and returns None (Lines 98-101)."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -347,7 +355,9 @@ def test_get_collection_generic_exception():
 def test_execute_with_retry_non_locked_error():
     """_execute_with_retry: immediately re-raises non-locked OperationalError (Line 116)."""
     import sqlite3
+
     import pytest
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -367,6 +377,7 @@ def test_add_retry_exhaustion_returns_false():
     """add(): retry exhaustion after MAX_RETRIES returns False (Lines 171-175)."""
     import sqlite3
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -388,6 +399,7 @@ def test_add_retry_exhaustion_returns_false():
 def test_add_generic_exception_returns_false():
     """add(): non-sqlite3 Exception returns False (Lines 176-178)."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -406,6 +418,7 @@ def test_query_retry_exhaustion_returns_empty():
     """query(): retry exhaustion returns [] and sets last_error (Lines 255-258)."""
     import sqlite3
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -421,6 +434,7 @@ def test_query_retry_exhaustion_returns_empty():
 def test_query_generic_exception_returns_empty():
     """query(): non-sqlite3 Exception returns [] and sets last_error (Lines 259-262)."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -436,6 +450,7 @@ def test_query_generic_exception_returns_empty():
 def test_count_generic_exception_returns_zero():
     """count property: generic Exception returns 0 and sets last_error (Lines 277-280)."""
     from unittest.mock import MagicMock
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -450,6 +465,7 @@ def test_count_generic_exception_returns_zero():
 def test_delete_collection_client_none():
     """delete_collection: _get_client returns None → early return, no error (Line 286)."""
     from unittest.mock import patch
+
     from vectordb.store import VectorStore
 
     store = VectorStore()
@@ -463,6 +479,7 @@ def test_delete_collection_client_none():
 def test_delete_collection_generic_exception():
     """delete_collection: Exception during delete is caught, no re-raise (Lines 292-293)."""
     from unittest.mock import MagicMock, patch
+
     from vectordb.store import VectorStore
 
     store = VectorStore()

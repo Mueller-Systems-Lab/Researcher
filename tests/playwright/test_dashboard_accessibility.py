@@ -16,15 +16,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 # package is resolved by removing tests/playwright/__init__.py — the
 # directory is NOT a Python package, so "import playwright" correctly
 # resolves the installed distribution.
+_PLAYWRIGHT_IMPORT_ERROR: str | None = None
+PlaywrightError: type[Exception] = Exception
 try:
-    from playwright.sync_api import Error as PlaywrightError
+    from playwright.sync_api import Error as PlaywrightError  # type: ignore[assignment]
     from playwright.sync_api import sync_playwright
 except ImportError as _pw_exc:
-    PlaywrightError = Exception
-    sync_playwright = None
+    sync_playwright = None  # type: ignore[assignment]
     _PLAYWRIGHT_IMPORT_ERROR = str(_pw_exc)
-else:
-    _PLAYWRIGHT_IMPORT_ERROR = None
 
 pytestmark = pytest.mark.skipif(
     sync_playwright is None,

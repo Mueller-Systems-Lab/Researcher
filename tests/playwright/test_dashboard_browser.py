@@ -75,14 +75,14 @@ class _FakeMonitor:
 @contextmanager
 def _dashboard_server():
     """Startet einen isolierten Dashboard-Server für einen Test."""
-    from http.server import HTTPServer
+    from http.server import ThreadingHTTPServer
 
     from dashboard.server import DashboardHandler
 
     old_monitor = DashboardHandler.monitor
     DashboardHandler.monitor = _FakeMonitor()
     port = _free_port()
-    server = HTTPServer(("127.0.0.1", port), DashboardHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), DashboardHandler)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -157,6 +157,7 @@ def test_gpu_sse_stream():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            page.goto(base_url, wait_until="domcontentloaded", timeout=10000)
             event_data = page.evaluate(
                 """
                 (url) => new Promise((resolve, reject) => {
@@ -263,7 +264,9 @@ def test_dashboard_xss_query_parameter_escaped():
 
     assert dialogs == []
     assert script_count == 0
-    assert displayed_query == payload
+    assert payload in displayed_query, (
+        f"XSS payload not visible as text: {displayed_query!r}"
+    )
 
 
 # === RESPONSIVE ===

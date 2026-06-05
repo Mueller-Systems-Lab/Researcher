@@ -11,9 +11,9 @@
 | Severity | Anzahl | Projekt | Submodul | Behandelt |
 |---:|---:|---:|---:|---|
 | HIGH | 7 | 0 | 7 | 0 behoben, 7 Vendor-dokumentiert |
-| MEDIUM | 18 | 2 | 16 | 0 behoben, 2 Test-akzeptiert, 16 Vendor-dokumentiert |
-| LOW | 18 | 9 | 9 | 0 behoben, 9 Test/akzeptiert, 9 Vendor-dokumentiert |
-| **Gesamt** | **43** | **11** | **32** | **43 triagiert** |
+| MEDIUM | 20 | 4 | 16 | 3 nosec-B310 (ci_acceptance, Phase 8), 0 behoben, 4 Projekt-akzeptiert, 16 Vendor-dokumentiert |
+| LOW | 21 | 10 | 11 | 0 behoben, 10 Projekt-akzeptiert, 11 Vendor-dokumentiert |
+| **Gesamt** | **48** | **14** | **34** | **48 triagiert** |
 
 ---
 
@@ -45,6 +45,11 @@
 | 7 | B310 | MEDIUM | `tests/playwright/test_dashboard_visual_regression.py` | 95 | Playwright-Test: `urllib.request.urlopen` für JSON-Read. Test-only. |
 | 8 | B105 | LOW | `tests/test_crawlers.py` | 55 | Test-Fixture: `crawler.config.password = ""`. Test-only, kein Produktiv-Credential. |
 | 9 | B105 | LOW | `tests/test_crawlers.py` | 179 | Test-Assertion: `assert token == "abc123"`. Mock-Testwert, kein Produktiv-Token. |
+| 10 | B310 | MEDIUM | `scripts/visual_e2e_acceptance.py` | 153 | Acceptance-Skript (pre-existing): `urllib.request.urlopen` für SearXNG-Healthcheck. URLs sind hardcoded `http://127.0.0.1:*`. Kein untrusted Input. |
+| 11 | B310 | MEDIUM | `scripts/visual_e2e_acceptance.py` | 194 | Acceptance-Skript (pre-existing): `urllib.request.urlopen` für API-Reports-Check. URL ist hardcoded `http://127.0.0.1:28202`. |
+| 12 | B310 | MEDIUM | `scripts/ci_acceptance.py` | 72 | Phase 8 CI-Acceptance: `urllib.request.urlopen` via `_validate_url_scheme()`. URLs hardcoded auf `127.0.0.1`. Defense-in-depth durch URL-Validierung. |
+| 13 | B310 | MEDIUM | `scripts/ci_acceptance.py` | 117 | Wie oben — `_submit()`-Pfad, `_validate_url_scheme()` validiert. |
+| 14 | B310 | MEDIUM | `scripts/ci_acceptance.py` | 127 | Wie oben — `_wait_for_completion()`-Pfad, `_validate_url_scheme()` validiert. |
 
 ---
 

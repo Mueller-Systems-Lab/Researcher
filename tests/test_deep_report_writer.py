@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json as _json
+from unittest.mock import patch as _patch
+
 from deep_report.citation_inserter import (
     generate_source_list,
     generate_source_table,
@@ -12,7 +15,14 @@ from deep_report.evaluator import (
     is_report_acceptable,
     rejection_reasons,
 )
-from deep_report.outline import REQUIRED_SECTIONS, generate_outline
+from deep_report.outline import (
+    REQUIRED_SECTIONS,
+    _extract_domain,
+    _extract_sources_from_artifacts,
+    _merge_sources,
+    generate_outline,
+    load_run_data_for_outline,
+)
 from deep_report.revision_loop import (
     generate_gap_queries,
     revision_needed,
@@ -340,18 +350,6 @@ def test_generate_gap_queries_with_node_questions():
 
 
 # ── Outline: untested branches (pure logic) ─────────────────────────────
-
-import json as _json
-from unittest.mock import patch as _patch
-
-from deep_report.outline import (
-    _extract_domain,
-    _extract_sources_from_artifacts,
-    _merge_sources,
-    generate_outline,
-    load_run_data_for_outline,
-    REQUIRED_SECTIONS,
-)
 
 
 def test_outline_uncertainty_with_evaluation():

@@ -394,7 +394,8 @@ def test_crawler_crawl_multi_page(mock_sleep):
 
 def test_crawler_login_failure_logged_in_false():
     """login(): when URL still contains 'login' after POST → logged_in=False (Line 134)."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
+
     from crawlers.darknet_crawler import DarknetCrawler
 
     config = MagicMock()
@@ -418,7 +419,8 @@ def test_crawler_login_failure_logged_in_false():
 
 def test_crawler_no_forum_base_url():
     """crawl(): empty forum_base_url → returns [] (Lines 221-222)."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
+
     from crawlers.darknet_crawler import DarknetCrawler
 
     config = MagicMock()
@@ -434,6 +436,7 @@ def test_crawler_no_forum_base_url():
 def test_crawler_post_parse_exception_continue():
     """crawl_thread_page: parse exception caught, continues to next post (Lines 191-193)."""
     from unittest.mock import MagicMock, patch
+
     from crawlers.darknet_crawler import DarknetCrawler
 
     config = MagicMock()
@@ -517,8 +520,8 @@ def test_crawler_crawl_thread_page_pagination_delay(mock_get):
 
 
 @patch("crawlers.darknet_crawler.requests.Session.get")
-def test_crawler_post_parse_exception_continue(mock_get):
-    """Post parsing exception → logged and continue (lines 191-193)."""
+def test_crawler_post_parse_exception_with_mixed_elements(mock_get):
+    """Post parsing exception with mixed elements → logged and continue (lines 191-193)."""
     from crawlers.darknet_crawler import DarknetCrawler
 
     crawler = DarknetCrawler()

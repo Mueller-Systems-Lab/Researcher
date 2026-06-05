@@ -3,6 +3,12 @@
 DR-08: Checks model presence, endpoint health, generation quality,
 garbled output detection, timeout handling, and cloud blocking.
 
+Endpoint Allowlist (check_endpoint_local):
+  1. Loopback: 127.0.0.1, localhost, ::1 (always allowed)
+  2. Explicit: LOCAL_LLM_ALLOWED_HOSTS env var (comma-separated hostnames/IPs)
+  3. Optional: ALLOW_PRIVATE_LAN_LLM=true for all RFC1918 private IPs
+  Cloud patterns (api.openai.com etc.) are always blocked.
+
 Status classes:
 - LOCAL_LLM_READY: All checks passed, Deep Research can start
 - LOCAL_LLM_PARTIAL: Some checks warn but can proceed
@@ -16,7 +22,9 @@ Status classes:
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -50,8 +58,41 @@ class RuntimeGuardResult:
     cloud_detected: bool = False
 
 
-# Allowed endpoints (localhost only)
-_ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
+# Always-allowed loopback hosts (non-negotiable)
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+# RFC1918 private IPv4 ranges (for ALLOW_PRIVATE_LAN_LLM mode)
+_RFC1918_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+]
+
+
+def _get_allowlisted_hosts() -> set[str]:
+    """Build the complete set of allowed hosts from env + defaults.
+
+    Reads LOCAL_LLM_ALLOWED_HOSTS (comma-separated hostnames/IPs).
+    Example: LOCAL_LLM_ALLOWED_HOSTS=192.168.43.52,10.0.0.5
+    """
+    allowed = _LOOPBACK_HOSTS.copy()
+    env_hosts = os.environ.get("LOCAL_LLM_ALLOWED_HOSTS", "")
+    if env_hosts:
+        for host in env_hosts.split(","):
+            host = host.strip()
+            if host:
+                allowed.add(host)
+    return allowed
+
+
+def _is_rfc1918(host: str) -> bool:
+    """Check if an IP address belongs to RFC1918 private ranges."""
+    try:
+        addr = ipaddress.ip_address(host)
+        return any(addr in net for net in _RFC1918_NETWORKS)
+    except ValueError:
+        return False
+
 
 # Cloud/blocked endpoint patterns
 _CLOUD_PATTERNS = [
@@ -76,21 +117,38 @@ def _validate_url_scheme(url: str) -> None:
 
 
 def check_endpoint_local(base_url: str) -> bool:
-    """Verify the endpoint is a local address (not cloud)."""
+    """Verify the endpoint is a local or explicitly allowed address (not cloud).
+
+    Allowlist hierarchy (first match wins):
+    1. Loopback: 127.0.0.1, localhost, ::1 (always allowed)
+    2. Explicit allowlist: LOCAL_LLM_ALLOWED_HOSTS env var (comma-separated)
+    3. Optional RFC1918 mode: ALLOW_PRIVATE_LAN_LLM=true
+
+    Cloud patterns in the URL path/host are always checked and blocked.
+    """
     parsed = urlparse(base_url)
     host = parsed.hostname or ""
 
-    # Must be localhost
-    if host not in _ALLOWED_HOSTS:
-        return False
-
-    # Check for cloud patterns in URL
+    # Check for cloud patterns in URL (always active)
     url_lower = base_url.lower()
     for pattern in _CLOUD_PATTERNS:
         if re.search(pattern, url_lower):
             return False
 
-    return True
+    # 1. Loopback — always allowed
+    if host in _LOOPBACK_HOSTS:
+        return True
+
+    # 2. Explicit allowlist via env var
+    if host in _get_allowlisted_hosts():
+        return True
+
+    # 3. Optional: allow RFC1918 private LAN IPs
+    if os.environ.get("ALLOW_PRIVATE_LAN_LLM", "").lower() in ("true", "1", "yes"):
+        if _is_rfc1918(host):
+            return True
+
+    return False
 
 
 def check_model_present(

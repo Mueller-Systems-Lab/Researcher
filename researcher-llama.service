@@ -1,0 +1,46 @@
+# =============================================================================
+# researcher-llama.service — llama-server (Qwen3.5-9B Uncensored)
+# =============================================================================
+# Handled via the serve script in the Researcher repository.
+# Port: 8082
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user/
+#   cp researcher-llama.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable researcher-llama.service
+#   systemctl --user start researcher-llama.service
+# =============================================================================
+[Unit]
+Description=Researcher — llama-server Qwen3.5-9B (Port 8082)
+Documentation=https://github.com/xxammaxx/Researcher
+After=network-online.target
+Wants=network-online.target
+Requires=researcher-ollama.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xxammaxx/Schreibtisch/Researcher
+ExecStart=/home/xxammaxx/Schreibtisch/Researcher/serve_qwen3.5_uncensored.sh
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+
+# Environment
+Environment=LD_LIBRARY_PATH=/home/xxammaxx/Schreibtisch/gemma4/llama.cpp/build/bin
+Environment=HOME=/home/xxammaxx
+
+# Logging
+StandardOutput=append:/var/log/researcher/llama-server.log
+StandardError=append:/var/log/researcher/llama-server-error.log
+
+# Security hardening (limited — llama-server needs GPU access)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# GPU process needs longer startup
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

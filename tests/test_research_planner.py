@@ -733,9 +733,8 @@ def test_llm_plan_missing_choices_key_returns_none():
 
 def test_llm_plan_requests_not_importable():
     """requests-Import schlägt fehl → _llm_plan returns None."""
-    from unittest.mock import patch
-
     import builtins
+    from unittest.mock import patch
 
     real_import = builtins.__import__
 

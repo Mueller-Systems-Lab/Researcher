@@ -1,0 +1,64 @@
+# =============================================================================
+# researcher-gptr.service — GPT Researcher Backend (Docker)
+# =============================================================================
+# Port: 28202 (mapped from container 8000)
+#
+# Install:
+#   sudo cp researcher-gptr.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable researcher-gptr.service
+#   sudo systemctl start researcher-gptr.service
+#
+# Requires: Docker, Ollama, llama-server, SearXNG all running
+# =============================================================================
+[Unit]
+Description=Researcher — GPT Researcher Backend
+Documentation=https://github.com/xxammaxx/Researcher
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+Requires=researcher-searxng.service
+
+[Service]
+Type=simple
+EnvironmentFile=/home/xxammaxx/Schreibtisch/Researcher/.env
+
+# Remove existing container if present
+ExecStartPre=-/usr/local/bin/docker rm -f gpt-researcher 2>/dev/null
+
+# Start GPT Researcher with host networking
+ExecStart=/usr/local/bin/docker run \
+    --rm \
+    --name gpt-researcher \
+    --network host \
+    -e RETRIEVER=${RETRIEVER:-searx} \
+    -e SEARX_URL=${SEARX_URL:-http://127.0.0.1:8090} \
+    -e FAST_LLM=${FAST_LLM:-openai:qwen3.5-uncensored} \
+    -e SMART_LLM=${SMART_LLM:-openai:qwen3.5-uncensored} \
+    -e STRATEGIC_LLM=${STRATEGIC_LLM:-openai:qwen3.5-uncensored} \
+    -e OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://127.0.0.1:8082/v1} \
+    -e OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed} \
+    -e EMBEDDING=${EMBEDDING:-ollama:nomic-embed-text:latest} \
+    -e OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://127.0.0.1:11434} \
+    -e LANGUAGE=${LANGUAGE:-german} \
+    -e MAX_SEARCH_RESULTS_PER_QUERY=${MAX_SEARCH_RESULTS_PER_QUERY:-15} \
+    -e MAX_SUBTOPICS=${MAX_SUBTOPICS:-5} \
+    -e REPORT_SOURCE=${REPORT_SOURCE:-web} \
+    -e TAVILY_API_KEY=${TAVILY_API_KEY:-} \
+    -e LOGGING_LEVEL=INFO \
+    -p 28202:8000 \
+    gptresearcher/gpt-researcher
+
+ExecStop=/usr/local/bin/docker stop gpt-researcher
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/researcher/gptr.log
+StandardError=append:/var/log/researcher/gptr-error.log
+
+# Timeouts (Docker pull + GPT Researcher startup can take a while)
+TimeoutStartSec=120
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

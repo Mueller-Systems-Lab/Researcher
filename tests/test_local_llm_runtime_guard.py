@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from config.local_llm_runtime import (
     RuntimeStatus,
     can_start_deep_research,
@@ -41,6 +43,139 @@ def test_cloud_tavily_blocked():
 def test_external_ip_blocked():
     """Externe IP wird blockiert."""
     assert check_endpoint_local("http://192.168.1.1:8080") is False
+
+
+# ── Allowlist Tests (DR-08 Extension) ─────────────────────────────────────
+
+
+def test_allowlisted_lan_ip_allowed(monkeypatch):
+    """Explizit erlaubte LAN-IP via LOCAL_LLM_ALLOWED_HOSTS wird akzeptiert."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "192.168.43.52")
+    assert check_endpoint_local("http://192.168.43.52:1234") is True
+
+
+def test_non_allowlisted_lan_ip_still_blocked(monkeypatch):
+    """Nicht freigegebene private IP bleibt blockiert trotz Allowlist."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "192.168.43.52")
+    assert check_endpoint_local("http://192.168.1.1:8080") is False
+
+
+def test_allowlist_comma_separated(monkeypatch):
+    """Komma-getrennte Hosts werden korrekt geparsed."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "192.168.43.52,10.0.0.5")
+    assert check_endpoint_local("http://192.168.43.52:1234") is True
+    assert check_endpoint_local("http://10.0.0.5:8080") is True
+
+
+def test_allowlist_handles_whitespace(monkeypatch):
+    """Leerzeichen um Kommas werden toleriert."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", " 192.168.43.52 , 10.0.0.5 ")
+    assert check_endpoint_local("http://192.168.43.52:1234") is True
+
+
+def test_allowlist_loopback_always_works(monkeypatch):
+    """Loopback funktioniert auch OHNE Env-Variable."""
+    monkeypatch.delenv("LOCAL_LLM_ALLOWED_HOSTS", raising=False)
+    assert check_endpoint_local("http://127.0.0.1:8080") is True
+    assert check_endpoint_local("http://localhost:8080") is True
+
+
+def test_allowlist_empty_env_no_break(monkeypatch):
+    """Leere LOCAL_LLM_ALLOWED_HOSTS ändert nichts (kein Crash)."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "")
+    # Loopback muss weiterhin gehen
+    assert check_endpoint_local("http://127.0.0.1:8080") is True
+    # Externe IP weiterhin blockiert
+    assert check_endpoint_local("http://192.168.1.1:8080") is False
+
+
+def test_allow_private_lan_mode_allows_rfc1918(monkeypatch):
+    """ALLOW_PRIVATE_LAN_LLM=true erlaubt RFC1918-IPs."""
+    monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", "true")
+    assert check_endpoint_local("http://192.168.43.52:1234") is True
+    assert check_endpoint_local("http://10.0.0.5:8080") is True
+    assert check_endpoint_local("http://172.16.0.1:8080") is True
+
+
+def test_private_lan_mode_still_blocks_public_ips(monkeypatch):
+    """ALLOW_PRIVATE_LAN_LLM=true blockiert weiterhin öffentliche IPs."""
+    monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", "true")
+    assert check_endpoint_local("http://8.8.8.8:8080") is False
+
+
+def test_cloud_pattern_in_allowed_url_blocked(monkeypatch):
+    """Cloud-Patterns in der URL werden geblockt, auch bei Allowlist."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "192.168.43.52")
+    # Cloud pattern im Pfad
+    assert (
+        check_endpoint_local("http://192.168.43.52:1234/proxy/api.openai.com/chat")
+        is False
+    )
+
+
+def test_rfc1918_10_network_allowed_in_mode(monkeypatch):
+    """10.x.x.x ist mit ALLOW_PRIVATE_LAN_LLM=true erlaubt."""
+    monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", "true")
+    assert check_endpoint_local("http://10.0.0.1:1234") is True
+
+
+def test_rfc1918_172_network_allowed_in_mode(monkeypatch):
+    """172.16-31.x.x ist mit ALLOW_PRIVATE_LAN_LLM=true erlaubt."""
+    monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", "true")
+    assert check_endpoint_local("http://172.16.0.1:1234") is True
+    assert check_endpoint_local("http://172.31.255.254:1234") is True
+
+
+def test_rfc1918_mode_all_values(monkeypatch):
+    """ALLOW_PRIVATE_LAN_LLM akzeptiert true, 1, yes (case-insensitive)."""
+    for value in ("true", "True", "TRUE", "1", "yes", "YES"):
+        monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", value)
+        assert check_endpoint_local("http://192.168.43.52:1234") is True
+
+
+def test_rfc1918_mode_false_values_block(monkeypatch):
+    """ALLOW_PRIVATE_LAN_LLM=false/0/no blockiert weiterhin."""
+    # Clear explicit allowlist so only the mode flag matters
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "")
+    for value in ("false", "0", "no", ""):
+        monkeypatch.setenv("ALLOW_PRIVATE_LAN_LLM", value)
+        assert check_endpoint_local("http://192.168.43.52:1234") is False
+
+
+def test_is_rfc1918_valid():
+    """_is_rfc1918 erkennt RFC1918-IPs korrekt."""
+    from config.local_llm_runtime import _is_rfc1918
+
+    assert _is_rfc1918("192.168.1.1") is True
+    assert _is_rfc1918("10.0.0.1") is True
+    assert _is_rfc1918("172.16.0.1") is True
+    assert _is_rfc1918("8.8.8.8") is False
+    assert _is_rfc1918("127.0.0.1") is False  # loopback is not RFC1918
+    assert _is_rfc1918("not-an-ip") is False  # non-IP hostname
+    assert _is_rfc1918("::1") is False  # IPv6
+    assert _is_rfc1918("192.168.43.52") is True
+
+
+def test_get_allowlisted_hosts_defaults(monkeypatch):
+    """_get_allowlisted_hosts enthält immer Loopback-Hosts."""
+    monkeypatch.delenv("LOCAL_LLM_ALLOWED_HOSTS", raising=False)
+    from config.local_llm_runtime import _get_allowlisted_hosts
+
+    hosts = _get_allowlisted_hosts()
+    assert "127.0.0.1" in hosts
+    assert "localhost" in hosts
+    assert "::1" in hosts
+
+
+def test_get_allowlisted_hosts_with_env(monkeypatch):
+    """_get_allowlisted_hosts erweitert Loopback um Env-Werte."""
+    monkeypatch.setenv("LOCAL_LLM_ALLOWED_HOSTS", "192.168.43.52,10.0.0.5")
+    from config.local_llm_runtime import _get_allowlisted_hosts
+
+    hosts = _get_allowlisted_hosts()
+    assert "127.0.0.1" in hosts
+    assert "192.168.43.52" in hosts
+    assert "10.0.0.5" in hosts
 
 
 def test_cloud_groq_blocked():
@@ -275,8 +410,6 @@ def test_garbled_mixed_printable():
 
 # ── _validate_url_scheme untested paths ──────────────────────────────────
 
-import pytest
-
 
 def test_validate_url_scheme_file_raises():
     from config.local_llm_runtime import _validate_url_scheme
@@ -311,6 +444,7 @@ _MOCK_MODELS_JSON = b'{"object":"list","data":[{"id":"qwen3.5-uncensored","objec
 
 def test_check_model_present_found():
     from unittest.mock import MagicMock, patch
+
     from config.local_llm_runtime import check_model_present
 
     mock = MagicMock()
@@ -324,6 +458,7 @@ def test_check_model_present_found():
 
 def test_check_model_present_not_found():
     from unittest.mock import MagicMock, patch
+
     from config.local_llm_runtime import check_model_present
 
     mock = MagicMock()
@@ -342,6 +477,7 @@ _MOCK_CHAT_GARBLED = b'{"id":"c2","object":"chat.completion","choices":[{"index"
 
 def test_check_generation_success():
     from unittest.mock import MagicMock, patch
+
     from config.local_llm_runtime import check_generation
 
     mock = MagicMock()
@@ -356,6 +492,7 @@ def test_check_generation_success():
 
 def test_check_generation_garbled():
     from unittest.mock import MagicMock, patch
+
     from config.local_llm_runtime import check_generation
 
     mock = MagicMock()
@@ -373,6 +510,7 @@ def test_check_generation_garbled():
 
 def test_run_guard_generation_timeout():
     from unittest.mock import patch
+
     from config.local_llm_runtime import RuntimeStatus, run_guard
 
     with (
@@ -390,6 +528,7 @@ def test_run_guard_generation_timeout():
 
 def test_run_guard_generation_garbled():
     from unittest.mock import patch
+
     from config.local_llm_runtime import RuntimeStatus, run_guard
 
     with (
@@ -412,6 +551,7 @@ def test_run_guard_generation_garbled():
 
 def test_run_guard_generation_crash():
     from unittest.mock import patch
+
     from config.local_llm_runtime import RuntimeStatus, run_guard
 
     with (
@@ -429,6 +569,7 @@ def test_run_guard_generation_crash():
 
 def test_run_guard_generation_ok():
     from unittest.mock import patch
+
     from config.local_llm_runtime import RuntimeStatus, run_guard
 
     with (
@@ -450,6 +591,7 @@ def test_run_guard_generation_ok():
 def test_check_generation_exception_handled():
     """check_generation: Exception during urlopen → caught, returns (False, "", str(exc), latency)."""
     from unittest.mock import patch
+
     from config.local_llm_runtime import check_generation
 
     with patch(

@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from crawlers.config import config
 from scrapers.http_session import create_session
@@ -70,9 +70,11 @@ class DarknetCrawler:
         """Extrahiert CSRF-Token aus einem Login-Formular."""
         soup = BeautifulSoup(html, "lxml")
         for inp in soup.find_all("input"):
-            name = inp.get("name", "")
-            if "csrf" in name.lower() or "token" in name.lower():
-                return inp.get("value")
+            name_raw = inp.get("name", "")
+            name = name_raw.lower() if isinstance(name_raw, str) else ""
+            if "csrf" in name or "token" in name:
+                value = inp.get("value")
+                return value if isinstance(value, str) else None
         return None
 
     def login(self) -> bool:
@@ -242,7 +244,7 @@ class DarknetCrawler:
         return all_posts
 
     @staticmethod
-    def _extract_text(soup: BeautifulSoup, selector: str) -> str:
+    def _extract_text(soup: Tag, selector: str) -> str:
         """Extrahiert Text aus einem Element per CSS-Selektor."""
         element = soup.select_one(selector)
         if element:
@@ -250,11 +252,10 @@ class DarknetCrawler:
         return ""
 
     @staticmethod
-    def _extract_attribute(
-        soup: BeautifulSoup, selector: str, attribute: str
-    ) -> str | None:
+    def _extract_attribute(soup: Tag, selector: str, attribute: str) -> str | None:
         """Extrahiert ein Attribut aus einem Element per CSS-Selektor."""
         element = soup.select_one(selector)
         if element:
-            return element.get(attribute)
+            value = element.get(attribute)
+            return value if isinstance(value, str) else None
         return None

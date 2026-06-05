@@ -485,7 +485,6 @@ def test_find_source_by_url_not_found():
 
 def test_find_source_by_url_found_in_store():
     """find_source_by_url: finds source after saving and loading."""
-    from evidence_store.store import load_sources_by_run_id
 
     source = EvidenceSource(url="http://found.onion", title="Found Source")
     save_source(source)
@@ -563,6 +562,7 @@ def test_citation_whitespace_segment_id_raises():
 def test_load_sources_skips_empty_lines():
     """load_sources: JSONL with empty lines → skipped (Line 70)."""
     import json
+
     from evidence_store.models import EvidenceSource
     from evidence_store.store import EVIDENCE_DIR, load_sources
 
@@ -609,6 +609,7 @@ def test_load_sources_skips_empty_lines():
 def test_load_segments_skips_empty_lines():
     """load_segments: JSONL with empty lines → skipped (Line 134)."""
     import json
+
     from evidence_store.models import EvidenceSegment
     from evidence_store.store import EVIDENCE_DIR, load_segments
 
@@ -648,6 +649,7 @@ def test_load_segments_skips_empty_lines():
 def test_load_citations_skips_empty_lines():
     """load_citations: JSONL with empty lines → skipped (Line 186)."""
     import json
+
     from evidence_store.models import Citation
     from evidence_store.store import EVIDENCE_DIR, load_citations
 

@@ -29,12 +29,12 @@ def _is_playwright_available() -> bool:
     return os.getenv("RUN_PLAYWRIGHT_TESTS", "").lower() in {"true", "1", "yes"}
 
 
+PlaywrightError: type[Exception] = Exception
 try:
-    from playwright.sync_api import Error as PlaywrightError
+    from playwright.sync_api import Error as PlaywrightError  # type: ignore[assignment]
     from playwright.sync_api import sync_playwright
 except ImportError:
-    PlaywrightError = Exception
-    sync_playwright = None
+    sync_playwright = None  # type: ignore[assignment]
 
 
 ROOT = Path(__file__).resolve().parents[2]

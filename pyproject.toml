@@ -4,12 +4,16 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "researcher"
-version = "0.2.2"
+version = "0.2.4"
 description = "Lokales, unzensiertes Research-System"
 requires-python = ">=3.11"
 
+[project.scripts]
+llm-smoke = "cli.llm_smoke:main"
+
 [tool.coverage.run]
 source = [
+    "cli",
     "config",
     "crawlers",
     "darknet_search",
@@ -53,6 +57,8 @@ ignore_missing_imports = true
 warn_return_any = false
 warn_unused_configs = true
 no_implicit_optional = true
+exclude = ["^cli/"]
+explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = ["gpt_researcher.*"]
@@ -99,6 +105,8 @@ markers = [
     "e2e: End-to-End-Tests mit gemockten oder optionalen externen Abhängigkeiten",
     "asyncio: AsyncIO-basierte Tests",
     "playwright: Browser- und Playwright-Tests",
+    "live: Live-Tests mit echten externen Endpoints (Opt-in via Env)",
+    "smoke: Smoke-Tests für kritische Pfade (kombinierbar mit live)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

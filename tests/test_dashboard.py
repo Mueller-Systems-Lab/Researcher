@@ -10,6 +10,8 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
@@ -263,6 +265,7 @@ def _make_handler(path: str, method: str = "GET"):
     """Create a DashboardHandler instance with mocks for testing."""
     import io
     from unittest.mock import MagicMock
+
     from dashboard.server import DashboardHandler
 
     handler = DashboardHandler.__new__(DashboardHandler)
@@ -271,10 +274,10 @@ def _make_handler(path: str, method: str = "GET"):
     handler.headers = MagicMock()
     handler.headers.get.return_value = ""
     handler.wfile = io.BytesIO()
-    handler.send_response = MagicMock()
-    handler.send_header = MagicMock()
-    handler.end_headers = MagicMock()
-    handler.log_message = MagicMock()
+    object.__setattr__(handler, "send_response", MagicMock())
+    object.__setattr__(handler, "send_header", MagicMock())
+    object.__setattr__(handler, "end_headers", MagicMock())
+    object.__setattr__(handler, "log_message", MagicMock())
     # Mock monitor for GPU data
     handler.monitor = MagicMock()
     handler.monitor.collect_dict.return_value = {
@@ -332,7 +335,6 @@ def test_do_get_health():
 def test_do_get_static_css():
     """do_GET: .css file served with text/css type (Line 58-59)."""
     import os
-    from dashboard.server import STATIC_DIR
 
     handler = _make_handler("/style.css")
     handler._serve_static = MagicMock()
@@ -346,7 +348,6 @@ def test_do_get_static_css():
 def test_do_get_static_js():
     """do_GET: .js file served with application/javascript type (Lines 60-61)."""
     import os
-    from dashboard.server import STATIC_DIR
 
     handler = _make_handler("/app.js")
     handler._serve_static = MagicMock()
@@ -543,7 +544,6 @@ def test_serve_gpu_sse_collection_error():
 
 def test_log_message_filters_sse():
     """log_message: SSE stream requests are not logged (Lines 190-191)."""
-    from unittest.mock import MagicMock
 
     handler = _make_handler("/api/gpu/stream")
     # log_message should skip logging for SSE paths
@@ -597,6 +597,7 @@ def test_gpu_monitor_file_not_found(mock_run):
 def test_gpu_monitor_timeout_expired(mock_run):
     """collect: TimeoutExpired → error message (Line 107-108)."""
     import subprocess
+
     from dashboard.gpu_monitor import GPUMonitor
 
     mock_run.side_effect = subprocess.TimeoutExpired(cmd="nvidia-smi", timeout=10)
@@ -621,8 +622,9 @@ def test_gpu_monitor_generic_exception(mock_run):
 @patch("dashboard.gpu_monitor.subprocess.run")
 def test_gpu_processes_nonzero_return(mock_run):
     """_get_processes: returncode != 0 → returns [] (Line 128)."""
-    from dashboard.gpu_monitor import GPUMonitor
     from unittest.mock import MagicMock
+
+    from dashboard.gpu_monitor import GPUMonitor
 
     # Configure subprocess.run to return different results for different calls
     call_count = [0]
@@ -649,8 +651,9 @@ def test_gpu_processes_nonzero_return(mock_run):
 @patch("dashboard.gpu_monitor.subprocess.run")
 def test_gpu_get_processes_exception(mock_run):
     """_get_processes: subprocess.run wirft Exception → returns [] (Lines 147-148)."""
-    from dashboard.gpu_monitor import GPUMonitor
     from unittest.mock import MagicMock
+
+    from dashboard.gpu_monitor import GPUMonitor
 
     # First call for main GPU query: success
     # Second call for process query: exception
@@ -691,8 +694,9 @@ def test_gpu_is_available_exception(mock_run):
 @patch("dashboard.gpu_monitor.subprocess.run")
 def test_gpu_monitor_empty_line_in_processes(mock_run):
     """collect: empty line in nvidia-smi process list → skipped (Line 134)."""
-    from dashboard.gpu_monitor import GPUMonitor
     from unittest.mock import MagicMock
+
+    from dashboard.gpu_monitor import GPUMonitor
 
     call_count = [0]
 
@@ -752,7 +756,7 @@ def test_serve_static_exception_returns_500():
     handler._resolve_static = MagicMock(return_value=safe_path)
 
     with patch.object(os.path, "exists", return_value=True):
-        with patch("builtins.open", side_effect=IOError("Disk full")):
+        with patch("builtins.open", side_effect=OSError("Disk full")):
             handler._serve_static("index.html", "text/html")
 
     handler.send_response.assert_called_with(500)
@@ -872,6 +876,7 @@ def test_run_server_default_port():
 def test_do_get_png_content_type():
     """do_GET: .png file → content_type image/png (lines 62-63)."""
     import os
+
     from dashboard.server import STATIC_DIR
 
     handler = _make_handler("/test.png")
@@ -921,10 +926,10 @@ def test_send_cors_no_headers_attribute():
 
 def test_log_message_sse_filter_coverage():
     """log_message: SSE stream args filter coverage (lines 190-191)."""
-    from dashboard.server import DashboardHandler
-
     # Create handler WITHOUT overriding log_message
     import types
+
+    from dashboard.server import DashboardHandler
 
     handler = _make_handler("/api/gpu/stream")
     # Restore the real log_message method (bound to this instance)
@@ -939,6 +944,7 @@ def test_resolve_static_symlink_traversal():
     """_resolve_static: path resolves outside STATIC_DIR → returns None (line 103)."""
     import os
     from unittest.mock import patch
+
     from dashboard.server import STATIC_DIR
 
     handler = _make_handler("/")
@@ -963,8 +969,9 @@ def test_resolve_static_symlink_traversal():
 @patch("dashboard.gpu_monitor.subprocess.run")
 def test_gpu_monitor_collect_empty_output(mock_run):
     """collect: empty nvidia-smi stdout → error (Line 81-82)."""
-    from dashboard.gpu_monitor import GPUMonitor
     from unittest.mock import MagicMock
+
+    from dashboard.gpu_monitor import GPUMonitor
 
     mock_result = MagicMock()
     mock_result.returncode = 0

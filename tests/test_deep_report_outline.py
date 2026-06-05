@@ -11,8 +11,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from deep_report.outline import (
     _extract_domain,
     _extract_sources_from_artifacts,
@@ -21,7 +19,6 @@ from deep_report.outline import (
     generate_outline,
     load_run_data_for_outline,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # load_run_data_for_outline — Error-Pfade
@@ -173,7 +170,6 @@ def test_load_sources_evidence_store_import_error():
 
 def test_load_sources_evidence_store_exception():
     """evidence_store.load_sources wirft Exception → returns [] (lines 314-316)."""
-    from unittest.mock import MagicMock
     import sys
 
     # Ensure evidence_store is in sys.modules (may have been removed by previous test)
@@ -195,7 +191,6 @@ def test_load_sources_evidence_store_exception():
 
 def test_load_sources_evidence_store_success():
     """load_sources_by_run_id returns sources → success path (lines 311-313, 318-329)."""
-    from unittest.mock import MagicMock
     import sys
 
     if "evidence_store" not in sys.modules:
@@ -220,7 +215,6 @@ def test_load_sources_evidence_store_success():
 
 def test_load_sources_evidence_store_fallback_to_global():
     """load_sources_by_run_id returns empty → fallback to load_sources() (line 312)."""
-    from unittest.mock import MagicMock
     import sys
 
     if "evidence_store" not in sys.modules:
@@ -244,9 +238,11 @@ def test_load_sources_evidence_store_fallback_to_global():
         assert result[0]["url"] == "https://fallback.com"
 
 
-def test_load_sources_evidence_store_exception():
-    """evidence_store.load_sources wirft Exception → returns [] (lines 314-316)."""
-    # Patch the specific functions AFTER they've been imported into the function scope
+def test_load_sources_evidence_store_patch_exception():
+    """evidence_store.load_sources wirft Exception → returns [] (lines 314-316).
+
+    Uses unittest.mock.patch to replace functions directly.
+    """
     with (
         patch(
             "evidence_store.store.load_sources_by_run_id",
@@ -257,24 +253,6 @@ def test_load_sources_evidence_store_exception():
             side_effect=RuntimeError("DB connection failed"),
         ),
     ):
-        result = _load_sources_from_evidence_store("test_run")
-        assert result == []
-
-
-def test_load_sources_evidence_store_exception():
-    """evidence_store.load_sources wirft Exception → returns [] (lines 314-316)."""
-    from unittest.mock import MagicMock
-    import sys
-
-    # Build a mock evidence_store.store module that will be used
-    # during the internal import in _load_sources_from_evidence_store
-    mock_store = MagicMock()
-    mock_store.load_sources_by_run_id = MagicMock(
-        side_effect=RuntimeError("DB connection failed")
-    )
-    mock_store.load_sources = MagicMock()
-
-    with patch.dict(sys.modules, {"evidence_store.store": mock_store}):
         result = _load_sources_from_evidence_store("test_run")
         assert result == []
 

@@ -833,8 +833,9 @@ def test_audit_log_read_event_filter_no_match():
 
 def test_audit_log_read_since_filter():
     """_read_entries filtert korrekt nach since."""
-    from mcp_tools.audit_log import AuditLog
     import json as json_mod
+
+    from mcp_tools.audit_log import AuditLog
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = f"{tmpdir}/audit.jsonl"
@@ -878,8 +879,9 @@ def test_audit_log_read_since_filter():
 
 def test_audit_log_read_json_decode_error_skip():
     """_read_entries überspringt Zeilen mit JSONDecodeError."""
-    from mcp_tools.audit_log import AuditLog
     import json as json_mod
+
+    from mcp_tools.audit_log import AuditLog
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = f"{tmpdir}/audit.jsonl"
@@ -907,8 +909,9 @@ def test_audit_log_read_json_decode_error_skip():
 
 def test_audit_log_read_empty_line_skip():
     """_read_entries überspringt Leerzeilen."""
-    from mcp_tools.audit_log import AuditLog
     import json as json_mod
+
+    from mcp_tools.audit_log import AuditLog
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = f"{tmpdir}/audit.jsonl"
@@ -1519,8 +1522,9 @@ def test_evidence_store_search_success():
 def test_registry_run_tool_exception():
     """run_tool: tool.run() raises Exception → returns error dict (Lines 75-77)."""
     from unittest.mock import MagicMock
-    from mcp_tools.registry import _TOOLS, run_tool
+
     from mcp_tools.base import MCPToolBase
+    from mcp_tools.registry import _TOOLS, run_tool
 
     # Register a tool that raises on run()
     mock_tool = MagicMock(spec=MCPToolBase)
@@ -1545,6 +1549,7 @@ def test_registry_run_tool_exception():
 def test_audit_log_read_exception():
     """AuditLog._read: Exception caught → error result (Lines 189-191)."""
     from unittest.mock import patch
+
     from mcp_tools.audit_log import AuditLog
 
     tool = AuditLog()
@@ -1561,6 +1566,7 @@ def test_audit_log_stats_empty_line_skip():
     """AuditLog._get_stats: empty lines skipped (Line 204)."""
     import json as _json
     import tempfile
+
     from mcp_tools.audit_log import AuditLog
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
@@ -1586,6 +1592,7 @@ def test_audit_log_stats_exception_handled():
     import json as _json
     import tempfile
     from unittest.mock import patch
+
     from mcp_tools.audit_log import AuditLog
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
@@ -1609,28 +1616,7 @@ def test_audit_log_stats_exception_handled():
 def test_audit_log_stats_json_decode_error():
     """AuditLog._get_stats: JSONDecodeError skipped, count continues (Lines 210-211)."""
     import tempfile
-    from mcp_tools.audit_log import AuditLog
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-        f.write('{"event": "valid"}\n')
-        f.write("this is not json\n")
-        f.write('{"event": "also valid"}\n')
-        log_file = f.name
-
-    try:
-        tool = AuditLog(log_file=log_file)
-        result = tool._get_stats()
-        assert result["success"] is True
-        assert result["data"]["total_entries"] == 2  # not-json line skipped
-    finally:
-        import os
-
-        os.unlink(log_file)
-
-
-def test_audit_log_stats_json_decode_error():
-    """AuditLog._get_stats: JSONDecodeError skipped, count continues (Lines 210-211)."""
-    import tempfile
     from mcp_tools.audit_log import AuditLog
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:

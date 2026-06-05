@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de" role="application" aria-label="GPU-Dashboard (Static)">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU-Dashboard — Researcher (Static)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 20px;
+  }
+  h1 { font-size: 1.5em; margin-bottom: 20px; color: #58a6ff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
+  .card .label { font-size: 0.8em; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card .value { font-size: 2em; font-weight: bold; margin-top: 8px; }
+  .card .unit { font-size: 0.5em; color: #8b949e; }
+  .bar-container { background: #21262d; border-radius: 12px; height: 20px; margin-top: 12px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 12px; transition: width 0.5s ease, background 0.5s ease; background: #238636; }
+  .bar.warning { background: #d29922; }
+  .bar.critical { background: #da3633; }
+  .warning-text { color: #d29922; font-weight: bold; }
+  .critical-text { color: #da3633; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }
+  th { color: #8b949e; font-size: 0.8em; }
+  .error { color: #da3633; text-align: center; padding: 40px; }
+  .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .status-dot.ok { background: #3fb950; }
+  .status-dot.warning { background: #d29922; }
+  .status-dot.critical { background: #da3633; }
+  .status-dot.error-dot { background: #8b949e; }
+  .footer-note { margin-top: 20px; color: #8b949e; font-size: 0.75em; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>⚙ GPU-Dashboard (Static Snapshot)</h1>
+
+<div id="error" class="error" style="display:none" role="alert" aria-live="assertive"></div>
+
+<div id="loading" style="text-align:center;padding:40px;color:#58a6ff;">
+  GPU-Daten werden geladen...
+</div>
+
+<div class="grid" id="metrics" style="display:none" aria-label="GPU-Metriken" role="region">
+  <div class="card" role="status" aria-label="GPU-Auslastung">
+    <div class="label">GPU-Auslastung</div>
+    <div class="value" id="gpu-util" aria-live="polite" aria-atomic="true">--</div>
+    <div class="bar-container">
+      <div class="bar" id="gpu-bar" style="width:0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+  </div>
+  <div class="card" role="status" aria-label="VRAM-Verbrauch">
+    <div class="label">VRAM-Verbrauch</div>
+    <div class="value" id="vram-used" aria-live="polite" aria-atomic="true">-- <span class="unit">MiB</span></div>
+    <div class="bar-container">
+      <div class="bar" id="vram-bar" style="width:0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+  </div>
+  <div class="card" role="status" aria-label="Temperatur">
+    <div class="label">Temperatur</div>
+    <div class="value" id="gpu-temp" aria-live="polite" aria-atomic="true">-- <span class="unit">°C</span></div>
+  </div>
+  <div class="card" role="status" aria-label="GPU-Name">
+    <div class="label">GPU-Name</div>
+    <div class="value" style="font-size:1em" id="gpu-name" aria-live="polite" aria-atomic="true">--</div>
+  </div>
+</div>
+
+<div class="card" role="region" aria-label="GPU-Prozesse">
+  <div class="label">GPU-Prozesse</div>
+  <table aria-label="GPU-Prozessliste">
+    <thead><tr><th>PID</th><th>Name</th><th>VRAM (MiB)</th></tr></thead>
+    <tbody id="process-list" aria-live="polite">
+      <tr><td colspan="3">Keine Daten</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p style="margin-top:20px;color:#8b949e;font-size:0.8em" id="timestamp" aria-live="polite" aria-atomic="true"></p>
+
+<div class="footer-note">
+  ⚡ Static Snapshot (one-shot <code>/api/gpu</code>, no SSE) — for automated screenshots<br>
+  <a href="/" style="color:#58a6ff">Live Dashboard (SSE)</a>
+</div>
+
+<script>
+// One-shot JSON fetch — no SSE, no persistent connection.
+// This avoids Playwright's networkidle/font-loading timeout.
+fetch('/api/gpu')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('metrics').style.display = '';
+
+    if (data.error) {
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error').textContent = '⚠ ' + data.error;
+      return;
+    }
+
+    // GPU utilization
+    var util = Math.round(data.gpu_utilization || 0);
+    document.getElementById('gpu-util').textContent = util + ' %';
+    var gpuBar = document.getElementById('gpu-bar');
+    gpuBar.style.width = util + '%';
+    gpuBar.className = 'bar ' + (util > 90 ? 'critical' : util > 70 ? 'warning' : '');
+    gpuBar.setAttribute('aria-valuenow', util);
+
+    // VRAM
+    var used = data.memory_used_mib || 0;
+    var total = data.memory_total_mib || 0;
+    var pct = data.memory_percent || 0;
+    var vramEl = document.getElementById('vram-used');
+    vramEl.textContent = used + ' / ' + total + ' MiB';
+    var vramBar = document.getElementById('vram-bar');
+    vramBar.style.width = Math.round(pct) + '%';
+    vramBar.className = 'bar ' + (data.warning_level === 'critical' ? 'critical' : data.warning_level === 'warning' ? 'warning' : '');
+
+    // Temperature
+    document.getElementById('gpu-temp').textContent = Math.round(data.temperature_c || 0) + ' °C';
+
+    // GPU Name
+    document.getElementById('gpu-name').textContent = data.gpu_name || '--';
+
+    // Processes
+    var procBody = document.getElementById('process-list');
+    procBody.textContent = '';
+    if (data.processes && data.processes.length > 0) {
+      data.processes.forEach(function(p) {
+        var tr = document.createElement('tr');
+        var tdPid = document.createElement('td');
+        tdPid.textContent = p.pid;
+        var tdName = document.createElement('td');
+        tdName.textContent = p.name;
+        var tdMem = document.createElement('td');
+        tdMem.textContent = p.memory_mib;
+        tr.appendChild(tdPid);
+        tr.appendChild(tdName);
+        tr.appendChild(tdMem);
+        procBody.appendChild(tr);
+      });
+    } else {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.setAttribute('colspan', '3');
+      td.textContent = 'Keine GPU-Prozesse';
+      tr.appendChild(td);
+      procBody.appendChild(tr);
+    }
+
+    // Timestamp
+    document.getElementById('timestamp').textContent = 'Snapshot: ' + new Date(data.timestamp).toLocaleTimeString();
+  })
+  .catch(function(err) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = '⚠ GPU-Monitor nicht verfügbar: ' + err.message;
+  });
+</script>
+
+</body>
+</html>

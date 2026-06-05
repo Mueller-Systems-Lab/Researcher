@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ════════════════════════════════════════════════════════════════════════
 # SQLiteFTS5Adapter Tests (38% → 90%+)
 # ════════════════════════════════════════════════════════════════════════
@@ -38,7 +37,7 @@ class TestSQLiteFTS5Adapter:
     def test_init_db_exception_raised(self):
         """_init_db: sqlite3.Error caught, logged, re-raised (Lines 80-82)."""
         import sqlite3
-        from unittest.mock import patch
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -113,6 +112,7 @@ class TestSQLiteFTS5Adapter:
     def test_index_error_returns_false(self):
         """index(): sqlite3.Error returns False."""
         import sqlite3
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
@@ -166,6 +166,7 @@ class TestSQLiteFTS5Adapter:
     def test_search_error_returns_empty(self):
         """search(): sqlite3.Error returns [ ]."""
         import sqlite3
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
@@ -197,6 +198,7 @@ class TestSQLiteFTS5Adapter:
     def test_delete_error_returns_false(self):
         """delete(): sqlite3.Error returns False."""
         import sqlite3
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
@@ -222,6 +224,7 @@ class TestSQLiteFTS5Adapter:
     def test_clear_error_handled(self):
         """clear(): sqlite3.Error is caught, no re-raise."""
         import sqlite3
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
@@ -248,6 +251,7 @@ class TestSQLiteFTS5Adapter:
     def test_doc_count_error_returns_zero(self):
         """doc_count: sqlite3.Error returns 0."""
         import sqlite3
+
         from search.adapters.sqlite_fts5_adapter import SQLiteFTS5Adapter
 
         adapter = SQLiteFTS5Adapter.__new__(SQLiteFTS5Adapter)
@@ -262,7 +266,6 @@ class TestSQLiteFTS5Adapter:
     def test_init_db_error_raised(self):
         """_init_db: sqlite3.Error is raised after logging."""
         import sqlite3
-        from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = f"{tmpdir}/test.sqlite3"
@@ -490,6 +493,7 @@ class TestWhooshIndexAdapter:
 def test_whoosh_search_none_timestamp():
     """whoosh search: None timestamp → empty string (Lines 72-73)."""
     from unittest.mock import MagicMock
+
     from search.adapters.whoosh_index_adapter import WhooshIndexAdapter
 
     adapter = WhooshIndexAdapter.__new__(WhooshIndexAdapter)
@@ -515,7 +519,7 @@ def test_whoosh_search_none_timestamp():
     mock_ix.searcher.return_value = mock_searcher
     adapter._ix = mock_ix
 
-    from whoosh.fields import Schema, ID, TEXT, DATETIME
+    from whoosh.fields import DATETIME, ID, TEXT, Schema
 
     adapter._schema = Schema(
         url=ID(stored=True),

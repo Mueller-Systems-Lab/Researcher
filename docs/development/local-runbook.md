@@ -52,10 +52,11 @@ NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0
 
 | Dienst | Port | Status | Zweck |
 |--------|------|--------|-------|
-| llama-server (Qwen3.5) | 8081 | ✅ | Chat/Summary (llama.cpp, eigenständig) |
 | llama-server (Qwen3.5) | 8082 | ✅ | Chat/Extraction (≈45 tok/s, llama.cpp, eigenständig) |
 | Ollama | 11434 | ✅ | Nur noch für Embedding (nomic-embed-text) |
-| SearXNG (Suche) | 8080 | ✅ | Metasuchmaschine |
+| SearXNG (Suche) | 8090 | ✅ | Metasuchmaschine (docker compose, 127.0.0.1:8090→container:8080) |
+| GPT Researcher | 28202 | ✅ | Research Backend (Docker, network host) |
+| Dashboard | 8888 | ✅ | GPU-Monitor (SSE + Static Fallback) |
 | Tor (Proxy) | 9050 | ✅ | Darknet-Zugriff (optional) |
 | ChromaDB | — | ✅ | Vektordatenbank |
 
@@ -91,6 +92,16 @@ ollama list | grep nomic-embed-text
 2. **Qwen3.5 Precision Trap**: `-ctk f32 -ctv f32` zwingend erforderlich auf Pascal (GTX 1070), da FP16-KV-Cache bei Qwen3.5 zu garbled Output führt
 3. **ChromaDB 1.5.9 count()**: Gibt `-1` statt `0` bei fehlender Verbindung (lokal in `vectordb/store.py` abgefangen)
 4. **Keine Ollama-Abhängigkeit für Chat**: Qwen3.5 läuft eigenständig via llama.cpp — Ollama wird nur noch für nomic-embed-text benötigt
+5. **SearXNG-Engines**: Phase 8 hat 10+ Suchmaschinen aktiviert (google, duckduckgo, brave, startpage, bing, qwant, mojeek, yahoo). Bei CAPTCHA-Risiko einzelne Engines in `searxng/settings.yml` deaktivieren.
+
+## Dashboard Screenshot (Static Fallback)
+
+Für Playwright-Screenshots (die an SSE-Font-Timeout hängen) gibt es jetzt eine statische Fallback-Seite:
+
+http://127.0.0.1:8888/static-fallback.html
+
+Diese verwendet einen einmaligen /api/gpu JSON-Fetch statt des persistenten SSE-Streams.
+Siehe docs/development/dashboard-screenshot-fix.md
 
 ## UI Smoke Test
 

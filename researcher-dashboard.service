@@ -1,0 +1,48 @@
+# =============================================================================
+# researcher-dashboard.service — GPU Dashboard (Python)
+# =============================================================================
+# Port: 8888
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user/
+#   cp researcher-dashboard.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable researcher-dashboard.service
+#   systemctl --user start researcher-dashboard.service
+# =============================================================================
+[Unit]
+Description=Researcher — GPU Dashboard
+Documentation=https://github.com/xxammaxx/Researcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xxammaxx/Schreibtisch/Researcher
+ExecStart=/usr/bin/python3 -m dashboard.server
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# Environment
+Environment=DASHBOARD_PORT=8888
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/home/xxammaxx
+
+# Logging
+StandardOutput=append:/var/log/researcher/dashboard.log
+StandardError=append:/var/log/researcher/dashboard-error.log
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/log/researcher
+
+# Timeouts
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

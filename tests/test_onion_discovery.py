@@ -698,6 +698,7 @@ def test_review_queue_add_defaults_only():
 def test_pipeline_di_index_backend():
     """DiscoveryPipeline: accepts index_backend via DI (Line 76)."""
     from unittest.mock import MagicMock
+
     from onion_discovery.engine import DiscoveryPipeline
 
     mock_backend = MagicMock()
@@ -708,6 +709,7 @@ def test_pipeline_di_index_backend():
 def test_create_default_backend_sqlite():
     """_create_default_backend: sqlite_fts5 path (Lines 91-99)."""
     from unittest.mock import patch
+
     from onion_discovery.engine import DiscoveryPipeline
 
     with (
@@ -723,6 +725,7 @@ def test_create_default_backend_sqlite():
 def test_create_default_backend_import_error():
     """_create_default_backend: ImportError returns None (Lines 109-116)."""
     from unittest.mock import patch
+
     from onion_discovery.engine import DiscoveryPipeline
 
     with (
@@ -741,6 +744,7 @@ def test_create_default_backend_import_error():
 def test_pipeline_index_exception_caught():
     """Index-Fehler exception caught and counted as error (Lines 271-273)."""
     from unittest.mock import MagicMock
+
     from onion_discovery.engine import DiscoveryPipeline
 
     pipeline = DiscoveryPipeline()
@@ -771,6 +775,7 @@ def test_pipeline_index_exception_caught():
 def test_pipeline_add_seeds():
     """add_seeds: delegates to seed_queue (Line 292)."""
     from unittest.mock import MagicMock, patch
+
     from onion_discovery.engine import DiscoveryPipeline
     from onion_discovery.seed_queue import SeedQueue
 
@@ -799,8 +804,9 @@ def test_pipeline_add_seeds():
 def test_review_queue_load_valid_json():
     """_load: valid JSON file populates _items (Lines 59-62)."""
     import json as _json
-    from onion_discovery.human_review import ReviewQueue, ReviewItem
     from dataclasses import asdict
+
+    from onion_discovery.human_review import ReviewItem, ReviewQueue
 
     item = ReviewItem(id="loaded1", url="http://loaded.onion", title="Loaded")
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -868,6 +874,7 @@ def test_review_queue_reject_empty_reviewer():
 def test_link_extractor_beautifulsoup_parse_error():
     """extract: BeautifulSoup parse error → soup=None, raw text extraction (Lines 62-66)."""
     from unittest.mock import patch
+
     from onion_discovery.link_extractor import LinkExtractor
 
     extractor = LinkExtractor()
@@ -880,7 +887,7 @@ def test_link_extractor_beautifulsoup_parse_error():
     ):
         links = extractor.extract("http://source.onion", html)
     # Should still find onion URL via raw text regex
-    onion_urls = [l for l in links if ".onion" in l["url"]]
+    onion_urls = [link for link in links if ".onion" in link["url"]]
     assert len(onion_urls) >= 1
 
 
@@ -891,7 +898,7 @@ def test_link_extractor_empty_href_skipped():
     html = '<a href="">Empty</a><a href="http://valid.onion">Valid</a>'
     extractor = LinkExtractor()
     links = extractor.extract("http://source.onion", html)
-    onion = [l for l in links if ".onion" in l["url"]]
+    onion = [link for link in links if ".onion" in link["url"]]
     assert len(onion) == 1
 
 
@@ -961,7 +968,6 @@ def test_policy_blocklist_regex_match():
 
 def test_policy_global_rate_limit():
     """is_allowed: global rate limit triggers when delay not elapsed (Line 94)."""
-    import time
     from onion_discovery.policy_gateway import PolicyGateway
 
     gateway = PolicyGateway(global_delay=0.1)
@@ -1031,6 +1037,7 @@ def test_seed_queue_save_exception_handled():
     """SeedQueue._save: OSError during save → logged, not raised (Lines 73-74)."""
     import tempfile
     from unittest.mock import patch
+
     from onion_discovery.seed_queue import SeedQueue
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1074,7 +1081,9 @@ def test_link_extractor_regex_fallback():
 @patch("onion_discovery.engine.DiscoveryPipeline.enabled")
 def test_pipeline_index_error_handled(mock_enabled, mock_get):
     """Pipeline: WhooshIndex.add_post raises → logged, errors incremented (Lines 271-273)."""
-    from unittest.mock import MagicMock, patch as m_patch
+    from unittest.mock import MagicMock
+    from unittest.mock import patch as m_patch
+
     from onion_discovery.engine import DiscoveryPipeline
 
     mock_enabled.return_value = True
@@ -1107,6 +1116,7 @@ def test_pipeline_index_error_handled(mock_enabled, mock_get):
 def test_review_queue_save_exception_cleanup():
     """ReviewQueue._save: Exception during save → tmp unlinked, re-raised (Lines 83-85)."""
     from unittest.mock import patch
+
     from onion_discovery.human_review import ReviewQueue
 
     with tempfile.TemporaryDirectory() as tmpdir:
