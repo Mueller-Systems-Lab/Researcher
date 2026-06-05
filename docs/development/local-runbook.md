@@ -2,7 +2,39 @@
 
 ## Local UI Status: **UI PARTIAL**
 
-GPT Researcher Submodul ist vorhanden und grundsätzlich startbar. Der volle Query→Research→Report-Flow konnte wegen historischer LLM-Ladezeiten (qwen3.5-Ära) noch nicht vollständig verifiziert werden. Mit dem Umstieg auf Qwen3.5-Uncensored (eigener llama-server, ~3.8 GB VRAM) ist die Runtime deutlich stabiler.
+GPT Researcher ist lokal startbar und die Phase-8-Qualitätstests sind vorbereitet. Der volle Query→Research→Report-Flow sollte mit `make acceptance` validiert werden; für Dashboard-Screenshots wird der SSE-freie Static-Fallback genutzt.
+
+## Phase 8 Architektur
+
+| Dienst | Port | Backend | Rolle |
+|---|---:|---|---|
+| Ollama | 11434 | `ollama serve` | Embeddings only (`nomic-embed-text`) |
+| llama-server | 8082 | `serve_qwen3.5_uncensored.sh` | Qwen3.5 Chat/Extraction, OpenAI-kompatibel |
+| SearXNG | 8090 | Docker Compose | Metasuche |
+| GPT Researcher | 28202 | Docker (`gptresearcher/gpt-researcher`) | Research backend |
+| Dashboard | 8888 | `python3 -m dashboard.server` | GPU monitor + JSON/SSE |
+
+## Autostart / systemd
+
+### Service-Dateien
+
+| Datei | Scope | Zweck |
+|---|---|---|
+| `researcher-ollama.service` | user | Ollama Embedding Service |
+| `researcher-llama.service` | user | llama-server Qwen3.5 |
+| `researcher-dashboard.service` | user | GPU Dashboard |
+| `researcher-searxng.service` | system | SearXNG Metasearch |
+| `researcher-gptr.service` | system | GPT Researcher Backend |
+
+### Launcher
+
+```bash
+./start_all_services.sh
+./start_all_services.sh --status
+./start_all_services.sh --stop
+```
+
+Das Launcher-Skript startet alle 5 Kernservices mit Healthchecks, Retry-Logik und Logging unter `/var/log/researcher/`.
 
 ## Startbefehle
 
@@ -12,24 +44,14 @@ python3 -m dashboard.server
 # http://127.0.0.1:8888
 ```
 
-### Qwen3.5-Uncensored Chat-Server (Port 8082)
-Das Chat-/Summary-Modell. Läuft eigenständig via llama.cpp, **unabhängig von Ollama**.
-
-```bash
-./serve_qwen3.5_obliterated_researcher.sh
-# http://127.0.0.1:8081
-# Alias im Server: qwen3.5-uncensored
-# VRAM: ~3.8 GB von 8 GB
-```
-
-### Qwen3.5 Uncensored Chat-/Extraction-Server (Port 8082)
-Das Co-Primary-Modell für schnelle Extraktion (45 tok/s) und strukturierte Ausgaben. Läuft ebenfalls eigenständig via llama.cpp.
+### Qwen3.5 llama-server (Port 8082)
+Das Chat-/Extraction-Modell. Läuft eigenständig via llama.cpp, **unabhängig von Ollama**.
 
 ```bash
 ./serve_qwen3.5_uncensored.sh
 # http://127.0.0.1:8082
 # Alias im Server: qwen3.5-uncensored
-# Fokus: Chat/Extraction, Scraping
+# Fokus: Chat/Extraction, strukturiertes Output-Format
 ```
 
 ### GPT Researcher Backend (Port 8000)
@@ -51,16 +73,14 @@ NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0
 ## Lokale Dienste
 
 | Dienst | Port | Status | Zweck |
-|--------|------|--------|-------|
-| llama-server (Qwen3.5) | 8082 | ✅ | Chat/Extraction (≈45 tok/s, llama.cpp, eigenständig) |
-| Ollama | 11434 | ✅ | Nur noch für Embedding (nomic-embed-text) |
-| SearXNG (Suche) | 8090 | ✅ | Metasuchmaschine (docker compose, 127.0.0.1:8090→container:8080) |
-| GPT Researcher | 28202 | ✅ | Research Backend (Docker, network host) |
+|---|---:|---|---|
+| llama-server (Qwen3.5) | 8082 | ✅ | Chat/Extraction (OpenAI-kompatibel, eigenständig) |
+| Ollama | 11434 | ✅ | Nur Embeddings (`nomic-embed-text`) |
+| SearXNG | 8090 | ✅ | Metasuche (Docker Compose) |
+| GPT Researcher | 28202 | ✅ | Research Backend (Docker, host networking) |
 | Dashboard | 8888 | ✅ | GPU-Monitor (SSE + Static Fallback) |
-| Tor (Proxy) | 9050 | ✅ | Darknet-Zugriff (optional) |
+| Tor (Proxy) | 9050 | ✅ | Optionaler Darknet-Zugriff |
 | ChromaDB | — | ✅ | Vektordatenbank |
-
-Qwen3.5 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgabe wird das passende Modell gestartet.
 
 ## Modelle
 
@@ -68,40 +88,70 @@ Qwen3.5 und Qwen3.5 können parallel auf getrennten Ports laufen; je nach Aufgab
 # Embedding (via Ollama):
 ollama list | grep nomic-embed-text
 
-# Chat (via llama-server, unabhängig von Ollama):
-# Läuft als eigener Prozess: ./serve_qwen3.5_obliterated_researcher.sh
-# Port 8082, Alias: qwen3.5-uncensored
-
-# Extraction/Chat (via llama-server, unabhängig von Ollama):
+# Chat / Extraction (via llama-server, unabhängig von Ollama):
 # Läuft als eigener Prozess: ./serve_qwen3.5_uncensored.sh
 # Port 8082, Alias: qwen3.5-uncensored
 ```
 
 | Modell | Typ | Backend | Größe | Status |
-|--------|-----|---------|-------|--------|
-| qwen3.5-uncensored | Chat/Summary | llama-server (Port 8082) | ~3.8 GB VRAM | ✅ Stabil |
-| qwen3.5-uncensored | Chat/Extraction | llama-server (Port 8082) | ~5.3 GB VRAM | ✅ Co-Primary |
+|---|---|---|---|---|
+| qwen3.5-uncensored | Chat/Extraction | llama-server (Port 8082) | ~5.3 GB VRAM | ✅ Stabil |
 | nomic-embed-text | Embedding | Ollama (Port 11434) | 274 MB | ✅ Stabil |
 
 ### Historisch (ersetzt)
 | qwen3.5-uncensored-no-thinking | Chat (deprecated) | Ollama | 6.6 GB | ❌ Instabil — ersetzt durch Qwen3.5 |
 
+## Acceptance Gate
+
+```bash
+make acceptance
+```
+
+Das Ziel nutzt `scripts/ci_acceptance.py` und prüft:
+
+1. alle 5 Services per HTTP-Healthcheck
+2. Research-Pipeline (`/report/`)
+3. Report-Qualität (Größe, Quellen, Claims)
+4. SearXNG-Direktabfrage
+
+Weitere Modi:
+
+```bash
+python3 scripts/ci_acceptance.py --skip-research
+python3 scripts/ci_acceptance.py --json-output
+```
+
+## Optional: LLM Smoke Test
+
+Für isolierte LLM-Validierung:
+
+```bash
+LM_STUDIO_LIVE_TEST=1 \
+LOCAL_LLM_ENDPOINT=http://127.0.0.1:8082 \
+LOCAL_LLM_MODEL=qwen3.5-uncensored \
+python -m cli.llm_smoke
+```
+
+Der Check ist opt-in und prüft Endpoint, Modell, Generierung und Ausgabe-Marker.
+
 ## Known Issues
 
-1. **SSE blockiert Playwright**: `networkidle`-Wait hängt wegen SSE-Stream
-2. **Qwen3.5 Precision Trap**: `-ctk f32 -ctv f32` zwingend erforderlich auf Pascal (GTX 1070), da FP16-KV-Cache bei Qwen3.5 zu garbled Output führt
-3. **ChromaDB 1.5.9 count()**: Gibt `-1` statt `0` bei fehlender Verbindung (lokal in `vectordb/store.py` abgefangen)
-4. **Keine Ollama-Abhängigkeit für Chat**: Qwen3.5 läuft eigenständig via llama.cpp — Ollama wird nur noch für nomic-embed-text benötigt
-5. **SearXNG-Engines**: Phase 8 hat 10+ Suchmaschinen aktiviert (google, duckduckgo, brave, startpage, bing, qwant, mojeek, yahoo). Bei CAPTCHA-Risiko einzelne Engines in `searxng/settings.yml` deaktivieren.
+1. **SSE blockiert Playwright**: `networkidle`-Wait hängt wegen SSE-Stream; für Screenshots den Static-Fallback nutzen.
+2. **Qwen3.5 Precision Trap**: `-ctk f32 -ctv f32` ist auf Pascal (GTX 1070) nötig, sonst droht garbled Output.
+3. **ChromaDB 1.5.9 count()**: Gibt `-1` statt `0` bei fehlender Verbindung (lokal in `vectordb/store.py` abgefangen).
+4. **Ollama nur für Embeddings**: Chat/Extraction läuft vollständig über llama-server.
+5. **SearXNG-Engines**: Phase 8 hat 10+ Suchmaschinen aktiviert; bei CAPTCHA-Risiko einzelne Engines in `searxng/settings.yml` deaktivieren.
 
 ## Dashboard Screenshot (Static Fallback)
 
-Für Playwright-Screenshots (die an SSE-Font-Timeout hängen) gibt es jetzt eine statische Fallback-Seite:
+Für Playwright-Screenshots gibt es eine SSE-freie statische Fallback-Seite:
 
 http://127.0.0.1:8888/static-fallback.html
 
-Diese verwendet einen einmaligen /api/gpu JSON-Fetch statt des persistenten SSE-Streams.
-Siehe docs/development/dashboard-screenshot-fix.md
+Datei: `dashboard/static/static-fallback.html`
+
+Die Seite nutzt einen einmaligen `/api/gpu` JSON-Fetch statt des persistierenden SSE-Streams.
+Siehe `docs/development/dashboard-screenshot-fix.md`.
 
 ## UI Smoke Test
 

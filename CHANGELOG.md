@@ -1,5 +1,21 @@
 # Changelog
 
+## [Phase 8] — 2026-06-05
+### Added
+- **SearXNG Quality Hardening**: 10+ Suchmaschinen aktiviert für breitere Quellenabdeckung (#143)
+- **Dashboard Screenshot Fallback**: SSE-freie Static-Seite für Playwright-/CI-Screenshots (`dashboard/static/static-fallback.html`) (#143)
+- **Infrastructure Autostart**: `start_all_services.sh` plus 5 systemd-Service-Dateien für den lokalen Stack (#143)
+- **CI/CD Acceptance Gate**: `make acceptance` und `scripts/ci_acceptance.py` als operative Qualitätsprüfung (#143)
+- **LLM Smoke Test CLI**: `cli/llm_smoke.py` für opt-in Live-Validierung lokaler LLM-Endpunkte (#143)
+
+### Changed
+- **Service Architecture**: Ollama auf Embeddings-only, Qwen3.5 via eigenständigem llama-server auf Port 8082, SearXNG auf 8090, GPT Researcher via Docker auf 28202, Dashboard auf 8888 (#143)
+- **Documentation**: `docs/development/local-runbook.md` für Phase 8 aktualisiert; Acceptance-Report-Template ergänzt (#143)
+
+### Fixed
+- **Dashboard Screenshot**: SSE-/Font-Timeouts durch den Static-Fallback umgangen (#143)
+- **Operational Validation**: Acceptance-Checks jetzt gegen den vollständigen lokalen Stack dokumentiert (#143)
+
 ## [v0.2.5] — 2026-06-04
 ### Added
 - **SearXNG Quality Hardening**: 10+ Suchmaschinen aktiviert (google, brave, startpage, bing, qwant, mojeek, yahoo, mwmbl, yacy, presearch) für ≥10 Quellen pro Query (#143)
