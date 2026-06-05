@@ -13,7 +13,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_ollama_available():
+    from config.ollama_models import load_ollama_model_config
     from scripts.runtime_smoke import check_ollama
+
+    chat_model = load_ollama_model_config().chat_model
 
     with patch("scripts.runtime_smoke.requests.get") as mock_get:
         mock_response = MagicMock()
@@ -21,7 +24,7 @@ def test_ollama_available():
         mock_response.json.return_value = {
             "models": [
                 {"name": "nomic-embed-text:latest"},
-                {"name": "qwen3.5-uncensored-no-thinking:latest"},
+                {"name": chat_model},
             ]
         }
         mock_get.return_value = mock_response

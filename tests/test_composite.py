@@ -16,9 +16,13 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-def test_composite_retriever_init():
+def test_composite_retriever_init(monkeypatch):
     """Test: CompositeRetriever initialisieren."""
     from search.composite import CompositeRetriever
+
+    # CompositeRetriever reads SEARX_URL from env; ensure it uses the hard-coded
+    # default so the assertion is stable across environments.
+    monkeypatch.setenv("SEARX_URL", "http://localhost:8080")
 
     r = CompositeRetriever("test query")
     assert r.query == "test query"
