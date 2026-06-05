@@ -103,47 +103,70 @@ def check_services() -> tuple[list[str], list[str]]:
 
 
 def submit_research_query(query: str, timeout: int = DEFAULT_TIMEOUT) -> str | None:
-    """Submit a research query and wait for completion. Returns task_id or None."""
+    """Submit a research query via the v3.5.0 /api/multi_agents endpoint.
+
+    GPT Researcher v3.5.0 removed the legacy POST /report/ endpoint and
+    replaced it with POST /api/multi_agents. The new endpoint accepts a
+    JSON body with ``query`` and ``report_type`` and returns the report
+    synchronously in the ``report`` key, or dispatches to a run directory
+    under ``outputs/run_<ts>_<query>/`` for asynchronous execution.
+
+    Returns task_id (generated from timestamp) on success, None on failure.
+    """
 
     def _submit():
         payload = json.dumps(
             {
-                "task": query,
+                "query": query,
                 "report_type": "research_report",
-                "report_source": "web",
-                "tone": "Objective",
-                "repo_name": "",
-                "branch_name": "",
             }
         ).encode()
-        research_url = _validate_url_scheme(f"{RESEARCH_API}/report/")
+        research_url = _validate_url_scheme(f"{RESEARCH_API}/api/multi_agents")
         req = urllib.request.Request(
             research_url,
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310
+        with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
             data = json.loads(resp.read())
-            return data.get("research_id") or data.get("task_id")
+            # v3.5.0 returns report content directly, or a run_id for async
+            report_content = data.get("report") or data.get("content")
+            if report_content:
+                # Synchronous response — save report to outputs/ for Stage 3
+                ts = time.strftime("%Y%m%d_%H%M%S")
+                safe_query = query[:40].replace(" ", "_").replace("/", "_")
+                ts_task_id = f"acceptance_{ts}_{safe_query}"
+                REPORT_DIR.mkdir(parents=True, exist_ok=True)
+                report_file = REPORT_DIR / f"{ts_task_id}.md"
+                report_file.write_text(str(report_content), errors="replace")
+                print(f"  📄 Report written: {report_file.name}")
+                return ts_task_id
+            return data.get("research_id") or data.get("task_id") or data.get("run_id")
 
-    def _wait_for_completion(task_id: str):
-        # GPT Researcher truncates filenames — match on the unique
-        # timestamp+sequence+hash prefix (first 7 underscore-segments).
-        # E.g. task_id "task_20260604_054300_025266_a8e8ac00_aktuelle_..."
-        # files use "task_20260604_054300_025266_a8e8ac00_*.md"
-        segments = task_id.split("_")
-        # Segments: task, date, time, seq, hash, query_suffix...
-        # Use first 5 segments (task_date_time_seq_hash) as stable prefix
-        if len(segments) >= 5:
-            stable_prefix = "_".join(segments[:6])  # up to hash
-        else:
-            stable_prefix = task_id[:50]  # fallback
+    def _wait_for_completion(task_id: str) -> bool:
+        """Poll outputs/ for report files matching the task.
+
+        v3.5.0 multi_agents writes into nested ``outputs/run_<ts>_<query>/``
+        directories. Use file-modification-time filtering to discover reports
+        created since the request was submitted.
+        """
+        request_time = time.time()
         start = time.time()
+
+        def _find_recent_reports():
+            """Recursively find .md files in REPORT_DIR modified after request_time."""
+            if not REPORT_DIR.exists():
+                return []
+            recent = []
+            for f in REPORT_DIR.rglob("*.md"):
+                if f.stat().st_mtime >= request_time and f.stat().st_size > 100:
+                    recent.append(f)
+            return sorted(recent, key=lambda x: x.stat().st_mtime, reverse=True)
+
         while time.time() - start < timeout:
-            matches = list(REPORT_DIR.glob(f"{stable_prefix}*.md"))
-            for f in matches:
-                if f.stat().st_size > 100:
-                    return True
+            matches = _find_recent_reports()
+            if matches:
+                return True
             time.sleep(5)
         return False
 
@@ -159,13 +182,26 @@ def submit_research_query(query: str, timeout: int = DEFAULT_TIMEOUT) -> str | N
             return task_id  # Report may still have been generated
         print(f"  ✅ Research completed: {task_id}")
         return task_id
+    except urllib.error.HTTPError as e:
+        print(f"  ❌ Research API error: HTTP {e.code} — {e.reason}")
+        if e.code == 404:
+            print(
+                "     Hint: GPT Researcher v3.5.0 uses /api/multi_agents, not /report/"
+            )
+        return None
     except Exception as e:
         print(f"  ❌ Research query failed: {e}")
         return None
 
 
 def check_reports(task_id: str | None = None) -> dict:
-    """Check for report files and analyze quality metrics."""
+    """Check for report files and analyze quality metrics.
+
+    v3.5.0 multi_agents writes reports into nested
+    ``outputs/run_<ts>_<query>/`` directories. This function recursively
+    scans REPORT_DIR for .md, .docx, .pdf, and .json files modified after
+    a given timestamp (or all files if task_id is None).
+    """
     import re
 
     result = {
@@ -181,50 +217,65 @@ def check_reports(task_id: str | None = None) -> dict:
     }
 
     if REPORT_DIR.exists():
-        stable_prefix = None
+        # Collect candidates — prefer mtime-based filtering when task_id is a
+        # timestamp-based id, fall back to prefix matching.
+        candidates = []
+        mtime_cutoff = 0.0
         if task_id:
-            segments = task_id.split("_")
-            if len(segments) >= 6:
-                stable_prefix = "_".join(segments[:6])
-            else:
-                stable_prefix = task_id[:50]
-
-        for f in sorted(
-            REPORT_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True
-        ):
-            if stable_prefix and not f.name.startswith(stable_prefix):
-                continue
-            if f.suffix in (".md", ".docx", ".pdf", ".json"):
-                result["reports_found"].append(str(f.name))
-                size = f.stat().st_size
-                result["total_size_kb"] += size / 1024
-
-                if f.suffix == ".md":
-                    result["has_report"] = True
-                    content = f.read_text(errors="replace")
-                    result["report_lines"] = len(content.splitlines())
-                    # Extract URLs from Markdown (e.g. [text](url) or bare https://...)
-                    for m in re.finditer(r"https?://[^\s\)\]]+", content):
-                        result["source_urls"].add(m.group().rstrip("."))
-                elif f.suffix == ".json" and "verification" in f.name.lower():
-                    result["has_verification"] = True
+            # Try to extract a timestamp from the task_id for mtime filtering
+            parts = task_id.split("_")
+            for p in parts:
+                if len(p) == 15 and p.isdigit():
                     try:
-                        data = json.loads(f.read_text())
-                        result["claims_count"] = len(data.get("claims", []))
-                        result["supported_claims"] = sum(
-                            1
-                            for c in data.get("claims", [])
-                            # verification.json uses "status", not "verdict"
-                            if c.get("status") in ("supported", "SUPPORTED")
-                        )
-                        # Extract source_urls from claims[*].sources[*].source_url
-                        for claim in data.get("claims", []):
-                            for source in claim.get("sources", []):
-                                url = source.get("source_url", "")
-                                if url:
-                                    result["source_urls"].add(url)
-                    except Exception:
+                        mtime_cutoff = time.mktime(time.strptime(p, "%Y%m%d_%H%M%S"))
+                        break
+                    except ValueError:
                         pass
+
+        for f in REPORT_DIR.rglob("*"):
+            if not f.is_file():
+                continue
+            if f.suffix not in (".md", ".docx", ".pdf", ".json"):
+                continue
+            if mtime_cutoff and f.stat().st_mtime < mtime_cutoff:
+                continue
+            candidates.append(f)
+
+        # Sort by modification time, newest first; take up to 20
+        candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        candidates = candidates[:20]
+
+        for f in candidates:
+            result["reports_found"].append(str(f.relative_to(REPORT_DIR)))
+            size = f.stat().st_size
+            result["total_size_kb"] += size / 1024
+
+            if f.suffix == ".md":
+                result["has_report"] = True
+                content = f.read_text(errors="replace")
+                result["report_lines"] = len(content.splitlines())
+                # Extract URLs from Markdown (e.g. [text](url) or bare https://...)
+                for m in re.finditer(r"https?://[^\s\)\]]+", content):
+                    result["source_urls"].add(m.group().rstrip("."))
+            elif f.suffix == ".json" and "verification" in f.name.lower():
+                result["has_verification"] = True
+                try:
+                    data = json.loads(f.read_text())
+                    result["claims_count"] = len(data.get("claims", []))
+                    result["supported_claims"] = sum(
+                        1
+                        for c in data.get("claims", [])
+                        # verification.json uses "status", not "verdict"
+                        if c.get("status") in ("supported", "SUPPORTED")
+                    )
+                    # Extract source_urls from claims[*].sources[*].source_url
+                    for claim in data.get("claims", []):
+                        for source in claim.get("sources", []):
+                            url = source.get("source_url", "")
+                            if url:
+                                result["source_urls"].add(url)
+                except Exception:
+                    pass
     return result
 
 
@@ -248,8 +299,8 @@ def main():
     args = parser.parse_args()
 
     results = {
-        "phase": "Quality Hardening (Phase 8)",
-        "issue": 143,
+        "phase": "Operational Readiness (Phase 9)",
+        "issue": 147,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "services": {},
         "research": {},
@@ -291,12 +342,10 @@ def main():
         results["research"]["completed"] = task_id is not None
 
         if not task_id:
-            # Research pipeline endpoint varies by API version (upstream vs local).
-            # Stage 4 quality gates are the authoritative pass/fail criteria.
-            print(
-                "  ⚠️  Research pipeline skipped — API version mismatch (non-blocking)"
-            )
-            results["research"]["skipped"] = True
+            # Stage 2 failed — the research pipeline is now blocking.
+            print("  ❌ Research pipeline failed — no report generated")
+            all_passed = False
+            results["research"]["skipped"] = False
 
     # ── Stage 3: Report Quality Analysis ─────────────────────────────────
     print("\n" + "=" * 60)

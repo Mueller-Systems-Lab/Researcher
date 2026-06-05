@@ -44,6 +44,14 @@ validated_by: "#145 (2026-06-05)"
 | Research Pipeline | ⚠️ Skipped | HTTP 404 (API version mismatch, non-blocking) |
 | GPT Researcher Start | ✅ Manual | `docker run -p 28202:8000 gptresearcher/gpt-researcher` |
 
-- SSE-based dashboard views can still block Playwright `networkidle`; use the static fallback for screenshots.
-- Qwen3.5 on Pascal GPUs may require the documented precision settings to avoid garbled output.
-- SearXNG engine availability can vary by upstream CAPTCHA/rate-limit behavior.
+## Known Issues (Phase 9 Monitoring)
+
+| # | Known Issue | Status | Monitoring |
+|---|---|---|---|
+| 1 | Dashboard-SSE blocks Playwright `networkidle` | **Accepted** | Static-Fallback monitored via `make runtime-smoke` → `check_dashboard_static()` |
+| 2 | Qwen3.5 precision trap on Pascal GPUs | **Accepted** | Documented in `docs/development/local-runbook.md`; `check_llama_server()` in runtime-smoke validates chat health |
+| 3 | SearXNG CAPTCHA/rate-limit variance | **Monitored** | `check_searxng()` now reports unique engine count; ≥3 engines expected, <3 warns |
+
+- SSE-based dashboard views can still block Playwright `networkidle`; use the static fallback (`/static-fallback.html`) for screenshots.
+- Qwen3.5 on Pascal GPUs may require the documented precision settings (`-ctk f32 -ctv f32`) to avoid garbled output.
+- SearXNG engine availability can vary by upstream CAPTCHA/rate-limit behavior; monitored via `make runtime-smoke`.

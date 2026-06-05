@@ -44,6 +44,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         request_path = parsed.path
         if request_path == "/" or request_path == "/index.html":
             self._serve_static("index.html", "text/html")
+        elif request_path == "/static-fallback.html":
+            self._serve_static("static-fallback.html", "text/html")
         elif request_path == "/api/gpu":
             self._serve_gpu_json()
         elif request_path == "/api/gpu/stream":

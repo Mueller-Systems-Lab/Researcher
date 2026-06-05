@@ -31,7 +31,7 @@ from config.ollama_models import (
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 LLAMA_SERVER_URL = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8082/v1")
 LLAMA_SERVER_MODEL = "qwen3.5-uncensored"  # Primary (ADR-017)
-SEARXNG_URL = os.getenv("SEARX_URL", "http://localhost:8080")
+SEARXNG_URL = os.getenv("SEARX_URL", "http://localhost:8090")
 SEARXNG_TIMEOUT = int(os.getenv("SEARXNG_TIMEOUT_SECONDS", "15"))
 TOR_HOST = os.getenv("TOR_SOCKS_HOST", "127.0.0.1")
 TOR_PORT = int(os.getenv("TOR_SOCKS_PORT", "9050"))
@@ -110,6 +110,9 @@ def check_searxng() -> bool:
 
     Fehlerklassen: NOT_RUNNING, TIMEOUT, BAD_STATUS, BAD_JSON, NO_RESULTS, OK.
     Timeout konfigurierbar via SEARXNG_TIMEOUT_SECONDS (default: 15).
+
+    Zusätzlich werden die verwendeten Search-Engines gezählt und ausgegeben
+    (informational — ein Engine-Count <3 führt NICHT zum Fehlschlag).
     """
     url = f"{SEARXNG_URL}/search?q=test&format=json"
     try:
@@ -133,7 +136,25 @@ def check_searxng() -> bool:
             print("  ⚠️  SearXNG NO_RESULTS — erreichbar, aber keine Treffer")
             print(f"     URL: {url}")
             return False
-        print(f"  ✅ SearXNG: {len(results)} results ({SEARXNG_URL})")
+
+        # Engine-Count-Check (Phase 9 informational)
+        engines = set()
+        for r_item in results:
+            engine = r_item.get("engine", "")
+            if engine:
+                engines.add(engine)
+        engine_count = len(engines)
+        if engine_count >= 3:
+            print(
+                f"  ✅ SearXNG: {len(results)} results, {engine_count} engines "
+                f"({', '.join(sorted(engines)[:5])})"
+            )
+        else:
+            print(
+                f"  ⚠️  SearXNG: {len(results)} results, only {engine_count} engine(s) "
+                f"({', '.join(sorted(engines)) if engines else 'none'})"
+            )
+            print("     CAPTCHA/rate-limit may be limiting engine availability")
         return True
     except requests.ConnectionError:
         print(f"  ❌ SearXNG NOT_RUNNING ({SEARXNG_URL})")
@@ -160,7 +181,6 @@ def check_tor() -> bool:
     except OSError:
         print(f"  {_status(False)} Tor SOCKS5 nicht erreichbar ({TOR_HOST}:{TOR_PORT})")
         return False
-
 
 
 def check_llama_server() -> bool:
@@ -232,6 +252,50 @@ def check_llama_server() -> bool:
         return False
 
 
+def check_dashboard_static() -> bool:
+    """Prüft, ob das Dashboard Static-Fallback korrekt rendert.
+
+    Der SSE-Stream des Dashboards blockiert Playwright ``networkidle``.
+    Der Static-Fallback (``/static-fallback.html``) löst das Problem
+    und muss korrekt als HTML ausgeliefert werden.
+
+    Informational only — schlägt nicht fehl (Phase 9).
+    """
+    dashboard_url = "http://127.0.0.1:8888"
+    fallback_url = f"{dashboard_url}/static-fallback.html"
+    try:
+        r = requests.get(fallback_url, timeout=(5, 10))
+        if r.status_code != 200:
+            print(f"  ⚠️  Dashboard fallback: HTTP {r.status_code}")
+            print(f"     URL: {fallback_url}")
+            return True  # informational — no failure
+
+        content_type = r.headers.get("Content-Type", "")
+        if "text/html" not in content_type:
+            print(
+                f"  ⚠️  Dashboard fallback Content-Type: {content_type} "
+                f"(expected text/html)"
+            )
+            print(f"     URL: {fallback_url}")
+        else:
+            content = r.text[:500].lower()
+            if "gpu" in content or "dashboard" in content:
+                print(f"  ✅ Dashboard fallback: HTML rendered ({len(r.text)} bytes)")
+            else:
+                print(
+                    "  ⚠️  Dashboard fallback: HTML received but no dashboard "
+                    "content markers found"
+                )
+        return True
+    except requests.ConnectionError:
+        print(f"  ⚠️  Dashboard nicht erreichbar ({dashboard_url})")
+        print("     Starte: python3 -m dashboard.server")
+        return True  # informational
+    except requests.Timeout:
+        print(f"  ⚠️  Dashboard Timeout ({dashboard_url})")
+        return True
+
+
 def check_cloud_blocker() -> bool:
     """Prüft, ob Cloud-Provider ohne ALLOW_CLOUD aktiv sind."""
     if os.getenv("ALLOW_CLOUD", "").lower() in ("true", "1", "yes"):
@@ -262,7 +326,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Runtime Smoke Test")
     parser.add_argument(
         "--only",
-        choices=["ollama", "searxng", "tor", "cloud", "llama-server"],
+        choices=["ollama", "searxng", "tor", "cloud", "llama-server", "dashboard"],
         help="Nur einen Dienst prüfen",
     )
     args = parser.parse_args()
@@ -308,6 +372,13 @@ def main() -> None:
             print("   ❌ REQUIRE_LLAMA_SERVER=true → Fehler")
         elif not results["llama-server"] and not only:
             print("   ℹ️  llama-server ist optional. Starte: research-serve.sh qwen")
+        if not only:
+            print()
+
+    # Dashboard Static-Fallback (Phase 9 — informational)
+    if only in (None, "dashboard"):
+        print("📊 Dashboard Static-Fallback:")
+        results["dashboard"] = check_dashboard_static()
         if not only:
             print()
 

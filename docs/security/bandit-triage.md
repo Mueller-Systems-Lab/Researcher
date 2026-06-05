@@ -1,6 +1,6 @@
 # Bandit Triage Policy
 
-**Datum:** 2026-05-19  
+**Datum:** 2026-06-05  
 **Bandit-Version:** 1.9.4  
 **Ausführung:** `python3 -m bandit -r . --skip B101,B311,B404,B603`
 
@@ -10,10 +10,10 @@
 
 | Severity | Anzahl | Projekt | Submodul | Behandelt |
 |---:|---:|---:|---:|---|
-| HIGH | 7 | 0 | 7 | 0 behoben, 7 Vendor-dokumentiert |
-| MEDIUM | 20 | 4 | 16 | 3 nosec-B310 (ci_acceptance, Phase 8), 0 behoben, 4 Projekt-akzeptiert, 16 Vendor-dokumentiert |
-| LOW | 21 | 10 | 11 | 0 behoben, 10 Projekt-akzeptiert, 11 Vendor-dokumentiert |
-| **Gesamt** | **48** | **14** | **34** | **48 triagiert** |
+| HIGH | 8 | 0 | 8 | 0 behoben, 8 Vendor-dokumentiert |
+| MEDIUM | 16 | 0 | 16 | Projekt-Gate grün, 16 Vendor-dokumentiert |
+| LOW | 20 | 9 | 11 | 9 Projekt-akzeptiert, 11 Vendor-dokumentiert |
+| **Gesamt** | **44** | **9** | **35** | **44 triagiert** |
 
 ---
 
@@ -30,9 +30,26 @@
 
 ---
 
-## Projekt-Findings (11)
+## Projekt-Findings
 
-### Akzeptiert mit Begründung (11)
+### Aktueller Projekt-Gate-Run — 2026-06-05
+
+```text
+$ make security-project
+python3 -m bandit -r config crawlers darknet_search search dashboard vectordb mcp_tools onion_discovery scripts --skip B101,B311,B404,B603 --severity-level medium
+Test results:
+    No issues identified.
+Run metrics:
+    Total issues (by severity): Low: 9, Medium: 0, High: 0
+    Total potential issues skipped due to specifically being disabled: 8
+```
+
+Ergebnis: **0 Medium/High-Findings im Projekt-Gate**. Zwei bereits dokumentierte
+`scripts/visual_e2e_acceptance.py`-B310-Akzeptanzen sind jetzt zusätzlich mit
+`# nosec B310` markiert, weil beide Aufrufe auf fest verdrahtete
+`127.0.0.1`-URLs mit explizitem Timeout beschränkt sind.
+
+### Historisch akzeptiert mit Begründung (14)
 
 | # | Test-ID | Severity | Datei | Zeile | Begründung |
 |---:|---|---|---|---|---|
@@ -53,9 +70,24 @@
 
 ---
 
-## Submodul-Findings (32) — `gpt_researcher/`
+## Submodul-Findings (35) — `gpt_researcher/`
 
-### HIGH (7) — Vendor-dokumentiert
+### Aktueller Vendor-Scan — 2026-06-05
+
+```text
+$ python3 -m bandit -r gpt_researcher --skip B101,B311,B404,B603
+Run metrics:
+    Total issues (by severity): Low: 11, Medium: 16, High: 8
+```
+
+Ergebnis: **report-only, nicht blockierend**. Seit der letzten Triage gibt es ein
+neues Vendor-High-Finding: `B324` in
+`gpt_researcher/gpt_researcher/llm_provider/image/modelslab_image_generator.py:64`
+(`hashlib.md5()` für Bild-Dateiname). Akzeptanz wie bei den bestehenden
+MD5-Findings: nicht für Sicherheitsentscheidungen genutzt, aber Upstream-/Fork-Fix
+auf SHA-256 oder `usedforsecurity=False` empfohlen.
+
+### HIGH (8) — Vendor-dokumentiert
 
 | # | Test-ID | CWE | Datei | Zeile | Beschreibung | Risiko |
 |---:|---|---|---|---|---|---|
@@ -64,8 +96,9 @@
 | 3 | B324 | CWE-327 | `backend/server/server_utils.py` | 120 | `hashlib.md5()` für Task-Hash | Nicht sicherheitsrelevant |
 | 4 | B324 | CWE-327 | `gpt_researcher/agent.py` | 212 | `hashlib.md5()` für Research-ID | Nicht sicherheitsrelevant |
 | 5 | B324 | CWE-327 | `llm_provider/image/image_generator.py` | 103 | `hashlib.md5()` für Bild-Dateiname | Nicht sicherheitsrelevant (Dateiname) |
-| 6 | B324 | CWE-327 | `scraper/utils.py` | 89 | `hashlib.md5()` für Image-Identifier | Nicht sicherheitsrelevant |
-| 7 | B501 | CWE-295 | `scraper/pymupdf/pymupdf.py` | 53 | `requests.get(..., verify=False)` | ⚠️ SSL-Verify deaktiviert. Risiko bei externen PDF-Quellen. NUR im Submodul-Scraper. |
+| 6 | B324 | CWE-327 | `llm_provider/image/modelslab_image_generator.py` | 64 | `hashlib.md5()` für Bild-Dateiname | Nicht sicherheitsrelevant (Dateiname) |
+| 7 | B324 | CWE-327 | `scraper/utils.py` | 89 | `hashlib.md5()` für Image-Identifier | Nicht sicherheitsrelevant |
+| 8 | B501 | CWE-295 | `scraper/pymupdf/pymupdf.py` | 52 | `requests.get(..., verify=False)` | ⚠️ SSL-Verify deaktiviert. Risiko bei externen PDF-Quellen. NUR im Submodul-Scraper. |
 
 ### MEDIUM (16) — Vendor-dokumentiert
 
@@ -79,13 +112,12 @@
 | B301 | 1 | `pickle.load` in Browser-Scraper | Submodul. Cookie-Persistenz. |
 | B108 | 1 | Hardcoded `/tmp` in Submodul-Test | Test-only im Submodul. |
 
-### LOW (9) — Vendor-dokumentiert
+### LOW (11) — Vendor-dokumentiert
 
 | Test-ID | Anzahl | Typ |
 |---|---|---|
 | B110 | 4 | `try/except/pass` in Submodul-Code |
 | B105 | 4 | Hardcoded-Zahlen als "Passwörter" erkannt (Token-Limits: 3000, 6000, 4000, 700) |
-| B607 | 1 | `subprocess.run(["nvidia-smi",...])` in Submodul-Integrationstest |
 | B405 | 1 | `xml.etree.ElementTree`-Import in PubMed-Retriever |
 | B403 | 1 | `pickle`-Import in Browser-Scraper |
 | B112 | 1 | `try/except/continue` in Google-Retriever |
@@ -94,7 +126,9 @@
 
 ## Behobene Findings
 
-Keine produktiven Code-Änderungen. Alle Projekt-Findings sind dokumentiert akzeptiert (Test-only, Low-Severity, oder System-Tool-Aufrufe).
+- `scripts/visual_e2e_acceptance.py`: Zwei lokal fest verdrahtete B310-Healthcheck-Aufrufe sind nach erneuter Prüfung mit `# nosec B310` markiert. Beide verwenden explizite Timeouts und ausschließlich `127.0.0.1`-Ziele.
+- `scrapers/http_session.py`: SSL- und User-Agent-Fallback-GETs setzen jetzt auch dann einen expliziten Timeout, wenn der Aufrufer keinen Timeout in `kwargs` übergibt.
+- Neue Regressionstests unter `tests/security/test_network_timeout_regression.py` sichern Timeout-Handling und statische Timeout-Verwendung in Projekt-HTTP-Aufrufen ab.
 
 ---
 
@@ -105,7 +139,7 @@ Keine produktiven Code-Änderungen. Alle Projekt-Findings sind dokumentiert akze
 | GPU-Monitor B607 (3×) | Minimal | `nvidia-smi` ist Standard-Systemtool. Kein untrusted Input. | Kein Follow-up nötig |
 | Playwright B310 (2×) | Test-only | Health-Check + JSON-Read gegen `localhost`. | Kein Follow-up nötig |
 | Test-Credentials B105 (2×) | Test-only | Mock-Werte in Test-Fixtures. | Kein Follow-up nötig |
-| Submodul B324 MD5 (6×) | Gering | Nicht-sicherheitsrelevante IDs/Dateinamen. Upstream-Fix empfohlen. | Issue in GPT-Researcher-Repo vorschlagen |
+| Submodul B324 MD5 (7×) | Gering | Nicht-sicherheitsrelevante IDs/Dateinamen. Upstream-Fix empfohlen. | Issue in GPT-Researcher-Repo vorschlagen |
 | Submodul B501 SSL-Verify | ⚠️ Mittel | `verify=False` im PDF-Scraper. Nur relevant bei externen PDFs. | Bei Fork-Update prüfen |
 
 ---
@@ -133,7 +167,7 @@ python3 -m bandit -r config crawlers darknet_search search dashboard \
 
 ## Nächste Security-Issues
 
-1. **Submodul-Security-Review**: MD5→SHA-256 im GPT-Researcher-Fork (6 Stellen)
+1. **Submodul-Security-Review**: MD5→SHA-256 im GPT-Researcher-Fork (7 Stellen)
 2. **SSL-Verify-Audit**: `gpt_researcher/scraper/pymupdf/pymupdf.py` — `verify=False` prüfen
 3. **Requests-Timeout-Upstream**: 8 Retriever ohne Timeout im Submodul
 4. **Security Regression Tests**: Netzwerk-/Hashing-/SQL-Pfade

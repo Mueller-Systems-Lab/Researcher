@@ -150,7 +150,7 @@ def run():
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
                 result = json.loads(resp.read())
                 research_id = result.get("research_id", "")
                 print(f"  Research ID: {research_id}")
@@ -191,7 +191,7 @@ def run():
         import urllib.request
 
         try:
-            with urllib.request.urlopen(
+            with urllib.request.urlopen(  # nosec B310
                 "http://127.0.0.1:28202/api/reports", timeout=10
             ) as resp:
                 reports = json.loads(resp.read())

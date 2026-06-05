@@ -169,7 +169,10 @@ def ssl_fallback_fetch(
             "SSL-Fallback: SSL-Verifikation deaktiviert für %s (Zertifikatsproblem)",
             url,
         )
-        return session.get(url, **kwargs)  # type: ignore[arg-type]
+        timeout = kwargs.pop(
+            "timeout", getattr(session, "timeout", DEFAULT_TIMEOUT.to_tuple())
+        )
+        return session.get(url, timeout=timeout, **kwargs)  # type: ignore[arg-type]
     finally:
         session.verify = original_verify
 
@@ -314,7 +317,10 @@ def refetch_with_fallback_ua(
     try:
         session.headers.update({"User-Agent": USER_AGENT_FALLBACK})
         logger.info("505-Fallback: Wechsle User-Agent für %s", url)
-        return session.get(url, **kwargs)  # type: ignore[arg-type]
+        timeout = kwargs.pop(
+            "timeout", getattr(session, "timeout", DEFAULT_TIMEOUT.to_tuple())
+        )
+        return session.get(url, timeout=timeout, **kwargs)  # type: ignore[arg-type]
     except requests.RequestException:
         return None
     finally:

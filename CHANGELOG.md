@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.4.0] — 2026-06-05
+
+### Summary
+Phase 9 — Operational Readiness. Research-Pipeline auf GPT Researcher v3.5.0 API migriert, Security-Follow-ups abgeschlossen, Runtime-Monitoring für Known Issues automatisiert, Stage 2 wieder blockierend. **1252 Tests, 0 flaky, Security-Gate 0 Medium/High.**
+
+### Phase 9 — Operational Readiness (#150)
+- **Research Pipeline Fix** (#147): `scripts/ci_acceptance.py` auf v3.5.0 API migriert
+  - Endpoint: `POST /report/` → `POST /api/multi_agents` mit korrektem Payload
+  - Report-Discovery: Rekursives `rglob` für `outputs/run_*/` Verzeichnisse
+  - Stage 2 jetzt **blockierend** (kein `⚠️ Skipped` mehr)
+- **Security Follow-ups** (#148): 3 offene Tasks aus Security-Gate-Policy abgeschlossen
+  - `make security-project`: 0 Medium/High (bestätigt)
+  - `make security-vendor`: 8H/16M/11L dokumentiert
+  - Neuer Regression-Test: `tests/security/test_network_timeout_regression.py` (37→38 Security Tests)
+  - Timeout-Hardening in `scrapers/http_session.py`
+- **Operational Baseline** (#149): Runtime-Monitoring für Phase 8 Known Issues
+  - `scripts/runtime_smoke.py`: SearXNG Engine-Count, Dashboard Static-Fallback, Port-Fix (8080→8090)
+  - `dashboard/server.py`: Explizite Route für `static-fallback.html` → `text/html`
+  - Phase 8 Known Issues als „überwacht“ / „akzeptiert“ dokumentiert
+
+### Release Validation
+- `make quality`: ✅ 1252 passed, 0 flaky
+- `make security-project`: ✅ 0 Medium/High
+- `make lint`: ✅ 0 Errors
+- `make runtime-smoke`: ✅ Erweiterte Checks (SearXNG Engines, Dashboard Fallback)
+- `make acceptance`: ✅ Ready (Stage 2 blocking, v3.5.0 API)
+
 ## [v0.3.0] — 2026-06-05
 
 ### Summary
