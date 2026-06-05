@@ -103,90 +103,81 @@ def check_services() -> tuple[list[str], list[str]]:
 
 
 def submit_research_query(query: str, timeout: int = DEFAULT_TIMEOUT) -> str | None:
-    """Submit a research query via the v3.5.0 /api/multi_agents endpoint.
+    """Submit a research query via the GPT Researcher POST /report/ endpoint.
 
-    GPT Researcher v3.5.0 removed the legacy POST /report/ endpoint and
-    replaced it with POST /api/multi_agents. The new endpoint accepts a
-    JSON body with ``query`` and ``report_type`` and returns the report
-    synchronously in the ``report`` key, or dispatches to a run directory
-    under ``outputs/run_<ts>_<query>/`` for asynchronous execution.
+    GPT Researcher v3.5.0 supports POST /report/ with a ResearchRequest
+    payload (task, report_type, report_source, tone, headers, repo_name,
+    branch_name, generate_in_background). When ``generate_in_background``
+    is False the response contains the complete report JSON including
+    ``report``, ``pdf``, ``docx``, ``md``, and ``verification`` keys.
 
-    Returns task_id (generated from timestamp) on success, None on failure.
+    The older POST /api/multi_agents endpoint requires an active WebSocket
+    connection and is not suitable for CI use.
+
+    Returns research_id on success, None on failure.
     """
 
     def _submit():
         payload = json.dumps(
             {
-                "query": query,
+                "task": query,
                 "report_type": "research_report",
+                "report_source": "web",
+                "tone": "Objective",
+                "headers": {},
+                "repo_name": "",
+                "branch_name": "",
+                "generate_in_background": False,
             }
         ).encode()
-        research_url = _validate_url_scheme(f"{RESEARCH_API}/api/multi_agents")
+        research_url = _validate_url_scheme(f"{RESEARCH_API}/report/")
         req = urllib.request.Request(
             research_url,
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
+        with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310
             data = json.loads(resp.read())
-            # v3.5.0 returns report content directly, or a run_id for async
+            research_id = data.get("research_id", "")
             report_content = data.get("report") or data.get("content")
             if report_content:
                 # Synchronous response — save report to outputs/ for Stage 3
-                ts = time.strftime("%Y%m%d_%H%M%S")
-                safe_query = query[:40].replace(" ", "_").replace("/", "_")
-                ts_task_id = f"acceptance_{ts}_{safe_query}"
                 REPORT_DIR.mkdir(parents=True, exist_ok=True)
-                report_file = REPORT_DIR / f"{ts_task_id}.md"
+                safe_id = research_id.replace(" ", "_")[:60]
+                report_file = REPORT_DIR / f"{safe_id}.md"
                 report_file.write_text(str(report_content), errors="replace")
                 print(f"  📄 Report written: {report_file.name}")
-                return ts_task_id
-            return data.get("research_id") or data.get("task_id") or data.get("run_id")
-
-    def _wait_for_completion(task_id: str) -> bool:
-        """Poll outputs/ for report files matching the task.
-
-        v3.5.0 multi_agents writes into nested ``outputs/run_<ts>_<query>/``
-        directories. Use file-modification-time filtering to discover reports
-        created since the request was submitted.
-        """
-        request_time = time.time()
-        start = time.time()
-
-        def _find_recent_reports():
-            """Recursively find .md files in REPORT_DIR modified after request_time."""
-            if not REPORT_DIR.exists():
-                return []
-            recent = []
-            for f in REPORT_DIR.rglob("*.md"):
-                if f.stat().st_mtime >= request_time and f.stat().st_size > 100:
-                    recent.append(f)
-            return sorted(recent, key=lambda x: x.stat().st_mtime, reverse=True)
-
-        while time.time() - start < timeout:
-            matches = _find_recent_reports()
-            if matches:
-                return True
-            time.sleep(5)
-        return False
+            # Also save the full verification JSON if present
+            verification = data.get("verification")
+            if verification:
+                REPORT_DIR.mkdir(parents=True, exist_ok=True)
+                safe_id = research_id.replace(" ", "_")[:60]
+                verif_file = REPORT_DIR / f"{safe_id}.verification.json"
+                verif_file.write_text(
+                    json.dumps(verification, indent=2), errors="replace"
+                )
+            return research_id
 
     try:
-        task_id = _submit()
-        if not task_id:
-            print("  ❌ Failed to submit research query — no task_id returned")
+        research_id = _submit()
+        if not research_id:
+            print("  ❌ Failed to submit research query — no research_id returned")
             return None
-        print(f"  📝 Research submitted: {task_id}")
-        ok = _wait_for_completion(task_id)
-        if not ok:
-            print(f"  ⚠️  Research timed out after {timeout}s (task: {task_id})")
-            return task_id  # Report may still have been generated
-        print(f"  ✅ Research completed: {task_id}")
-        return task_id
+        print(f"  ✅ Research completed: {research_id}")
+        return research_id
     except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")[:200]
+        except Exception:
+            pass
         print(f"  ❌ Research API error: HTTP {e.code} — {e.reason}")
-        if e.code == 404:
+        if body:
+            print(f"     Response: {body}")
+        if e.code == 400:
             print(
-                "     Hint: GPT Researcher v3.5.0 uses /api/multi_agents, not /report/"
+                "     Hint: Check that GPT Researcher container is running the local"
+                " build (gptresearcher/gpt-researcher:local), not the public :latest."
             )
         return None
     except Exception as e:
@@ -197,10 +188,10 @@ def submit_research_query(query: str, timeout: int = DEFAULT_TIMEOUT) -> str | N
 def check_reports(task_id: str | None = None) -> dict:
     """Check for report files and analyze quality metrics.
 
-    v3.5.0 multi_agents writes reports into nested
-    ``outputs/run_<ts>_<query>/`` directories. This function recursively
-    scans REPORT_DIR for .md, .docx, .pdf, and .json files modified after
-    a given timestamp (or all files if task_id is None).
+    The POST /report/ endpoint with ``generate_in_background=False``
+    returns the report synchronously. Reports are saved as .md, .docx,
+    .pdf, and .verification.json files in REPORT_DIR. This function
+    recursively scans for report artifacts and extracts quality metrics.
     """
     import re
 
