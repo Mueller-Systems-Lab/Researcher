@@ -1,5 +1,35 @@
 # Changelog
 
+## [v0.3.0] — 2026-06-05
+
+### Summary
+Release v0.3.0 rollt die Phasen 6–8 zusammen. Coverage von 88% auf 100% gesteigert (4191 Statements), SearXNG mit 70+ Quellen, CI/CD Acceptance Gate, 5-Service-Infrastructure-Autostart, Dashboard-Fix. **256 Tests, 0 flaky, Security-Gate grün.**
+
+### Phase 8 — Quality Hardening (#143)
+- **Acceptance Test bestanden**: Alle 5 Gates grün (5 Services, Report-Qualität, 60 Quellen, 12 Claims) (#145)
+- **SearXNG Quality Hardening**: 10+ Suchmaschinen aktiviert für breitere Quellenabdeckung
+- **Dashboard Screenshot Fallback**: SSE-freie Static-Seite für Playwright-/CI-Screenshots
+- **Infrastructure Autostart**: `start_all_services.sh` plus 5 systemd-Service-Dateien
+- **CI/CD Acceptance Gate**: `make acceptance` und `scripts/ci_acceptance.py`
+- **LLM Smoke Test CLI**: `cli/llm_smoke.py` für Live-Validierung
+
+### Phase 7 — 100% Coverage (#142)
+- **4191 Statements** mit 100% Coverage, alle Module abgedeckt
+- **+35 Tests** in mcp_tools + search/composite (99% → 100%)
+- **+12 Tests** in crawlers + claim_retriever + human_review
+- Live LLM-Qualitäts-Optimierung (Qwen3.5 Extraction-Format)
+
+### Phase 6 — Coverage 99%+ (#141)
+- **0 mypy Errors**, **0 ruff Errors**
+- **Playwright**: 3 Browser-Test-Fehler behoben (SSE, XSS, Visual-Regression)
+- **Testing**: 1271 Tests passed, Coverage 88% → 99%+
+- **Security Gate**: 0 Medium/High Bandit Findings im Projektcode
+
+### Release Validation
+- `make acceptance`: ✅ 5/5 Gates green
+- `make quality`: ✅ 256 tests, 0 flaky
+- `make security-project`: ✅ 0 Medium/High
+
 ## [Phase 8] — 2026-06-05
 ### Added
 - **SearXNG Quality Hardening**: 10+ Suchmaschinen aktiviert für breitere Quellenabdeckung (#143)
