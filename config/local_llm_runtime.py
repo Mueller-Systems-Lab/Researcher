@@ -28,11 +28,11 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from urllib.parse import urlparse
 
 
-class RuntimeStatus(str, Enum):
+class RuntimeStatus(StrEnum):
     LOCAL_LLM_READY = "LOCAL_LLM_READY"
     LOCAL_LLM_PARTIAL = "LOCAL_LLM_PARTIAL"
     LOCAL_LLM_BLOCKED = "LOCAL_LLM_BLOCKED"

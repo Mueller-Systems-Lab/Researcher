@@ -8,10 +8,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class ResearchPlanStatus(str, Enum):
+class ResearchPlanStatus(StrEnum):
     """Status for a ResearchPlan and ResearchNode."""
 
     DRAFT = "draft"
@@ -22,7 +22,7 @@ class ResearchPlanStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk classification for a ResearchNode."""
 
     LOW = "low"

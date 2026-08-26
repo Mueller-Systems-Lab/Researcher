@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     RUN_CREATED = "RUN_CREATED"
     RUN_STARTED = "RUN_STARTED"
     RUN_COMPLETED = "RUN_COMPLETED"

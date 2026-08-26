@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     """Overall run status."""
 
     CREATED = "created"
@@ -20,7 +20,7 @@ class RunStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class NodeRunStatus(str, Enum):
+class NodeRunStatus(StrEnum):
     """Per-node execution status within a run."""
 
     PENDING = "pending"
