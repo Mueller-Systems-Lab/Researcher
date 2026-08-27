@@ -13,7 +13,7 @@
 # =============================================================================
 [Unit]
 Description=Researcher — GPT Researcher Backend
-Documentation=https://github.com/xxammaxx/Researcher
+Documentation=https://github.com/Mueller-Systems-Lab/Researcher
 After=docker.service network-online.target researcher-searxng.service
 Wants=docker.service network-online.target
 Requires=researcher-searxng.service
