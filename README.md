@@ -29,7 +29,7 @@ make research-evaluate    # Report Quality (Overall: 99/100)
 
 ```bash
 # 1. Clone & Setup
-git clone https://github.com/xxammaxx/Researcher.git
+git clone https://github.com/Mueller-Systems-Lab/Researcher.git
 cd Researcher
 git submodule update --init --recursive
 
@@ -114,7 +114,7 @@ SearXNG (lokale Websuche)     Darknet-Crawler + Whoosh
 ### 1) Repository klonen
 
 ```bash
-git clone https://github.com/xxammaxx/Researcher.git
+git clone https://github.com/Mueller-Systems-Lab/Researcher.git
 cd Researcher
 ```
 
