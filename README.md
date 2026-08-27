@@ -1,6 +1,6 @@
 # Researcher — Lokales, unzensiertes Research-System
 
-[![CI](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml/badge.svg)](https://github.com/xxammaxx/Researcher/actions/workflows/test.yml)
+[![CI](https://github.com/Mueller-Systems-Lab/Researcher/actions/workflows/test.yml/badge.svg)](https://github.com/Mueller-Systems-Lab/Researcher/actions/workflows/test.yml)
 [![Coverage](https://img.shields.io/badge/coverage-78%25-green)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![Positron-tested](https://img.shields.io/badge/positron-tested-7B2FF5?logo=github)]()
@@ -9,6 +9,12 @@
 > **Release:** [Changelog](CHANGELOG.md) · [Release Notes](RELEASE_NOTES.md) · [Known Limitations](docs/release/known-limitations.md)
 
 Researcher ist ein vollständig lokales Research-System auf Basis von GPT Researcher. Es nutzt ein lokales LLM, lokale Websuche, einen Darknet-Crawler und einen lokalen Vektorspeicher — ohne externe API-Aufrufe.
+
+<p align="left">
+  <img src="docs/brand/mueller-systems-lab-icon.svg" alt="Mueller-Systems-Lab" width="96">
+</p>
+
+Entwickelt von [Mueller-Systems-Lab](https://github.com/Mueller-Systems-Lab). Researcher bleibt ein eigenständiges internes System.
 
 ## Shortcuts
 
@@ -23,7 +29,7 @@ make research-evaluate    # Report Quality (Overall: 99/100)
 
 ```bash
 # 1. Clone & Setup
-git clone https://github.com/xxammaxx/Researcher.git
+git clone https://github.com/Mueller-Systems-Lab/Researcher.git
 cd Researcher
 git submodule update --init --recursive
 
@@ -108,7 +114,7 @@ SearXNG (lokale Websuche)     Darknet-Crawler + Whoosh
 ### 1) Repository klonen
 
 ```bash
-git clone https://github.com/xxammaxx/Researcher.git
+git clone https://github.com/Mueller-Systems-Lab/Researcher.git
 cd Researcher
 ```
 
