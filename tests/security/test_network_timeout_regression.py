@@ -11,7 +11,6 @@ from unittest.mock import patch
 from scrapers.http_session import TimeoutConfig, create_session
 from search.composite import CompositeRetriever
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_HTTP_PATHS = (
     "config",

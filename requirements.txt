@@ -24,6 +24,13 @@
 # Stand 2026-05: requests 2.34.2 ist aktuellster Patchstand
 requests[socks]>=2.34.2
 
+# HTTP/API runtime used by the MCP server and dashboard tests
+fastapi>=0.115,<1.0
+mcp>=1.13,<2.0
+
+# HTML extraction used by the SSRF-protected web fetch tool
+beautifulsoup4>=4.12,<5.0
+
 # Volltext-Suchindex (Pure-Python, dateibasiert, kein Server nötig)
 # DEPRECATED: unmaintained since 2021 — migrate to SQLite FTS5 (see ADR-013)
 whoosh>=2.7.4
