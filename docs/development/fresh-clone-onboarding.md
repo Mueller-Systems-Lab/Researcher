@@ -24,7 +24,7 @@
 ### 1. Clone & Submodule
 
 ```bash
-git clone https://github.com/xxammaxx/Researcher.git
+git clone https://github.com/Mueller-Systems-Lab/Researcher.git
 cd Researcher
 git submodule update --init --recursive
 ```

@@ -13,7 +13,7 @@ project:
     GPT Researcher. Nutzt ein unzensiertes LLM (Qwen3.5-9B), integriert
     SearXNG für Websuche und einen eigenen Darknet-Forum-Crawler.
     Speichert Wissen in einer ChromaDB-Vektordatenbank.
-  repository: "https://github.com/xxammaxx/Researcher"
+  repository: "https://github.com/Mueller-Systems-Lab/Researcher"
   branch: "main"
   blueprint: "blueprint.md"
 

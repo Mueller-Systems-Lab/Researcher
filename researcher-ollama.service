@@ -13,7 +13,7 @@
 # =============================================================================
 [Unit]
 Description=Researcher — Ollama Embedding Service
-Documentation=https://github.com/xxammaxx/Researcher
+Documentation=https://github.com/Mueller-Systems-Lab/Researcher
 After=network-online.target
 Wants=network-online.target
 
