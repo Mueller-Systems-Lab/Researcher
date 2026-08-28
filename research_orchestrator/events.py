@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     RUN_CREATED = "RUN_CREATED"
     RUN_STARTED = "RUN_STARTED"
     RUN_COMPLETED = "RUN_COMPLETED"
@@ -22,6 +22,8 @@ class EventType(str, Enum):
     NODE_COMPLETED = "NODE_COMPLETED"
     NODE_FAILED = "NODE_FAILED"
     NODE_BLOCKED = "NODE_BLOCKED"
+
+    __str__ = Enum.__str__
 
 
 def emit_event(
